@@ -1,0 +1,86 @@
+{
+  "codeCommit": "8b3dec3b6006b26fdee658b821bdfdb287426991",
+  "screenshots": [
+    {
+      "file": "final-zh-dialog.png",
+      "bytes": 259167,
+      "sha256": "11f58bda58dbb00605fe390ff559dccf16f6684bbdcb3dcd65cfb3e1abc19d9c"
+    },
+    {
+      "file": "final-zh-banner-draft.png",
+      "bytes": 261117,
+      "sha256": "83d5ebf569b7fadd21c1dc5a7709294b1c64a12e7fab85062f34242511f458a1"
+    },
+    {
+      "file": "final-en-dialog.png",
+      "bytes": 244429,
+      "sha256": "bac77ecd617d23d92d2c4c259bb2cab7f91512886a7e3031389767abb3e9dd5c"
+    },
+    {
+      "file": "final-en-banner-draft.png",
+      "bytes": 272453,
+      "sha256": "e1cdec6e5b33358493ed0ce7901a3a477161bc4c222c8a867ab7590604b088ec"
+    },
+    {
+      "file": "final-retry-success.png",
+      "bytes": 212455,
+      "sha256": "9395899599104383f99776137be71a68a2741dc6c530451f609a1369f48e1edd"
+    },
+    {
+      "file": "final-windows-desktop.png",
+      "bytes": 110665,
+      "sha256": "340c25aea9ead2b2c558ce577a89fb1d0cf22b7b6be20a24b1f3a54383f2c405"
+    }
+  ],
+  "windowsWorkspaceTests": {
+    "total": 531,
+    "passed": 529,
+    "baselineFailures": 2
+  },
+  "androidTests": {
+    "files": 18,
+    "passed": 90
+  },
+  "finalDurable": {
+    "sessionId": "session-60794d72-c2a5-4f59-8a96-88ac953baf96",
+    "prompt": "PR108_FINAL_Reply_only_OK",
+    "durableUserMessages": 1,
+    "userSeq": 40,
+    "sha256": "6107acfe06f430bc50912e39ee47f996c55511c90c90e430ed4ad6a5642d3d7c",
+    "rows": 47,
+    "turnEnd": [
+      {
+        "turn": 1,
+        "reason": {
+          "kind": "completed"
+        }
+      },
+      {
+        "turn": 2,
+        "reason": {
+          "kind": "completed"
+        }
+      },
+      {
+        "turn": 3,
+        "reason": {
+          "kind": "completed"
+        }
+      }
+    ]
+  },
+  "beforeEnglishRejection": {
+    "sha256": "f6933e581358069465250358be250b5ab1f7958394fdba238853833fd62afd76",
+    "bytes": 28965,
+    "rows": 37
+  },
+  "afterEnglishRejection": {
+    "sha256": "f6933e581358069465250358be250b5ab1f7958394fdba238853833fd62afd76",
+    "bytes": 28965,
+    "rows": 37
+  },
+  "exitProof": {
+    "exists": false,
+    "error": 2
+  }
+}
