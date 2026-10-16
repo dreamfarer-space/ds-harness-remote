@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -16,7 +17,19 @@ class RemoteForegroundService : Service() {
   override fun onCreate() {
     super.onCreate()
     createChannel()
-    startForeground(NOTIFICATION_ID, notification())
+    // Android 14 (API 34) requires the foreground service type at the call
+    // site, not only in the manifest. The manifest already declares
+    // `android:foregroundServiceType="remoteMessaging"`, but without passing it
+    // here the platform stops the service with
+    // "FGS stop call for: <uid> has no types!" as soon as the app leaves the
+    // foreground, which drops the remote carrier.
+    // The three-argument overload exists from API 29 while this app's
+    // minSdkVersion is 26, so keep the older overload as a fallback.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING)
+    } else {
+      startForeground(NOTIFICATION_ID, notification())
+    }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
