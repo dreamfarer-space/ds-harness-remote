@@ -388,10 +388,20 @@ export function ChatScreen({ onBack, onNewSession, onOpenWorkspaces }: { onBack:
 
   // Stable renderItem keeps FlatList rows from re-rendering on every streaming
   // delta; ChatItemView is memoized so only the changing row re-renders.
+  //
+  // `interleavedTurns` is derived from `visibleSections`, so it gets a fresh
+  // Set identity on every streaming delta. Keeping it in the dependency array
+  // rebuilt this callback - and therefore every mounted row - once per delta,
+  // which defeated the stability this callback exists for. Read it through a
+  // ref instead: the callback keeps one identity while each render still sees
+  // the current value. The ref is refreshed on every render, so it cannot go
+  // stale for a caller that only reads it during render.
+  const interleavedTurnsRef = useRef(interleavedTurns)
+  interleavedTurnsRef.current = interleavedTurns
   const renderChatItem = useCallback(({ item }: { item: ChatSection }) => item.kind === 'process'
-    ? <ChatProcessGroup items={item.items} foldAllowed={!interleavedTurns.has(item.turn)} busyAction={busy} onApproval={respondApproval} onQuestion={respondQuestion} />
+    ? <ChatProcessGroup items={item.items} foldAllowed={!interleavedTurnsRef.current.has(item.turn)} busyAction={busy} onApproval={respondApproval} onQuestion={respondQuestion} />
     : <ChatItemView item={item.item} busyAction={busy} compact={false} onApproval={respondApproval} onQuestion={respondQuestion} />,
-  [busy, respondApproval, respondQuestion, interleavedTurns])
+  [busy, respondApproval, respondQuestion])
 
   // Keep chat's back action at the top of the Android responder stack. The
   // navigator also handles back globally, but a freshly mounted FlatList can
