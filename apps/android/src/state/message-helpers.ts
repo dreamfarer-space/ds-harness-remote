@@ -154,11 +154,12 @@ export function mergeHistoryAndLive(history: ChatItem[], live: ChatItem[], throu
 
 export type ChatSection =
   | { kind: 'item'; key: string; item: ChatItem }
-  | { kind: 'process'; key: string; turn: string; items: ChatItem[] }
+  | { kind: 'process'; key: string; turn: string; items: ChatItem[]; foldAllowed: boolean }
 
 /** Group adjacent activity from one native turn, leaving user rows in place. */
 export function chatSections(items: ChatItem[]): ChatSection[] {
   const sections: ChatSection[] = []
+  const turnGroups = new Map<string, number>()
   for (const item of items) {
     const turn = item.kind === 'message' && item.role === 'user'
       ? undefined
@@ -167,10 +168,16 @@ export function chatSections(items: ChatItem[]): ChatSection[] {
     if (turn !== undefined && previous?.kind === 'process' && previous.turn === turn) {
       previous.items.push(item)
     } else if (turn !== undefined) {
-      sections.push({ kind: 'process', key: `process:${turn}:${item.id}`, turn, items: [item] })
+      turnGroups.set(turn, (turnGroups.get(turn) ?? 0) + 1)
+      sections.push({ kind: 'process', key: `process:${turn}:${item.id}`, turn, items: [item], foldAllowed: true })
     } else {
       sections.push({ kind: 'item', key: item.id, item })
     }
+  }
+  // Keep the fold decision in the same immutable render snapshot as its rows.
+  // A turn split by another row must stay expanded in every one of its groups.
+  for (const section of sections) if (section.kind === 'process') {
+    section.foldAllowed = turnGroups.get(section.turn) === 1
   }
   return sections
 }
