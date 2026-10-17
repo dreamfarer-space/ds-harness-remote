@@ -231,15 +231,6 @@ export function ChatScreen({ onBack, onNewSession, onOpenWorkspaces }: { onBack:
       // turnEnd reason — it must stay visible so the failure is explainable.
       || item.turnEnd !== undefined))), [messages, session?.backend])
   const visibleSections = useMemo(() => chatSections(visibleMessages), [visibleMessages])
-  const interleavedTurns = useMemo(() => {
-    const seen = new Set<string>()
-    const interleaved = new Set<string>()
-    for (const section of visibleSections) if (section.kind === 'process') {
-      if (seen.has(section.turn)) interleaved.add(section.turn)
-      seen.add(section.turn)
-    }
-    return interleaved
-  }, [visibleSections])
   // Queued prompts: the Host `inbox` projection is authoritative (includes
   // items queued from other devices); local `queued` rows are the fallback for
   // Hosts without projections. Rows in this state are hidden from the timeline.
@@ -386,20 +377,11 @@ export function ChatScreen({ onBack, onNewSession, onOpenWorkspaces }: { onBack:
     pinToBottomRef.current = atBottom
   }, [])
 
-  // Stable renderItem keeps FlatList rows from re-rendering on every streaming
-  // delta; ChatItemView is memoized so only the changing row re-renders.
-  //
-  // `interleavedTurns` is derived from `visibleSections`, so it gets a fresh
-  // Set identity on every streaming delta. Keeping it in the dependency array
-  // rebuilt this callback - and therefore every mounted row - once per delta,
-  // which defeated the stability this callback exists for. Read it through a
-  // ref instead: the callback keeps one identity while each render still sees
-  // the current value. The ref is refreshed on every render, so it cannot go
-  // stale for a caller that only reads it during render.
-  const interleavedTurnsRef = useRef(interleavedTurns)
-  interleavedTurnsRef.current = interleavedTurns
+  // Read fold eligibility from the row snapshot, keeping renderItem stable
+  // across streaming deltas without reading mutable refs during rendering.
+  // Memoized children can skip unchanged content even when sections are rebuilt.
   const renderChatItem = useCallback(({ item }: { item: ChatSection }) => item.kind === 'process'
-    ? <ChatProcessGroup items={item.items} foldAllowed={!interleavedTurnsRef.current.has(item.turn)} busyAction={busy} onApproval={respondApproval} onQuestion={respondQuestion} />
+    ? <ChatProcessGroup items={item.items} foldAllowed={item.foldAllowed} busyAction={busy} onApproval={respondApproval} onQuestion={respondQuestion} />
     : <ChatItemView item={item.item} busyAction={busy} compact={false} onApproval={respondApproval} onQuestion={respondQuestion} />,
   [busy, respondApproval, respondQuestion])
 
@@ -2015,7 +1997,14 @@ const ChatProcessGroup = memo(function ChatProcessGroup({ items, foldAllowed, bu
           busyAction={busyAction} onApproval={onApproval} onQuestion={onQuestion} />)}
     {answer !== undefined && <MessageBubble item={{ ...answer, reasoning: undefined }} compact />}
   </View>
-})
+}, (previous, next) => previous.foldAllowed === next.foldAllowed
+  && previous.busyAction === next.busyAction
+  && previous.onApproval === next.onApproval
+  && previous.onQuestion === next.onQuestion
+  // chatSections rebuilds the arrays on each delta, but the reducer preserves
+  // unchanged item objects. Compare their identities to skip historical groups.
+  && previous.items.length === next.items.length
+  && previous.items.every((item, index) => item === next.items[index]))
 
 const ChatActivityGroup = memo(function ChatActivityGroup({ items, closed, busyAction, onApproval, onQuestion }: {
   items: ChatItem[]
