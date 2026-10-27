@@ -202,6 +202,7 @@ const frFR = {
   },
   status: { online: "En ligne", offline: "Hors ligne", disconnected: "Déconnecté", lan: "Réseau local direct", relay: "Relais serveur", p2p: "P2P direct", turn: "TOUR relais", waiting: "Connexion en cours", running: "En cours" },
   setup: {
+    heroSignIn: 'Se connecter à DeepSeek Harness Remote', emailSignIn: 'Se connecter par e-mail',
     title: "Se connecter", signIn: "Connectez-vous à votre compte", signInAgain: "Connectez-vous à nouveau", lead: "Choisissez la même méthode de connexion que sur votre appareil distant pour continuer votre travail.",
     switchServer: "Changer de serveur", saveServer: "Enregistrer le serveur", switchServerHint: "La connexion actuelle sera interrompue. Connectez-vous ensuite au nouveau serveur.",
     google: "Continuer avec Google",
