@@ -128,6 +128,21 @@ dsh plugin --profile web add -w ds-harness-remote@0.5.20
 
 隐藏输入 Token、更新、服务管理和验证边界见[安装指南](docs/installation.zh.md)。仓库修改不会自动部署到线上安装入口。
 
+### 推荐搭配：Intelligent UI
+
+[Intelligent UI](https://github.com/dreamfarer-space/deepseek-harness-intelligent-ui) 让模型用卡片、表格、图表和表单作答。
+Android 客户端可原生渲染这些内容，并在 **插件 → Remote 适配** 中列出该插件，可直接开关和修改实时设置。
+
+请在电脑上安装，并 **安装到与 Remote 相同的 profile**（手机端不能安装插件）：
+
+| Host | 方式 |
+| --- | --- |
+| Desktop | 插件管理 → 从 npm 安装 → `deepseek-harness-intelligent-ui` |
+| CLI `web` profile | `dsh plugin --profile web add -w deepseek-harness-intelligent-ui` |
+| `scripts/install.sh` | 设置 `INTELLIGENT_UI=1`（可选 `INTELLIGENT_UI_VERSION=...`） |
+
+安装后重启对应的 Harness。在手机上修改其设置需要 Intelligent UI 0.2.10 或更高版本。
+
 ### Android 客户端
 
 支持同时使用多工作区连接对话，同时创造性加入了 「Bot 模式」（ Power by [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)）

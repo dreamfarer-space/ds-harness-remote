@@ -123,6 +123,21 @@ CLI からは `dsh plugin` を使って npm パッケージを選択したプロ
 
 トークンを安全に入力する方法、更新、サービス管理、検証範囲については[インストールガイド](docs/installation.md)を参照してください。リポジトリの変更が、公開中のインストーラーへ自動的にデプロイされるわけではありません。
 
+### おすすめの組み合わせ：Intelligent UI
+
+[Intelligent UI](https://github.com/dreamfarer-space/deepseek-harness-intelligent-ui) を使うと、モデルがカード・表・グラフ・フォームで回答できます。
+Android クライアントはこれらをネイティブ表示し、**プラグイン → Remote 対応** に表示されたプラグインのオン/オフやライブ設定を変更できます。
+
+パソコンで、**Remote と同じ profile に**インストールしてください（スマホからはインストールできません）：
+
+| Host | 方法 |
+| --- | --- |
+| Desktop | プラグイン管理 → npm からインストール → `deepseek-harness-intelligent-ui` |
+| CLI `web` profile | `dsh plugin --profile web add -w deepseek-harness-intelligent-ui` |
+| `scripts/install.sh` | `INTELLIGENT_UI=1`（任意で `INTELLIGENT_UI_VERSION=...`） |
+
+インストール後、その Harness を再起動してください。スマホから設定を変更するには Intelligent UI 0.2.10 以降が必要です。
+
 ### Android クライアント
 
 複数のワークスペースで同時に接続して会話を続けられます。[Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot) を利用した **Bot モード**も搭載しています。

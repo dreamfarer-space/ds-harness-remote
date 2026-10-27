@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Puzzle,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -67,6 +68,7 @@ export function HostSessionsDrawer({
   onOpenWorkspaces,
   onSelect,
   onOpenAutomationTasks,
+  onOpenPlugins,
   inline = false,
   backLabel,
 }: {
@@ -75,6 +77,7 @@ export function HostSessionsDrawer({
   onOpenWorkspaces: () => void
   onSelect: (session: RemoteSession) => Promise<void>
   onOpenAutomationTasks?: () => void
+  onOpenPlugins?: () => void
   inline?: boolean
   backLabel?: string
 }) {
@@ -441,6 +444,18 @@ export function HostSessionsDrawer({
           <Text style={styles.newSessionText}>{strings.sessions.newSession}</Text>
         </Pressable>
       </View>
+
+      {onOpenPlugins !== undefined && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={strings.plugins.nav}
+          onPress={onOpenPlugins}
+          style={({ pressed }) => [styles.navItem, pressed && styles.pressedBg]}
+        >
+          <Puzzle size={16} color={colors.muted} />
+          <Text style={styles.navItemText}>{strings.plugins.nav}</Text>
+        </Pressable>
+      )}
 
       {/* 固定自动化入口 */}
       <Pressable

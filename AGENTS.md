@@ -7,6 +7,19 @@ Host 插件、随包 Remote 客户端和 Android 已移除 Harness `0.1.1-rc.2` 
 
 本轮验证：全仓 check 与串行生产 build（含 Android Hermes export）、Plugin 57 文件 / 397 tests、Android 35 文件 / 201 tests、DSH bundle 校验、根 GitHub 入口加载与 npm dry-run 检查通过；发布包不包含退役模块。未验证 APK、原生真机或本轮加密跨设备 E2E。Metro noble/hashes exports fallback 警告仍存在。
 
+## Android plugin management (2026-10-27)
+
+Android 新增插件页（工作区标题栏拼图图标与会话侧栏「插件」），只调用 Host 已放行的官方
+pluginManager list/setBundleEnabled/setPluginEnabled 与 settings/describe/mutate，不改 Host allowlist。
+分组为「Remote 适配」（客户端原生渲染的插件，`REMOTE_ADAPTED_PLUGINS`，未安装也提示）、已安装、实验性；
+基础/运行时 bundle 与缺失目录项不显示。设置 namespace 为 entry 的 `patchId`（非 `include:` entryId），
+官方 settings 只暴露 Schemastery `volatile` 字段；表单按 schema 生成，保存带 expectedRevision，
+「恢复默认」对用户覆盖字段执行 unset。deepseek-harness-intelligent-ui 同步将 Widget 策略字段改为
+volatile（读取改为惰性 getter）并加 zh-CN 描述。插件只能在电脑安装：Remote 适配插件未安装或版本过旧（无可编辑设置）时，详情页给出可复制的
+Desktop/CLI 安装命令；`scripts/install.sh` 支持 `INTELLIGENT_UI=1` 安装到同一 profile，README 增加推荐搭配说明。模拟器 + 真实 web profile Host 验证：列表/图标/分组、
+保存并持久化、越界本地拦截、恢复默认、插件停用/启用（profile 恢复原状）。未验证真机、Desktop profile
+（其 intelligent-ui 为独立旧副本）与暗色模式人工烟测。
+
 ## WebRTC runtime probe isolation (2026-10-25)
 
 外部原生 WebRTC helper 的候选探测必须显式设置 `ELECTRON_RUN_AS_NODE=1`，不能删除该标记：

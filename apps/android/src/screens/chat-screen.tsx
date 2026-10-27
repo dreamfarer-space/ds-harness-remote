@@ -140,6 +140,7 @@ import { SessionInfo } from './chat/session-info'
 import { workspaceStableKey } from '../lib/workspace-key'
 import { HostSessionsDrawer } from './host-sessions-drawer'
 import { AutomationTasksModal } from './automation-tasks-modal'
+import { PluginsModal } from './plugins-modal'
 import { resolveSessionDisplayTitle } from './session-title'
 import { SessionToolsPanel } from './session-tools-panel'
 
@@ -227,6 +228,8 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
 
   const [sessionsOpen, setSessionsOpen] = useState(false)
   const [automationTasksOpen, setAutomationTasksOpen] = useState(false)
+  const [pluginsOpen, setPluginsOpen] = useState(false)
+  const pluginsAvailable = useAppStore(state => state.connection.phase === 'connected')
   const [sessionInfoOpen, setSessionInfoOpen] = useState(false)
 
   // Web-style blue marks: `/` commands and `@` references render in accent blue.
@@ -1629,6 +1632,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
               onClose={() => Keyboard.dismiss()}
               onSelect={async next => { await openSession(next) }}
               onOpenAutomationTasks={() => setAutomationTasksOpen(true)}
+              onOpenPlugins={pluginsAvailable ? () => setPluginsOpen(true) : undefined}
             />
           </View>
         )}
@@ -2069,6 +2073,10 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
           setSessionsOpen(false)
           setAutomationTasksOpen(true)
         }}
+        onOpenPlugins={pluginsAvailable ? () => {
+          setSessionsOpen(false)
+          setPluginsOpen(true)
+        } : undefined}
         onSelect={async next => {
           const pending = openSession(next)
           const visible = useAppStore.getState().selectedSession?.sessionId === next.sessionId
@@ -2139,6 +2147,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
           </Pressable>
         </View>
       </Modal>
+      <PluginsModal visible={pluginsOpen} onClose={() => setPluginsOpen(false)} />
       <AutomationTasksModal
         visible={automationTasksOpen}
         onClose={() => setAutomationTasksOpen(false)}

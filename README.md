@@ -128,6 +128,22 @@ The sole installer is `scripts/install.sh`:
 
 See the [installation guide](docs/installation.md) for private token input, updates, service controls and validation limits. Repository changes do not automatically deploy the hosted installer.
 
+### Recommended companion: Intelligent UI
+
+[Intelligent UI](https://github.com/dreamfarer-space/deepseek-harness-intelligent-ui) lets the model answer
+with cards, tables, charts and forms. The Android client renders them natively, and lists the plugin under
+**Plugins → Remote ready**, where you can switch it on or off and edit its live settings.
+
+Install it on the computer, **into the same profile as Remote** (plugins cannot be installed from the phone):
+
+| Host | Command |
+| --- | --- |
+| Desktop | Plugin management → install from npm → `deepseek-harness-intelligent-ui` |
+| CLI `web` profile | `dsh plugin --profile web add -w deepseek-harness-intelligent-ui` |
+| `scripts/install.sh` | `INTELLIGENT_UI=1` (optionally `INTELLIGENT_UI_VERSION=...`) |
+
+Restart that Harness instance afterward. Editing its settings from the phone needs Intelligent UI 0.2.10 or later.
+
 ### Android client
 
 Keep conversations connected across multiple workspaces at once, and use **Bot mode**, powered by [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot).
