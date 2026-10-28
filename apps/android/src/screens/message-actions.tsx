@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AccessibilityInfo, Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { Copy, GitBranch } from 'lucide-react-native'
+import { QuoteMarkIcon } from '../ui/quote-preview'
 import type { ChatItemBase, ChatMessage } from '../types'
 import { useAppStore } from '../state/store'
 import { strings } from '../locales/i18n'
@@ -34,7 +35,9 @@ export function MessageActions({ item }: { item: ChatMessage }) {
   const supportsBranch = harness && item.nativeSeq !== undefined && Number.isSafeInteger(item.nativeSeq) && item.nativeSeq >= 0
   const time = messageTime(item)
   const fork = useAppStore(state => state.forkChatMessage)
+  const quote = useAppStore(state => state.quoteChatMessage)
   const [copied, setCopied] = useState(false)
+  const [quoted, setQuoted] = useState(false)
   const disabled = !connected || busy || item.streaming === true
   const report = () => Alert.alert(strings.messageActions.failed, useAppStore.getState().error ?? strings.messageActions.unavailable)
   const branch = async () => {
@@ -60,6 +63,20 @@ export function MessageActions({ item }: { item: ChatMessage }) {
     <Pressable accessibilityRole="button" accessibilityLabel={copied ? strings.messageActions.copied : strings.messageActions.copy} disabled={item.text.length === 0} style={styles.icon} onPress={() => {
       void Clipboard.setStringAsync(item.text).then(() => { setCopied(true); AccessibilityInfo.announceForAccessibility(strings.messageActions.copied) }).catch(report)
     }}><Copy size={16} color={copied ? colors.primary : colors.muted} /></Pressable>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={quoted ? strings.messageActions.quoted : strings.messageActions.quote}
+      disabled={item.text.length === 0}
+      style={styles.icon}
+      onPress={() => {
+        quote(item.text, item.sessionId)
+        setQuoted(true)
+        AccessibilityInfo.announceForAccessibility(strings.messageActions.quoted)
+        setTimeout(() => setQuoted(false), 1500)
+      }}
+    >
+      <QuoteMarkIcon size={14} color={quoted ? colors.primary : colors.muted} />
+    </Pressable>
     {!user && !pending && <>
     {supportsBranch && <Pressable accessibilityRole="button" accessibilityLabel={strings.messageActions.branch} accessibilityState={{ disabled }} disabled={disabled} style={styles.icon} onPress={() => void branch()}><GitBranch size={16} color={colors.muted} /></Pressable>}
     {backend !== 'codex' && item.usage !== undefined && <Pressable accessibilityRole="button" accessibilityLabel={strings.messageActions.usage} style={styles.usage} onPress={showUsage}><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{item.usage.totalTokens === undefined ? strings.messageActions.usage : `${item.usage.totalTokens.toLocaleString()} tokens`}</Text></Pressable>}

@@ -145,6 +145,8 @@ import { resolveSessionDisplayTitle } from './session-title'
 import { SessionToolsPanel } from './session-tools-panel'
 
 import { browseScope, browseKey, useBrowseMemory, updateBrowseEntry } from '../services/browse-memory'
+import { QuotePreview, formatQuoteText } from '../ui/quote-preview'
+const EMPTY_QUOTES: string[] = []
 const EMPTY_IMAGES: PromptImage[] = []
 const EMPTY_CHAT_ITEMS: ChatItem[] = []
 const EMPTY_UI_ARTIFACTS: UiArtifact[] = []
@@ -239,6 +241,18 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
     const previous = useBrowseMemory.getState().entries[memoryKey]?.images ?? EMPTY_IMAGES
     updateBrowseEntry(memoryScope, session?.sessionId ?? '', {images: typeof value === 'function' ? value(previous) : value})
   }
+  const quotes = useBrowseMemory(state => state.entries[memoryKey]?.quotes ?? EMPTY_QUOTES)
+  const setQuotes = (value: string[] | ((previous: string[]) => string[])) => {
+    const previous = useBrowseMemory.getState().entries[memoryKey]?.quotes ?? EMPTY_QUOTES
+    updateBrowseEntry(memoryScope, session?.sessionId ?? '', {quotes: typeof value === 'function' ? value(previous) : value})
+  }
+  const lastQuoteCountRef = useRef(quotes.length)
+  useEffect(() => {
+    if (quotes.length > lastQuoteCountRef.current) {
+      composerInputRef.current?.focus()
+    }
+    lastQuoteCountRef.current = quotes.length
+  }, [quotes.length])
   const [pickingImages, setPickingImages] = useState(false)
   const [pickingFiles, setPickingFiles] = useState(false)
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
@@ -361,6 +375,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
   }, [mentionType, session?.sessionId, session?.backend, connection.phase, skillCatalog, workspaceFileRefs])
   const [reconnectingSession, setReconnectingSession] = useState(false)
   const [newSessionPending, setNewSessionPending] = useState(false)
+  const runStartTimeRef = useRef<number | undefined>(undefined)
   const creatingSessionRef = useRef(false)
   const lastNewSessionTimeRef = useRef(0)
   const listRef = useRef<FlatList<ChatSection>>(null)
@@ -949,17 +964,24 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
     // typed right before the tap, silently dropping the tail of the message.
     const submittedDraft = draftRef.current
     const text = submittedDraft.trim()
-    if (text.length === 0 && images.length === 0 && stagedFiles.length === 0) return
+    const submittedQuotes = quotes
     const submittedImages = images
     const submittedFiles = stagedFiles
+    if (text.length === 0 && submittedQuotes.length === 0 && images.length === 0 && stagedFiles.length === 0) return
+    let promptWithQuotes = text
+    if (submittedQuotes.length > 0) {
+      const formattedQuotes = submittedQuotes.map(formatQuoteText).join('\n\n')
+      promptWithQuotes = text.length > 0 ? `${formattedQuotes}\n\n${text}` : formattedQuotes
+    }
     const promptText = submittedFiles.length > 0
-      ? formatUploadedFilesPrompt(text, submittedFiles)
-      : text
+      ? formatUploadedFilesPrompt(promptWithQuotes, submittedFiles)
+      : promptWithQuotes
     if (promptText.length > LONG_DRAFT_MAX) {
       Alert.alert(zhCN.chat.draftTooLongTitle, zhCN.chat.draftTooLong(LONG_DRAFT_MAX))
       return
     }
     applyDraft('')
+    setQuotes([])
     setImages([])
     setStagedFiles([])
     setMentionType(null)
@@ -978,6 +1000,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
     setAwayFromLatest(false)
     setNewContent(false)
     scheduleScrollToBottom()
+    runStartTimeRef.current = Date.now()
     const outcome = await sendMessage(promptText, submittedImages)
     if (outcome === 'rejected') {
       if (session.sessionId === targetSessionId && scrollIntentGenerationRef.current === sendGeneration) {
@@ -995,6 +1018,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
       if (sessionGenerationRef.current === sendSessionGen && useAppStore.getState().selectedSession?.sessionId === targetSessionId) {
         const inFlight = useBrowseMemory.getState().entries[memoryKey]?.draft ?? ''
         setDraft(inFlight.length === 0 ? submittedDraft : `${submittedDraft}\n${inFlight}`)
+        setQuotes(previous => previous.length === 0 ? submittedQuotes : [...submittedQuotes, ...previous])
         setImages(previous => previous.length === 0 ? submittedImages : [...submittedImages, ...previous])
         setStagedFiles(current => {
           const combined = [...submittedFiles, ...current]
@@ -1310,9 +1334,27 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
   const sendReady = connected && !busy?.startsWith('session:')
     && (session?.backend !== 'codex' || codexReadySessionId === session.sessionId)
   const hasActiveChatItem = visibleMessages.some(isActiveChatItem)
-  const canStop = connected && (busy === 'send-message' || busy === 'stop-session' || session.running || hasActiveChatItem)
+  const hasComposerContent = draft.trim().length > 0 || quotes.length > 0 || images.length > 0 || stagedFiles.length > 0
+  const canStop = connected && (busy === 'send-message' || busy === 'stop-session' || session.running || hasActiveChatItem) && !hasComposerContent
   const stopping = busy === 'stop-session'
   const replyActive = connected && (busy === 'send-message' || busy === 'stop-session' || session.running || hasActiveChatItem)
+  const activeRunStartTime = useMemo(() => {
+    if (!replyActive) return undefined
+    if (runStartTimeRef.current !== undefined) return runStartTimeRef.current
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      const item = visibleMessages[i]
+      if (item !== undefined && item.kind === 'message' && item.role === 'user') {
+        return item.createdAt
+      }
+    }
+    return undefined
+  }, [replyActive, visibleMessages])
+
+  useEffect(() => {
+    if (!replyActive) {
+      runStartTimeRef.current = undefined
+    }
+  }, [replyActive])
   const projectedPermissions = sessionPermissions(session)
   const permissions = projectedPermissions === undefined ? undefined : { ...projectedPermissions, options: permissionOptions ?? projectedPermissions.options }
   const currentPermission = permissions?.options.find(option => option.value === permissions.currentValue)
@@ -1378,6 +1420,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
 
   const sendPrompt = async (prompt: CustomPrompt) => {
     setPromptsPickerOpen(false)
+    runStartTimeRef.current = Date.now()
     const outcome = await sendMessage(prompt.text)
     if (outcome === 'sent') AccessibilityInfo.announceForAccessibility(zhCN.chat.toolPromptSent(prompt.title))
     else if (outcome === 'rejected') Alert.alert(zhCN.chat.toolPromptSendFailed, zhCN.chat.toolPromptSendFailed)
@@ -1723,6 +1766,22 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
         <View style={[styles.composerInner, readableColumn]}>
         {queueItems.length > 0 && <QueueDock items={queueItems} />}
 
+        {quotes.length > 0 && (
+          <View style={styles.quoteTray} accessibilityLabel={zhCN.chat.quoteTrayLabel}>
+            {quotes.map((quoteText, index) => (
+              <QuotePreview
+                key={`composer-quote-${index}`}
+                text={quoteText}
+                removal={{
+                  label: zhCN.chat.removeQuote,
+                  onRemove: () => setQuotes(current => current.filter((_, i) => i !== index)),
+                }}
+                style={styles.composerQuoteItem}
+              />
+            ))}
+          </View>
+        )}
+
         {images.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.imageTray}>
             {images.map((image, index) => (
@@ -1877,10 +1936,10 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={zhCN.chat.send}
-                  accessibilityState={{ disabled: !sendReady || permissionSelecting || (draft.trim().length === 0 && images.length === 0 && stagedFiles.length === 0) }}
-                  disabled={!sendReady || permissionSelecting || (draft.trim().length === 0 && images.length === 0 && stagedFiles.length === 0)}
+                  accessibilityState={{ disabled: !sendReady || permissionSelecting || !hasComposerContent }}
+                  disabled={!sendReady || permissionSelecting || !hasComposerContent}
                   onPress={() => void submit()}
-                  style={({ pressed }) => [styles.sendButton, pressed && styles.sendPressed, (!sendReady || permissionSelecting || (draft.trim().length === 0 && images.length === 0 && stagedFiles.length === 0)) && styles.sendDisabled]}
+                  style={({ pressed }) => [styles.sendButton, pressed && styles.sendPressed, (!sendReady || permissionSelecting || !hasComposerContent) && styles.sendDisabled]}
                 >
                   <ArrowUp size={20} color={colors.white} />
                 </Pressable>

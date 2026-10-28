@@ -154,6 +154,7 @@ export interface AppState {
   retrySendMessage(itemId: string): Promise<boolean>
   updateQueueItem(itemId: string, action: 'remove' | 'steer', rpcId?: string): Promise<boolean>
   forkChatMessage(message: ChatMessage): Promise<boolean>
+  quoteChatMessage(text: string, sessionId?: string): void
   rateMessage(message: ChatMessage, rating: 'positive' | 'negative'): Promise<boolean>
   stopSession(): Promise<void>
   respondApproval(itemId: string, outcome: 'allowed-once' | 'rejected'): Promise<void>

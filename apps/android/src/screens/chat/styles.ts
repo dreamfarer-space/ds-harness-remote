@@ -175,6 +175,7 @@ export function createStyles(colors: ThemeColors, density: TypographyDensity = '
     composerWrap: { backgroundColor: colors.background, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
     composerInner: { width: '100%' },
 
+    runningFooterWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.md },
     replyStatus: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: spacing.xs, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
     replyStatusText: { ...t.small, color: colors.accent },
     replyDots: { flexDirection: 'row', alignItems: 'center', marginLeft: -spacing.xs },
@@ -265,6 +266,17 @@ export function createStyles(colors: ThemeColors, density: TypographyDensity = '
     effortRowLabel: { ...t.smallStrong, color: colors.ink },
     effortRowValue: { ...t.small, color: colors.muted, flexShrink: 1 },
     composerInputWrap: { position: 'relative' },
+    quoteTray: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.xs,
+      gap: spacing.xs,
+    },
+    composerQuoteItem: {
+      marginVertical: 0,
+    },
+    messageQuotePreview: {
+      marginBottom: spacing.xs,
+    },
 
     composerInput: { ...t.body, color: colors.ink, minHeight: 40, maxHeight: 126, paddingVertical: 8, paddingHorizontal: spacing.sm, textAlignVertical: 'top' },
 

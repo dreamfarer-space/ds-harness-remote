@@ -44,6 +44,7 @@ import type {
 import { Button, IconButton } from '../../ui/components'
 import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '../../ui/fish-logo'
 import { NativeMarkdown, useMarkdownLink } from '../../ui/markdown'
+import { parseMessageQuotes, QuotePreview } from '../../ui/quote-preview'
 import { PresentedFileCard } from '../../ui/file-card'
 import { useTheme } from '../../ui/theme-context'
 import { useThemedStyles } from '../../ui/use-themed-styles'
@@ -307,10 +308,14 @@ function MessageBubble({ item, compact }: { item: ChatMessage; compact: boolean 
   if (user) {
     const undelivered = item.sendState === 'failed' || item.sendState === 'unconfirmed'
     const status = item.sendError ?? (item.sendState === 'failed' ? zhCN.chat.sendFailed : zhCN.chat.sendUnconfirmed)
+    const { quotes, body } = parseMessageQuotes(item.text)
     return <View style={styles.userBlock}>
       <View style={styles.userBubble}>
         {showImages && <ChatImages images={item.images!} alignEnd />}
-        {showText && <NativeMarkdown text={item.text} />}
+        {quotes.map((quoteText, index) => (
+          <QuotePreview key={`quote:${index}`} text={quoteText} style={styles.messageQuotePreview} />
+        ))}
+        {hasVisibleMessageText(body) && <NativeMarkdown text={body} />}
       </View>
       {item.sendState === 'canceled'
         ? <Text style={styles.canceledText}>{zhCN.chat.sendCanceled}</Text>

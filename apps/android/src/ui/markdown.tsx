@@ -10,6 +10,7 @@ import { type ThemeColors } from './theme-context'
 import { useThemedStyles } from './use-themed-styles'
 import { CodeBlockView } from './code-block'
 import { PresentedFileCard } from './file-card'
+import { QuotePreview } from './quote-preview'
 import { DshLinkIcon, classifyDshLinkPath } from './dsh-icons'
 
 // Remote messages are untrusted E2EE business content. Parse Markdown without
@@ -216,6 +217,11 @@ function markdownTree(tokens: Token[], keyOffset = 0): MarkdownNode[] {
 
 type MarkdownStyles = ReturnType<typeof createStyles>
 
+function extractBlockText(node: MarkdownNode): string {
+  if (node.token.content) return node.token.content
+  return node.children.map(extractBlockText).filter(Boolean).join('\n')
+}
+
 function renderBlock(node: MarkdownNode, styles: MarkdownStyles, onLinkPress?: MarkdownLinkHandler): ReactNode {
   const { token, key, children } = node
   if (token.type === 'math_block') return <MathFormula key={key} source={token.content} display />
@@ -230,6 +236,16 @@ function renderBlock(node: MarkdownNode, styles: MarkdownStyles, onLinkPress?: M
     return <CodeBlockView key={key} code={token.content} language={lang} />
   }
   if (token.type === 'blockquote_open') {
+    const rawQuote = children.map(extractBlockText).filter(Boolean).join('\n').trim()
+    if (rawQuote.length > 0) {
+      return (
+        <QuotePreview
+          key={key}
+          text={rawQuote}
+          style={styles.blockquotePreview}
+        />
+      )
+    }
     return <View key={key} style={styles.blockquote}>{children.map(child => renderBlock(child, styles, onLinkPress))}</View>
   }
   if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
@@ -363,6 +379,7 @@ export function createStyles(colors: ThemeColors, density: TypographyDensity = '
     codeBlock: { alignSelf: 'stretch', borderRadius: isCompact ? radius.sm : radius.md, backgroundColor: colors.surface, padding: isCompact ? 8 : 10, marginBottom: isCompact ? 5 : 8 },
     code: { fontFamily: 'monospace', fontSize: isCompact ? 12 : 13, lineHeight: isCompact ? 17 : 18.5, color: colors.ink, includeFontPadding: false },
     blockquote: { borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: isCompact ? 8 : 10, marginBottom: isCompact ? 5 : 8 },
+    blockquotePreview: { backgroundColor: colors.surfaceStrong, borderColor: 'transparent', borderLeftWidth: 3, borderLeftColor: colors.primary, borderRadius: 6, marginVertical: isCompact ? 4 : 6 },
     list: { gap: isCompact ? 1 : 2, marginBottom: isCompact ? 5 : 8 },
     listItem: { flexDirection: 'row', alignItems: 'flex-start' },
     listMarker: { ...t.body, color: colors.muted, width: isCompact ? 22 : 26 },

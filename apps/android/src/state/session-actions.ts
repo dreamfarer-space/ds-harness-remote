@@ -28,7 +28,7 @@ import { readOpencodeHistory, selectOpencodeModel } from '../services/opencode'
 import { readClaudeHistory, selectClaudeModel } from '../services/claude'
 import { readPiHistory, selectPiModel } from '../services/pi'
 import { saveCodexPermissionPreset } from '../services/storage'
-import { browseKey, browseScope } from '../services/browse-memory'
+import { browseKey, browseScope, updateBrowseEntry, useBrowseMemory } from '../services/browse-memory'
 import type { RemoteSession } from '../types'
 import { loadSavedCodexPermissions, withBestCodexPermission, withCodexPermissionState } from './codex-session-state'
 import { foldHistory, settleTurnItems } from './event-reducer'
@@ -39,7 +39,7 @@ import type { AppState } from './store-state'
 
 /** Session actions use the store's single connection/session runtime. */
 export function createSessionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
-  'refreshSessionStatus' | 'openSession' | 'forkChatMessage' | 'rateMessage' | 'createSession' | 'archiveSession' | 'selectModel' | 'selectPermission' | 'loadAgentPresets' | 'selectAgentPreset' | 'loadOlderHistory'> {
+  'refreshSessionStatus' | 'openSession' | 'forkChatMessage' | 'quoteChatMessage' | 'rateMessage' | 'createSession' | 'archiveSession' | 'selectModel' | 'selectPermission' | 'loadAgentPresets' | 'selectAgentPreset' | 'loadOlderHistory'> {
   return {
     async refreshSessionStatus() {
       if (get().connection.phase !== 'connected') return
@@ -407,6 +407,15 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         set({ busyAction: undefined, error: friendlyError(error) })
         return false
       }
+    },
+
+    quoteChatMessage(text, sessionId) {
+      const targetId = sessionId ?? get().selectedSession?.sessionId
+      if (!targetId || !text.trim()) return
+      const scope = browseScope({ config: get().config, selectedDevice: get().selectedDevice })
+      const key = browseKey(scope, targetId)
+      const existing = useBrowseMemory.getState().entries[key]?.quotes ?? []
+      updateBrowseEntry(scope, targetId, { quotes: [...existing, text.trim()] })
     },
 
     async createSession(workspaceId) {
