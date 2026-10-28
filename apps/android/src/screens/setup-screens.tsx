@@ -103,7 +103,7 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
   }, [])
   const { width, height, sheetMaxHeight } = useResponsiveLayout()
   // Give tablets a larger code while keeping the same login tabs on all screens.
-  const largeScreen = Math.min(width, height) >= 600 && Math.min(width, height) / PixelRatio.get() >= 600
+  const largeScreen = Math.min(width, height) >= 600
   const { colors } = useTheme()
   const styles = useThemedStyles(createStyles)
 
@@ -117,8 +117,13 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
     void listLoginProviders(serverUrl).then(result => {
       if (cancelled) return
       if (result === undefined) {
+        qrRun.current += 1
         setProvidersPhase('failed')
         setLoginMethod('password')
+        setShowPassword(true)
+        setShowQr(false)
+        setQrLogin(undefined)
+        setQrPhase('idle')
         return
       }
       setLoginProviders(result.providers)
@@ -126,7 +131,17 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
       const nextMethod = ([preferredLoginMethod, 'oauth', 'github-oauth', 'google-oauth'] as const)
         .find(method => result.providers.some(provider => provider.id === qrProviderFor(method))) ?? 'password'
       setLoginMethod(nextMethod)
+      setShowPassword(nextMethod === 'password')
       setShowQr(false)
+    }).catch(() => {
+      if (cancelled) return
+      qrRun.current += 1
+      setProvidersPhase('failed')
+      setLoginMethod('password')
+      setShowPassword(true)
+      setShowQr(false)
+      setQrLogin(undefined)
+      setQrPhase('idle')
     })
     return () => { cancelled = true }
   }, [serverUrl, providerReload, listLoginProviders, preferredLoginMethod, largeScreen])
@@ -301,6 +316,7 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
     else if (showQr) void refreshQr(method)
   }
 
+  const qrMethods = availableMethods.filter(method => loginProviders.some(provider => provider.id === qrProviderFor(method) && provider.qrStartUrl !== undefined))
   const oauthMethods = availableMethods.filter(method => method !== 'password')
 
   const signInWithProvider = (method: SetupLoginMethod) => {
@@ -316,7 +332,9 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
     else if (method === 'google-oauth') void signInWithGoogle()
   }
 
-  const qrContent = !showQr ? null : (
+  const qrVisible = largeScreen && showQr
+
+  const qrContent = !qrVisible ? null : (
     <View style={styles.qrPanel}>
       {qrPhase === 'loading'
         ? <View style={styles.qrPlaceholder}><ActivityIndicator color={colors.primary} accessibilityLabel={zhCN.setup.qrWaiting} /></View>
@@ -333,6 +351,26 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
                     label={`${zhCN.setup.qrScanTitle}. ${zhCN.setup.qrScanHint}`}
                   />
                 : null}
+      {(qrPhase === 'waiting' || qrPhase === 'expired') && <Text style={styles.qrHint}>{zhCN.setup.qrScanHint}</Text>}
+      <View style={styles.pillAction}>
+        <Button
+          label={zhCN.setup.qrRefresh}
+          variant="secondary"
+          onPress={() => void refreshQr()}
+          loading={qrPhase === 'loading'}
+          disabled={busy || serverDirty}
+        />
+      </View>
+      <Pressable accessibilityRole="button" onPress={() => {
+        qrRun.current += 1
+        setShowQr(false)
+        setShowPassword(true)
+        setLoginMethod('password')
+        setQrLogin(undefined)
+        setQrPhase('idle')
+      }} style={styles.textLink}>
+        <Text style={styles.textLinkLabel}>{zhCN.setup.emailSignIn}</Text>
+      </Pressable>
     </View>
   )
 
@@ -421,39 +459,63 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
           </View>
 
           <View style={[styles.loginCard, largeScreen && styles.formLarge]}>
-            <Text style={styles.loginCardTitle}>{language.startsWith('zh-') ? '请选择登录方式' : 'Choose a sign-in method'}</Text>
-          {providersPhase === 'ready' && oauthMethods.length > 0 && (
+            <Text style={styles.loginCardTitle}>{qrVisible ? zhCN.setup.qrScanTitle : (showPassword || loginMethod === 'password' ? zhCN.setup.heroSignIn : (language.startsWith('zh-') ? '请选择登录方式' : 'Choose a sign-in method'))}</Text>
+          {providersPhase === 'ready' && (
             <>
-              <View style={[styles.providerRow, largeScreen && styles.providerRowWide]}>
-                {[...oauthMethods, 'password' as const].map(method => (
-                  <Pressable
-                    key={method}
-                    accessibilityRole="button"
-                    accessibilityLabel={providerLabel(method)}
-                    accessibilityState={{ disabled: busy || oauthFlowBusy || serverDirty, selected: loginMethod === method }}
-                    disabled={busy || oauthFlowBusy || serverDirty}
-                    onPress={() => {
-                      if (method === 'password') {
+              {oauthMethods.length > 0 && (
+                <View style={[styles.providerRow, largeScreen && styles.providerRowWide]}>
+                  {[...oauthMethods, 'password' as const].map(method => (
+                    <Pressable
+                      key={method}
+                      accessibilityRole="button"
+                      accessibilityLabel={providerLabel(method)}
+                      accessibilityState={{ disabled: busy || oauthFlowBusy || serverDirty, selected: loginMethod === method && (method !== 'password' ? !showPassword && !qrVisible : showPassword) }}
+                      disabled={busy || oauthFlowBusy || serverDirty}
+                      onPress={() => {
+                        if (method === 'password') {
+                          qrRun.current += 1
+                          setShowQr(false)
+                          setShowPassword(true)
+                          setLoginMethod('password')
+                          setQrLogin(undefined)
+                          setQrPhase('idle')
+                          return
+                        }
+                        if (showQr) {
+                          qrRun.current += 1
+                          setQrLogin(undefined)
+                          setQrPhase('idle')
+                        }
+                        setShowPassword(false)
+                        setLoginMethod(method)
                         setShowQr(false)
-                        setShowPassword(true)
-                        setLoginMethod('password')
-                        return
-                      }
-                      setShowPassword(false)
-                      setLoginMethod(method)
-                      setShowQr(false)
-                    }}
-                    style={({ pressed }) => [styles.providerButton, loginMethod === method && styles.providerButtonSelected, pressed && styles.providerButtonPressed]}
-                  >
-                    {providerIcon(method)}
-                  </Pressable>
-                ))}
-              </View>
-              {loginMethod !== 'password' && (
+                      }}
+                      style={({ pressed }) => [styles.providerButton, loginMethod === method && (method !== 'password' ? !showPassword && !qrVisible : showPassword) && styles.providerButtonSelected, pressed && styles.providerButtonPressed]}
+                    >
+                      {providerIcon(method)}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              {loginMethod !== 'password' && !showPassword && !qrVisible && (
                 <View style={[styles.providerAction, largeScreen && styles.providerActionWide]}><Button label={providerActionLabel(loginMethod)} onPress={() => signInWithProvider(loginMethod)} loading={oauthFlowBusy} disabled={busy || oauthFlowBusy || serverDirty} /></View>
               )}
-              {largeScreen && loginMethod !== 'password' && (
-                <Pressable accessibilityRole="button" accessibilityLabel={zhCN.setup.qr} disabled={busy || oauthFlowBusy || serverDirty} onPress={() => { setShowQr(true); void refreshQr(loginMethod) }} style={styles.qrEntry}>
+              {largeScreen && qrMethods.length > 0 && !serverDirty && !qrVisible && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={zhCN.setup.qr}
+                  disabled={busy || oauthFlowBusy || serverDirty}
+                  onPress={() => {
+                    const method = qrMethods.includes(loginMethod) ? loginMethod : qrMethods[0]
+                    if (method !== undefined) {
+                      setLoginMethod(method)
+                      setShowPassword(false)
+                      setShowQr(true)
+                      void refreshQr(method)
+                    }
+                  }}
+                  style={styles.qrEntry}
+                >
                   <Text style={styles.qrEntryText}>{zhCN.setup.qr}</Text>
                 </Pressable>
               )}
@@ -464,7 +526,7 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
               ? <ActivityIndicator color={colors.primary} />
               : <>
                   {providersPhase === 'failed' && <Button label={zhCN.common.retry} variant="secondary" onPress={() => setProviderReload(value => value + 1)} />}
-                  {qrContent ?? (showPassword ? emailContent : null)}
+                  {qrVisible ? qrContent : (showPassword || loginMethod === 'password' ? emailContent : null)}
                 </>}
           </View>
 
