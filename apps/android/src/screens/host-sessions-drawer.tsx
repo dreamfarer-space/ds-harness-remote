@@ -3,7 +3,9 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   PanResponder,
+  Platform,
   TextInput,
   SectionList,
   ScrollView,
@@ -15,6 +17,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import * as Haptics from 'expo-haptics'
+import * as Clipboard from 'expo-clipboard'
 import {
   ArrowLeft,
   Check,
@@ -38,6 +41,7 @@ import { radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
 import { resolveSessionDisplayTitle } from './session-title'
+import { OfficialMenuIcons } from '../ui/official-menu-icons'
 import { browseStatus } from '../lib/backend-groups'
 import { loadHostSessionsDrawerGroups, saveHostSessionsDrawerGroup } from '../services/storage'
 import { clampDrawerTranslate, shouldConfirmSwipeLeftClose, shouldStartSwipeLeftToClose } from '../lib/gesture-swipe-rules'
@@ -94,11 +98,39 @@ export function HostSessionsDrawer({
   const lifecycles = useAppStore(state => state.sessionLifecycles)
   const selected = useAppStore(state => state.selectedSession)
   const archivedIds = useAppStore(state => state.archivedSessionIds)
+  const pinnedSessionIds = useAppStore(state => state.pinnedSessionIds)
   const workspaces = useAppStore(state => state.workspaces)
   const busy = useAppStore(state => state.busyAction)
   const connected = useAppStore(state => state.connection.phase === 'connected')
   const refreshWorkspaces = useAppStore(state => state.refreshWorkspaces)
   const createSession = useAppStore(state => state.createSession)
+  const pinSession = useAppStore(state => state.pinSession)
+  const unpinSession = useAppStore(state => state.unpinSession)
+  const renameSession = useAppStore(state => state.renameSession)
+  const forkSession = useAppStore(state => state.forkSession)
+  const archiveSession = useAppStore(state => state.archiveSession)
+  const unarchiveSession = useAppStore(state => state.unarchiveSession)
+
+  const [menuSession, setMenuSession] = useState<RemoteSession | null>(null)
+  const [renameTarget, setRenameTarget] = useState<{ sessionId: string; currentTitle: string; backend?: RemoteSession['backend'] } | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const menuBackend = menuSession?.backend ?? 'harness'
+  const canUseHarnessActions = !!menuSession && menuBackend === 'harness'
+  const menuIsPinned = !!menuSession && canUseHarnessActions && pinnedSessionIds.includes(menuSession.sessionId)
+  const menuIsArchived = !!menuSession && canUseHarnessActions && archivedIds.includes(menuSession.sessionId)
+
+  const closeDrawer = () => {
+    setMenuSession(null)
+    setRenameTarget(null)
+    setRenameError(null)
+    setRenaming(false)
+    setToastMessage(null)
+    onClose()
+  }
 
   const [backend, setBackend] = useState<AgentBackend>(selected?.backend ?? useAppStore.getState().workspaceCatalog?.backend ?? 'harness')
   const backends = [...new Set<AgentBackend>([
@@ -156,6 +188,34 @@ export function HostSessionsDrawer({
 
   const creatingSessionRef = useRef(false)
   const lastNewSessionTimeRef = useRef(0)
+  useEffect(() => {
+    if (renameTarget) {
+      setRenameDraft(renameTarget.currentTitle)
+      setRenameError(null)
+      setRenaming(false)
+    } else {
+      setRenameDraft('')
+      setRenameError(null)
+      setRenaming(false)
+    }
+  }, [renameTarget])
+
+  useEffect(() => {
+    if (!connected) {
+      setMenuSession(null)
+      setRenameTarget(null)
+      setRenameError(null)
+      setRenaming(false)
+      setToastMessage(null)
+    }
+  }, [connected])
+
+  useEffect(() => {
+    if (!toastMessage) return
+    const timer = setTimeout(() => setToastMessage(null), 2000)
+    return () => clearTimeout(timer)
+  }, [toastMessage])
+
   // 打开浮窗时测量工具栏位置，确保浮窗紧贴工具栏下方
   useEffect(() => {
     if (!showConfigModal) return
@@ -239,13 +299,32 @@ export function HostSessionsDrawer({
   }, [sessions, selected, backend, archivedIds, filterMode, searchQuery, orderBy])
 
   const sections = useMemo(() => {
+    const partitionPinned = (items: RemoteSession[]) => {
+      const pinned: RemoteSession[] = []
+      const ordinary: RemoteSession[] = []
+      for (const s of items) {
+        const isHarness = (s.backend ?? 'harness') === 'harness'
+        if (isHarness && pinnedSessionIds.includes(s.sessionId) && !archivedIds.includes(s.sessionId)) {
+          pinned.push(s)
+        } else {
+          ordinary.push(s)
+        }
+      }
+      return [...pinned, ...ordinary]
+    }
+
     if (groupBy === 'list') {
-      return [{ id: 'all', title: strings.sessions.allSessions, data: filteredSessions, total: filteredSessions.length, expanded: true }]
+      const ordered = partitionPinned(filteredSessions)
+      return [{ id: 'all', title: strings.sessions.allSessions, data: ordered, total: ordered.length, expanded: true }]
     }
     const recentOrder = new Map(recentIds.map((id, index) => [id, index]))
     if (selected) recentOrder.set(selected.sessionId, recentIds.length)
-    const recent = filteredSessions.filter(session => recentOrder.has(session.sessionId))
-      .sort((a, b) => recentOrder.get(b.sessionId)! - recentOrder.get(a.sessionId)!).slice(0, 5)
+    const recent = partitionPinned(
+      filteredSessions
+        .filter(session => recentOrder.has(session.sessionId))
+        .sort((a, b) => recentOrder.get(b.sessionId)! - recentOrder.get(a.sessionId)!)
+        .slice(0, 5),
+    )
     const recentExpanded = expandedWorkspaces[`recent:${backend}`] ?? true
     const recentSections = recent.length ? [{ id: `recent:${backend}`, title: strings.comfort.recent,
       data: recentExpanded ? recent : [], total: recent.length, expanded: recentExpanded }] : []
@@ -253,9 +332,9 @@ export function HostSessionsDrawer({
       backendWorkspaces.length > 0 ? backendWorkspaces : [{ workspaceId: 'default', title: 'Default', path: '', sessionIds: [] }]
     return [...recentSections, ...wsList.map(ws => {
       const isDefault = ws.workspaceId === 'default'
-      const wsSessions = filteredSessions.filter(s =>
+      const wsSessions = partitionPinned(filteredSessions.filter(s =>
         isDefault ? !backendWorkspaces.some(w => w.sessionIds.includes(s.sessionId)) : ws.sessionIds.includes(s.sessionId)
-      )
+      ))
       const groupId = `workspace:${backend}:${ws.workspaceId}`
       const isExpanded = expandedWorkspaces[groupId] ?? true
       const limit = visibleCounts[groupId] ?? SESSION_PAGE_SIZE
@@ -268,7 +347,7 @@ export function HostSessionsDrawer({
         data: isExpanded ? wsSessions.slice(0, limit) : [],
       }
     })]
-  }, [groupBy, backendWorkspaces, backend, filteredSessions, recentIds, selected, expandedWorkspaces, visibleCounts, language])
+  }, [groupBy, backendWorkspaces, backend, filteredSessions, recentIds, selected, expandedWorkspaces, visibleCounts, language, pinnedSessionIds, archivedIds])
 
   // 手势与抽屉动画
   const { width: screenWidth } = useWindowDimensions()
@@ -592,14 +671,27 @@ export function HostSessionsDrawer({
         renderItem={({ item }) => {
           const isSelected = item.sessionId === selected?.sessionId
           const isRunning = browseStatus(item, lifecycles[item.sessionId]) === 'running'
+          const isHarness = (item.backend ?? 'harness') === 'harness'
+          const isPinned = isHarness && pinnedSessionIds.includes(item.sessionId) && !archivedIds.includes(item.sessionId)
+          const isArchived = isHarness && archivedIds.includes(item.sessionId)
           const timeStr = formatRelativeTime(item.updatedAt)
+          const displayTitle = resolveSessionDisplayTitle(item) ?? strings.sessions.untitled
+          const accessibilityLabel = isPinned
+            ? `${displayTitle}, ${strings.sessions.pinned}`
+            : displayTitle
 
           return (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={accessibilityLabel}
+              accessibilityState={{ selected: isSelected }}
               onPress={() => {
-                if (isSelected) onClose()
+                if (isSelected) closeDrawer()
                 else void onSelect(item)
+              }}
+              onLongPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
+                setMenuSession(item)
               }}
               style={({ pressed }) => [
                 styles.sessionRow,
@@ -610,14 +702,276 @@ export function HostSessionsDrawer({
               <View style={styles.statusIndicatorSlot}>
                 {isRunning && <View style={styles.runningDot} />}
               </View>
-              <Text style={[styles.sessionText, isSelected && styles.sessionTextSelected]} numberOfLines={1}>
-                {resolveSessionDisplayTitle(item) ?? strings.sessions.untitled}
+              <Text
+                style={[
+                  styles.sessionText,
+                  isSelected && styles.sessionTextSelected,
+                  isArchived && styles.archivedText,
+                ]}
+                numberOfLines={1}
+              >
+                {displayTitle}
               </Text>
               {timeStr ? <Text style={styles.timeText}>{timeStr}</Text> : null}
+              {isPinned && (
+                <View style={styles.pinIndicator} accessibilityLabel={strings.sessions.pinned}>
+                  <OfficialMenuIcons.pinFill size={13} color={colors.ink} />
+                </View>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={strings.sessions.moreActions}
+                hitSlop={8}
+                onPress={(e) => {
+                  e.stopPropagation()
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
+                  setMenuSession(item)
+                }}
+                style={styles.moreActionBtn}
+              >
+                <OfficialMenuIcons.ellipsis size={14} color={colors.muted} />
+              </Pressable>
             </Pressable>
           )
         }}
       />
+
+      {/* 会话上下文操作浮层/菜单 */}
+      {menuSession && (
+        <Modal
+          transparent
+          animationType="fade"
+          visible={true}
+          onRequestClose={() => setMenuSession(null)}
+          statusBarTranslucent
+        >
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuSession(null)}>
+            <View style={styles.contextMenuCard} onStartShouldSetResponder={() => true}>
+              <View style={styles.menuHeader}>
+                <Text style={styles.menuTitle} numberOfLines={1}>
+                  {resolveSessionDisplayTitle(menuSession) ?? strings.sessions.untitled}
+                </Text>
+              </View>
+
+              {canUseHarnessActions && (
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityLabel={menuIsPinned ? strings.sessions.unpinSession : strings.sessions.pinSession}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.pressedBg]}
+                  onPress={async () => {
+                    const sid = menuSession.sessionId
+                    const targetBackend = menuSession.backend
+                    setMenuSession(null)
+                    if (menuIsPinned) {
+                      const ok = await unpinSession(sid, targetBackend)
+                      if (!ok) setToastMessage(strings.sessions.unpinFailed)
+                    } else {
+                      const ok = await pinSession(sid, targetBackend)
+                      if (!ok) setToastMessage(strings.sessions.pinFailed)
+                    }
+                  }}
+                >
+                  {menuIsPinned ? (
+                    <OfficialMenuIcons.pinFill size={16} color={colors.ink} />
+                  ) : (
+                    <OfficialMenuIcons.pin size={16} color={colors.ink} />
+                  )}
+                  <Text style={styles.menuItemText}>
+                    {menuIsPinned ? strings.sessions.unpinSession : strings.sessions.pinSession}
+                  </Text>
+                </Pressable>
+              )}
+
+              {canUseHarnessActions && (
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityLabel={strings.sessions.renameSession}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.pressedBg]}
+                  onPress={() => {
+                    const target = {
+                      sessionId: menuSession.sessionId,
+                      currentTitle: resolveSessionDisplayTitle(menuSession) ?? '',
+                      backend: menuSession.backend,
+                    }
+                    setMenuSession(null)
+                    setRenameError(null)
+                    setRenameTarget(target)
+                  }}
+                >
+                  <OfficialMenuIcons.edit size={16} color={colors.ink} />
+                  <Text style={styles.menuItemText}>{strings.sessions.renameSession}</Text>
+                </Pressable>
+              )}
+
+              {canUseHarnessActions && (
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityLabel={strings.sessions.forkSession}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.pressedBg]}
+                  onPress={async () => {
+                    const sid = menuSession.sessionId
+                    const targetBackend = menuSession.backend
+                    setMenuSession(null)
+                    const created = await forkSession(sid, targetBackend)
+                    if (created) {
+                      closeDrawer()
+                    }
+                  }}
+                >
+                  <OfficialMenuIcons.fork size={16} color={colors.ink} />
+                  <Text style={styles.menuItemText}>{strings.sessions.forkSession}</Text>
+                </Pressable>
+              )}
+
+              {canUseHarnessActions && (
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityLabel={menuIsArchived ? strings.sessions.unarchiveSession : strings.sessions.archiveSession}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.pressedBg]}
+                  onPress={async () => {
+                    const sid = menuSession.sessionId
+                    const wasArchived = menuIsArchived
+                    setMenuSession(null)
+                    if (wasArchived) {
+                      await unarchiveSession(sid, menuSession.backend)
+                    } else {
+                      await archiveSession(sid)
+                    }
+                  }}
+                >
+                  {menuIsArchived ? (
+                    <OfficialMenuIcons.unarchive size={16} color={colors.ink} />
+                  ) : (
+                    <OfficialMenuIcons.archive size={16} color={colors.ink} />
+                  )}
+                  <Text style={styles.menuItemText}>
+                    {menuIsArchived ? strings.sessions.unarchiveSession : strings.sessions.archiveSession}
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* 复制 Session ID 对所有会话可用 */}
+              <Pressable
+                accessibilityRole="menuitem"
+                accessibilityLabel={strings.sessions.copySessionId}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.pressedBg]}
+                onPress={async () => {
+                  const sid = menuSession.sessionId
+                  setMenuSession(null)
+                  try {
+                    await Clipboard.setStringAsync(sid)
+                    setToastMessage(strings.sessions.sessionIdCopied)
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined)
+                  } catch {
+                    setToastMessage(strings.sessions.copyFailed)
+                  }
+                }}
+              >
+                <OfficialMenuIcons.copy size={16} color={colors.ink} />
+                <Text style={styles.menuItemText}>{strings.sessions.copySessionId}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* 重命名模态弹窗 */}
+      {renameTarget && (
+        <Modal
+          transparent
+          animationType="fade"
+          visible={true}
+          onRequestClose={() => {
+            if (!renaming) {
+              setRenameTarget(null)
+              setRenameError(null)
+            }
+          }}
+          statusBarTranslucent
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.renameBackdrop}
+          >
+            <View style={styles.renameCard}>
+              <Text style={styles.renameModalTitle}>{strings.sessions.renameSessionTitle}</Text>
+              <TextInput
+                value={renameDraft}
+                onChangeText={(text) => {
+                  setRenameDraft(text)
+                  if (renameError) setRenameError(null)
+                }}
+                placeholder={strings.sessions.renamePlaceholder}
+                placeholderTextColor={colors.muted}
+                style={styles.renameInput}
+                autoFocus
+                selectTextOnFocus
+                editable={!renaming}
+                accessibilityLabel={strings.sessions.renameSessionTitle}
+              />
+              {renameError ? (
+                <Text accessibilityRole="alert" style={styles.renameErrorText}>
+                  {renameError}
+                </Text>
+              ) : null}
+              <View style={styles.renameButtonRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={strings.common.cancel}
+                  disabled={renaming}
+                  onPress={() => {
+                    setRenameTarget(null)
+                    setRenameError(null)
+                  }}
+                  style={({ pressed }) => [styles.renameCancelBtn, pressed && styles.pressedBg]}
+                >
+                  <Text style={styles.renameCancelText}>{strings.common.cancel}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={strings.sessions.renameSession}
+                  disabled={renaming || !renameDraft.trim()}
+                  onPress={async () => {
+                    if (renaming || !renameDraft.trim() || !renameTarget) return
+                    const target = renameTarget
+                    setRenaming(true)
+                    setRenameError(null)
+                    try {
+                      const ok = await renameSession(target.sessionId, renameDraft.trim(), target.backend)
+                      if (ok) {
+                        setRenameTarget(null)
+                        setRenameError(null)
+                      } else {
+                        setRenameError(strings.sessions.renameFailed)
+                      }
+                    } finally {
+                      setRenaming(false)
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    styles.renameConfirmBtn,
+                    (!renameDraft.trim() || renaming) && styles.btnDisabled,
+                    pressed && styles.pressedBg,
+                  ]}
+                >
+                  {renaming ? (
+                    <ActivityIndicator size="small" color={colors.surface} />
+                  ) : (
+                    <Text style={styles.renameConfirmText}>{strings.sessions.renameSession}</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
+
+      {/* 轻量 Toast 提示 */}
+      {toastMessage && (
+        <View style={styles.toastContainer} pointerEvents="none">
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
 
       {/* 排序配置浮窗覆盖层：整层覆盖抽屉内容，遮罩与浮窗同级且顺序明确 */}
       {showConfigModal && (
@@ -807,4 +1161,153 @@ const createStyles = (colors: ThemeColors) =>
     },
     modalItemText: { ...type.small, color: colors.ink },
     modalDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginVertical: 6 },
+
+    archivedText: { color: colors.muted, fontStyle: 'italic' },
+    pinIndicator: { marginLeft: 4, marginRight: 2, alignItems: 'center', justifyContent: 'center' },
+    moreActionBtn: {
+      minWidth: 44,
+      minHeight: 44,
+      paddingHorizontal: 8,
+      marginLeft: 2,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    menuBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.md,
+    },
+    contextMenuCard: {
+      width: '80%',
+      maxWidth: 280,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.separator,
+      paddingVertical: spacing.xs,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    menuHeader: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.separator,
+      marginBottom: spacing.xxs,
+    },
+    menuTitle: {
+      ...type.caption,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: spacing.md,
+      gap: spacing.sm,
+    },
+    menuItemText: {
+      ...type.small,
+      color: colors.ink,
+      flex: 1,
+    },
+
+    renameBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.md,
+    },
+    renameCard: {
+      width: '85%',
+      maxWidth: 340,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.separator,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    renameModalTitle: {
+      ...type.heading,
+      color: colors.ink,
+      fontWeight: '600',
+    },
+    renameInput: {
+      borderWidth: 1,
+      borderColor: colors.separator,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      marginVertical: spacing.md,
+      ...type.small,
+      color: colors.ink,
+      backgroundColor: colors.surfaceStrong,
+    },
+    renameErrorText: {
+      ...type.caption,
+      color: colors.ink,
+      fontWeight: '600',
+      marginBottom: spacing.sm,
+    },
+    renameButtonRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+    },
+    renameCancelBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.separator,
+    },
+    renameCancelText: {
+      ...type.small,
+      color: colors.ink,
+    },
+    renameConfirmBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
+      backgroundColor: colors.ink,
+    },
+    renameConfirmText: {
+      ...type.small,
+      color: colors.surface,
+      fontWeight: '600',
+    },
+    btnDisabled: {
+      opacity: 0.5,
+    },
+
+    toastContainer: {
+      position: 'absolute',
+      bottom: 60,
+      alignSelf: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      zIndex: 9999,
+      elevation: 9999,
+    },
+    toastText: {
+      ...type.caption,
+      color: '#fff',
+      fontWeight: '500',
+    },
   })

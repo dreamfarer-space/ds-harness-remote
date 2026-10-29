@@ -80,6 +80,7 @@ export interface HarnessWorkspaceView {
 export interface HarnessWorkspaceList {
   items: HarnessWorkspaceView[]
   archivedSessionIds: string[]
+  pinnedSessionIds?: string[]
 }
 
 export type ScheduleKind = 'after' | 'at' | 'every' | 'daily' | 'weekly' | 'cron'
@@ -328,9 +329,10 @@ export class HarnessAlphaClient {
     return saved
   }
 
-  async sessionFork(sessionId: string, atSeq: number): Promise<{ sessionId: string }> {
-    if (!Number.isSafeInteger(atSeq) || atSeq < 0) throw new RemoteGatewayError('INVALID_MESSAGE', 'Invalid fork boundary.')
-    const result = await this.callValue<{ sessionId: string }>('session/fork', { request: { sessionId, atSeq } })
+  async sessionFork(sessionId: string, atSeq?: number): Promise<{ sessionId: string }> {
+    if (atSeq !== undefined && (!Number.isSafeInteger(atSeq) || atSeq < 0)) throw new RemoteGatewayError('INVALID_MESSAGE', 'Invalid fork boundary.')
+    const request = atSeq === undefined ? { sessionId } : { sessionId, atSeq }
+    const result = await this.callValue<{ sessionId: string }>('session/fork', { request })
     if (typeof result?.sessionId !== 'string' || result.sessionId.length === 0) throw new RemoteGatewayError('INVALID_MESSAGE', 'Invalid fork result.')
     return result
   }
@@ -593,6 +595,25 @@ export class HarnessAlphaClient {
   async workspaceArchiveSession(sessionId: string): Promise<string[]> {
     const result = await this.callValue<{ archivedSessionIds: string[] }>('workspace/archiveSession', { request: { sessionId } })
     return Array.isArray(result.archivedSessionIds) ? result.archivedSessionIds : []
+  }
+
+  async workspaceUnarchiveSession(sessionId: string): Promise<string[]> {
+    const result = await this.callValue<{ archivedSessionIds: string[] }>('workspace/unarchiveSession', { request: { sessionId } })
+    return Array.isArray(result.archivedSessionIds) ? result.archivedSessionIds : []
+  }
+
+  async workspacePinSession(sessionId: string): Promise<string[]> {
+    const result = await this.callValue<{ pinnedSessionIds: string[] }>('workspace/pinSession', { request: { sessionId } })
+    return Array.isArray(result.pinnedSessionIds) ? result.pinnedSessionIds : []
+  }
+
+  async workspaceUnpinSession(sessionId: string): Promise<string[]> {
+    const result = await this.callValue<{ pinnedSessionIds: string[] }>('workspace/unpinSession', { request: { sessionId } })
+    return Array.isArray(result.pinnedSessionIds) ? result.pinnedSessionIds : []
+  }
+
+  async sessionRename(sessionId: string, title: string): Promise<{ title: string; seq: number }> {
+    return this.callValue<{ title: string; seq: number }>('session/rename', { request: { sessionId, title } })
   }
 
   async workspaceInsertBefore(workspaceId: string, beforeWorkspaceId?: string): Promise<string[]> {
@@ -1021,6 +1042,9 @@ function normalizeWorkspaceList(value: Record<string, unknown>): HarnessWorkspac
       : [],
     archivedSessionIds: Array.isArray(value.archivedSessionIds)
       ? value.archivedSessionIds.filter((item): item is string => typeof item === 'string')
+      : [],
+    pinnedSessionIds: Array.isArray(value.pinnedSessionIds)
+      ? value.pinnedSessionIds.filter((item): item is string => typeof item === 'string')
       : [],
   }
 }

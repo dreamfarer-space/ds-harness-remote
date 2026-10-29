@@ -60,6 +60,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   favoriteWorkspaces: [],
   recentWorkspaces: [],
   archivedSessionIds: [],
+  pinnedSessionIds: [],
   sessions: [],
   currentWorkSessionIds: [],
   messages: {},

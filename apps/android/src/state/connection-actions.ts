@@ -52,6 +52,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         workspaces: sameHost ? state.workspaces : cached?.workspaces ?? [],
         sessions: sameHost ? state.sessions : cached?.sessions ?? [],
         archivedSessionIds: sameHost ? state.archivedSessionIds : [],
+        pinnedSessionIds: sameHost ? state.pinnedSessionIds : [],
         sessionModels: undefined,
         error: undefined,
       }))
@@ -259,6 +260,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         workspaceCatalog: undefined,
         workspaces: [],
         archivedSessionIds: [],
+        pinnedSessionIds: [],
         sessions: [],
         selectedSession: undefined,
         scheduleTasks: [],

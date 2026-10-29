@@ -71,6 +71,7 @@ export interface AppState {
   /** Newest first; the home screen falls back to these when Favorites is empty. */
   recentWorkspaces: WorkspaceShortcut[]
   archivedSessionIds: string[]
+  pinnedSessionIds: string[]
   sessions: RemoteSession[]
   selectedSession?: RemoteSession
   /** History and the current connection's Codex event subscription are ready. */
@@ -160,7 +161,12 @@ export interface AppState {
   respondApproval(itemId: string, outcome: 'allowed-once' | 'rejected'): Promise<void>
   respondQuestion(itemId: string, selected: Record<string, string[]>, custom?: Record<string, string>): Promise<void>
   createSession(workspaceId?: string): Promise<boolean>
+  forkSession(sessionId: string, backend?: RemoteSession['backend']): Promise<RemoteSession | undefined>
   archiveSession(sessionId: string): Promise<boolean>
+  unarchiveSession(sessionId: string, backend?: RemoteSession['backend']): Promise<boolean>
+  pinSession(sessionId: string, backend?: RemoteSession['backend']): Promise<boolean>
+  unpinSession(sessionId: string, backend?: RemoteSession['backend']): Promise<boolean>
+  renameSession(sessionId: string, title: string, backend?: RemoteSession['backend']): Promise<boolean>
   selectModel(selection: ModelSelection): Promise<boolean>
   selectPermission(preset: string): Promise<boolean>
   loadAgentPresets(): Promise<boolean>
@@ -200,7 +206,7 @@ export const disconnected: ConnectionSnapshot = {
 
 export function initialData(): Pick<AppState,
   'config' | 'account' | 'devices' | 'selectedDevice' | 'connection' | 'hostDescriptor' | 'codexAvailable' | 'cursorAvailable' | 'antigravityAvailable' | 'piAvailable' | 'opencodeAvailable' | 'claudeAvailable' | 'workspaceCatalog' | 'workspaces' |
-  'favoriteWorkspaces' | 'recentWorkspaces' | 'archivedSessionIds' | 'sessions' | 'selectedSession' | 'codexReadySessionId' | 'currentWorkSessionIds' | 'messages' | 'sessionModels' | 'modelSelecting' | 'permissionSelecting' |
+  'favoriteWorkspaces' | 'recentWorkspaces' | 'archivedSessionIds' | 'pinnedSessionIds' | 'sessions' | 'selectedSession' | 'codexReadySessionId' | 'currentWorkSessionIds' | 'messages' | 'sessionModels' | 'modelSelecting' | 'permissionSelecting' |
   'historyHasMore' | 'historyLoadingOlder' | 'oldestLoadedSeq' | 'transportPreference' | 'authPhase' | 'refreshing' | 'busyAction' | 'error' |
   'connectionProbeOrder' | 'connectionNetworkDetails' | 'reauthRequired' | 'feedbackBySession' | 'commandResult' | 'sessionLifecycles' | 'sessionProjectionSeqs'> {
   return {
@@ -223,6 +229,7 @@ export function initialData(): Pick<AppState,
     favoriteWorkspaces: [],
     recentWorkspaces: [],
     archivedSessionIds: [],
+    pinnedSessionIds: [],
     sessions: [],
     selectedSession: undefined,
     codexReadySessionId: undefined,

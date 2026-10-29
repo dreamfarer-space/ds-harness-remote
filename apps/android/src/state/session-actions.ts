@@ -39,7 +39,16 @@ import type { AppState } from './store-state'
 
 /** Session actions use the store's single connection/session runtime. */
 export function createSessionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
-  'refreshSessionStatus' | 'openSession' | 'forkChatMessage' | 'quoteChatMessage' | 'rateMessage' | 'createSession' | 'archiveSession' | 'selectModel' | 'selectPermission' | 'loadAgentPresets' | 'selectAgentPreset' | 'loadOlderHistory'> {
+  'refreshSessionStatus' | 'openSession' | 'forkChatMessage' | 'quoteChatMessage' | 'rateMessage' | 'createSession' | 'forkSession' | 'archiveSession' | 'unarchiveSession' | 'pinSession' | 'unpinSession' | 'renameSession' | 'selectModel' | 'selectPermission' | 'loadAgentPresets' | 'selectAgentPreset' | 'loadOlderHistory'> {
+  const isHarnessBackend = (backend?: RemoteSession['backend']) =>
+    (backend ?? 'harness') === 'harness'
+
+  const isHarnessTarget = (sessionId: string, backend?: RemoteSession['backend']) => {
+    const target = get().sessions.find(item => item.sessionId === sessionId)
+    const effectiveBackend = backend ?? target?.backend ?? 'harness'
+    return isHarnessBackend(effectiveBackend) && (!target || isHarnessBackend(target.backend))
+  }
+
   return {
     async refreshSessionStatus() {
       if (get().connection.phase !== 'connected') return
@@ -588,6 +597,42 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
       return task
     },
 
+    async forkSession(sessionId, backend) {
+      if (get().connection.phase !== 'connected') return undefined
+      if (!isHarnessTarget(sessionId, backend)) return undefined
+      const generation = runtime.connectionGeneration
+      set({ busyAction: `fork:${sessionId}`, error: undefined })
+      try {
+        const proxy = runtime.connection.requireProxy()
+        const { sessionId: childId } = await proxy.sessionFork(sessionId)
+        if (generation !== runtime.connectionGeneration) return undefined
+        const [sessions, workspaceList] = await Promise.all([proxy.sessionList(), proxy.workspaceList()])
+        if (generation !== runtime.connectionGeneration) return undefined
+        const created = sessions.find(s => s.sessionId === childId)
+        set(state => ({
+          sessions: [
+            ...(state.sessions ?? []).filter(item => !isHarnessBackend(item.backend)),
+            ...sessions,
+          ],
+          workspaces: [
+            ...(state.workspaces ?? []).filter(item => !isHarnessBackend(item.backend)),
+            ...workspaceList.items,
+          ],
+          archivedSessionIds: workspaceList.archivedSessionIds,
+          ...(workspaceList.pinnedSessionIds ? { pinnedSessionIds: workspaceList.pinnedSessionIds } : {}),
+          busyAction: undefined,
+        }))
+        if (created) {
+          await get().openSession(created)
+        }
+        return created
+      } catch (error) {
+        if (generation !== runtime.connectionGeneration) return undefined
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return undefined
+      }
+    },
+
     async archiveSession(sessionId) {
       if (get().connection.phase !== 'connected') return false
       const generation = runtime.connectionGeneration
@@ -639,6 +684,87 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           busyAction: undefined,
           selectedSession: state.selectedSession?.sessionId === sessionId ? undefined : state.selectedSession,
           sessionModels: state.selectedSession?.sessionId === sessionId ? undefined : state.sessionModels,
+        }))
+        return true
+      } catch (error) {
+        if (generation !== runtime.connectionGeneration) return false
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return false
+      }
+    },
+
+    async unarchiveSession(sessionId, backend) {
+      if (get().connection.phase !== 'connected') return false
+      if (!isHarnessTarget(sessionId, backend)) return false
+      const generation = runtime.connectionGeneration
+      set({ busyAction: `unarchive:${sessionId}`, error: undefined })
+      try {
+        const proxy = runtime.connection.requireProxy()
+        const archivedSessionIds = await proxy.workspaceUnarchiveSession(sessionId)
+        if (generation !== runtime.connectionGeneration) return false
+        set({ archivedSessionIds, busyAction: undefined })
+        return true
+      } catch (error) {
+        if (generation !== runtime.connectionGeneration) return false
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return false
+      }
+    },
+
+    async pinSession(sessionId, backend) {
+      if (get().connection.phase !== 'connected') return false
+      if (!isHarnessTarget(sessionId, backend)) return false
+      const generation = runtime.connectionGeneration
+      set({ busyAction: `pin:${sessionId}`, error: undefined })
+      try {
+        const proxy = runtime.connection.requireProxy()
+        const pinnedSessionIds = await proxy.workspacePinSession(sessionId)
+        if (generation !== runtime.connectionGeneration) return false
+        set({ pinnedSessionIds, busyAction: undefined })
+        return true
+      } catch (error) {
+        if (generation !== runtime.connectionGeneration) return false
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return false
+      }
+    },
+
+    async unpinSession(sessionId, backend) {
+      if (get().connection.phase !== 'connected') return false
+      if (!isHarnessTarget(sessionId, backend)) return false
+      const generation = runtime.connectionGeneration
+      set({ busyAction: `unpin:${sessionId}`, error: undefined })
+      try {
+        const proxy = runtime.connection.requireProxy()
+        const pinnedSessionIds = await proxy.workspaceUnpinSession(sessionId)
+        if (generation !== runtime.connectionGeneration) return false
+        set({ pinnedSessionIds, busyAction: undefined })
+        return true
+      } catch (error) {
+        if (generation !== runtime.connectionGeneration) return false
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return false
+      }
+    },
+
+    async renameSession(sessionId, title, backend) {
+      if (get().connection.phase !== 'connected') return false
+      if (!isHarnessTarget(sessionId, backend)) return false
+      const generation = runtime.connectionGeneration
+      const trimmed = title.trim()
+      if (!trimmed) return false
+      set({ busyAction: `rename:${sessionId}`, error: undefined })
+      try {
+        const proxy = runtime.connection.requireProxy()
+        const result = await proxy.sessionRename(sessionId, trimmed)
+        if (generation !== runtime.connectionGeneration) return false
+        const updatedTitle = result?.title ?? trimmed
+        set(state => ({
+          busyAction: undefined,
+          sessions: state.sessions.map(s => (s.sessionId === sessionId ? { ...s, title: updatedTitle } : s)),
+          selectedSession: state.selectedSession?.sessionId === sessionId
+            ? { ...state.selectedSession, title: updatedTitle }
+            : state.selectedSession,
         }))
         return true
       } catch (error) {

@@ -79,12 +79,14 @@ export function createWorkspaceActions({ set, get, connection, getConnectionGene
         if (!current()) return
         let catalog: { workspaces: WorkspaceView[]; sessions: RemoteSession[] }
         let archivedSessionIds: string[] | undefined
+        let pinnedSessionIds: string[] | undefined
         switch (backend) {
           case 'harness': {
             const proxy = scope.bind(() => connection.requireProxy())
             const [workspaces, sessions] = await Promise.all([proxy.workspaceList(), proxy.sessionList()])
             catalog = { workspaces: workspaces.items, sessions }
             archivedSessionIds = workspaces.archivedSessionIds
+            pinnedSessionIds = workspaces.pinnedSessionIds
             break
           }
           case 'codex': {
@@ -122,6 +124,7 @@ export function createWorkspaceActions({ set, get, connection, getConnectionGene
           workspaces: [...state.workspaces.filter(item => (item.backend ?? 'harness') !== backend), ...catalog.workspaces],
           sessions: [...state.sessions.filter(item => (item.backend ?? 'harness') !== backend), ...catalog.sessions],
           ...(archivedSessionIds === undefined ? {} : { archivedSessionIds }),
+          ...(pinnedSessionIds === undefined ? {} : { pinnedSessionIds }),
           selectedSession: catalog.sessions.find(item => item.sessionId === state.selectedSession?.sessionId) ?? state.selectedSession,
           workspaceCatalog: { backend, loading: false },
         }))
