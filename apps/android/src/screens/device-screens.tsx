@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatedEllipsis } from '../ui/animated-ellipsis'
 import * as Haptics from 'expo-haptics'
 import { AccessibilityInfo, ActivityIndicator, Alert, Animated, BackHandler, Easing, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
-import { Archive, ArrowLeft, ChevronRight, CircleCheck, Code2, Laptop, MessageSquareText, MoreVertical, Pencil, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react-native'
+import { Archive, ArrowLeft, Check, ChevronRight, Code2, Laptop, MessageSquareText, MoreVertical, Pencil, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { ConnectionProbeTransport, ConnectionStage, RemoteDevice, RemoteSession, WorkspaceShortcut } from '../types'
 import { workspaceStableKey } from '../lib/workspace-key'
@@ -28,6 +28,7 @@ import { strings as zhCN } from '../locales/i18n'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { resolveSessionDisplayTitle } from './session-title'
 import { DeviceRenameModal } from './device-rename-modal'
+import { ConnectionHero } from './connection-hero'
 
 export function DevicesScreen({ onDevice, onBack, onMore, onShortcut }: {
   onDevice: (device: RemoteDevice) => void
@@ -782,52 +783,65 @@ export function ConnectionScreen({ device, onBack, onConnected }: {
           <IconButton label={zhCN.common.back} icon={ArrowLeft} onPress={cancel} />
         </View>
       )}
-      <Screen>
+      <Screen fill>
         <View style={[styles.connectionHero, compactHero && styles.connectionHeroCompact]}>
-          <View style={styles.connectionDeviceIcon}><Laptop size={30} color={colors.primary} /></View>
+          <ConnectionHero
+            secured={currentIndex > connectionStages.indexOf('secure')}
+            ready={currentStage === 'ready'}
+            failed={failed}
+          />
           <View style={styles.connectionHeading}>
-            <Text accessibilityLiveRegion="polite" style={styles.connectionStatus}>
-              {currentStage === 'ready' ? zhCN.devices.connectionReady : zhCN.devices.connecting}
-              {currentStage !== 'ready' && !failed && <AnimatedEllipsis />}
-            </Text>
-            <Text style={styles.connectionDeviceName} numberOfLines={2}>{device.name}</Text>
-            <Text style={styles.connectionVersions} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {`${zhCN.devices.harnessShort} ${device.harnessVersion ?? zhCN.devices.unknownVersion} | ${zhCN.devices.pluginShort} ${device.clientVersion ?? zhCN.devices.unknownVersion}`}
-            </Text>
+            <View style={styles.connectionStatusLine}>
+              <View style={[styles.connectionStatusDot, currentStage === 'ready' && styles.connectionStatusDotReady, failed && styles.connectionStatusDotFailed]} />
+              <Text accessibilityLiveRegion="polite" style={[styles.connectionStatus, failed && styles.connectionStatusFailed]}>
+                {failed ? zhCN.devices.connectionInterrupted : currentStage === 'ready' ? zhCN.devices.connectionReady : zhCN.devices.connecting}
+                {currentStage !== 'ready' && !failed && <AnimatedEllipsis />}
+              </Text>
+            </View>
+            <Text style={styles.connectionDeviceName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{device.name}</Text>
+            <View style={styles.connectionVersions}>
+              <View style={styles.versionItem}>
+                <Text style={styles.versionLabel}>{zhCN.devices.harnessShort}</Text>
+                <Text style={styles.versionValue} numberOfLines={1}>{device.harnessVersion ?? zhCN.devices.unknownVersion}</Text>
+              </View>
+              <View style={styles.versionItem}>
+                <Text style={styles.versionLabel}>{zhCN.devices.pluginShort}</Text>
+                <Text style={styles.versionValue} numberOfLines={1}>{device.clientVersion ?? zhCN.devices.unknownVersion}</Text>
+              </View>
+            </View>
           </View>
         </View>
 
         <View style={styles.connectionSteps}>
           {connectionStages.map((stage, index) => {
-            const completed = index < currentIndex
+            const done = index < currentIndex
             const active = index === currentIndex && !failed
             const stepFailed = index === currentIndex && failed
             const copy = zhCN.devices.connectionSteps[stage]
+            const showRoute = stage === 'transport' && connectionProbeOrder.length > 0
             return (
               <View key={stage} style={styles.connectionStep}>
-                <View style={styles.stepMarker}>
-                  <View style={[
-                    styles.stepCircle,
-                    completed && styles.stepCircleComplete,
-                    active && styles.stepCircleActive,
-                    stepFailed && styles.stepCircleFailed,
-                  ]}>
-                    {completed
-                      ? <CircleCheck size={18} color={colors.white} />
-                      : active
-                        ? <ActivityIndicator size="small" color={colors.primary} />
-                        : <View style={[styles.stepDot, stepFailed && styles.stepDotFailed]} />}
-                  </View>
-                  {index < connectionStages.length - 1 && <View style={[styles.stepConnector, completed && styles.stepConnectorComplete]} />}
+                <View style={[styles.stepMarker, done && styles.stepMarkerDone, active && styles.stepMarkerActive, stepFailed && styles.stepMarkerFailed]}>
+                  {done
+                    ? <Check size={11} strokeWidth={3.2} color={colors.white} />
+                    : active
+                      ? <ActivityIndicator size={12} color={colors.primary} />
+                      : stepFailed ? <X size={11} strokeWidth={3} color={colors.white} /> : null}
                 </View>
                 <View style={styles.stepCopy}>
-                  <Text accessibilityLiveRegion={active ? 'polite' : 'none'} style={[styles.stepTitle, (active || completed) && styles.stepTitleCurrent]}>{copy.title}</Text>
-                  {(stage !== 'transport' || connectionProbeOrder.length === 0) && <Text style={styles.stepBody}>{copy.body}</Text>}
-                  {stage === 'transport' && connectionProbeOrder.length > 0 && (
+                  <Text
+                    accessibilityLiveRegion={active ? 'polite' : 'none'}
+                    style={[styles.stepTitle, done && styles.stepTitleDone, (active || stepFailed) && styles.stepTitleCurrent]}
+                  >
+                    {copy.title}
+                  </Text>
+                  {active && !showRoute && <Text style={styles.stepBody}>{copy.body}</Text>}
+                  {stepFailed && connection.error !== undefined && <Text style={styles.stepBodyFailed}>{connection.error}</Text>}
+                  {showRoute && (
                     <View style={styles.progressRoute}>
                       {connectionProbeOrder.map((transport, probeIndex) => (
                         <View key={`${transport}:${probeIndex}`} style={styles.progressRouteSegment}>
-                          {probeIndex > 0 && <Text style={styles.progressRouteArrow}>→</Text>}
+                          {probeIndex > 0 && <ChevronRight size={12} color={colors.subtle} />}
                           <Text style={[
                             styles.progressRouteLabel,
                             selectedProbe === transport && styles.progressRouteLabelActive,
@@ -842,15 +856,9 @@ export function ConnectionScreen({ device, onBack, onConnected }: {
               </View>
             )
           })}
+          {failed && <View style={styles.connectionRetry}><Button label={zhCN.devices.retryConnection} variant="secondary" onPress={retry} /></View>}
         </View>
-
-        {failed && (
-          <View style={styles.connectionError}>
-            <Text style={styles.connectionErrorTitle}>{zhCN.devices.connectionInterrupted}</Text>
-            <Text style={styles.connectionErrorBody}>{connection.error}</Text>
-            <Button label={zhCN.devices.retryConnection} variant="secondary" onPress={retry} />
-          </View>
-        )}
+        <View style={styles.connectionBottomSpace} />
       </Screen>
     </View>
   )
@@ -1138,33 +1146,38 @@ function createStyles(colors: ThemeColors) {
   compactSessionTitle: { ...type.smallStrong, color: colors.ink },
   compactSessionMeta: { ...type.caption, color: colors.muted, marginTop: 2 },
   connectionBack: { position: 'absolute', top: spacing.sm, left: spacing.sm, zIndex: 2 },
-  connectionHero: { alignItems: 'center', paddingTop: spacing.xxxl, paddingBottom: spacing.xxl },
-  connectionHeroCompact: { paddingTop: spacing.lg, paddingBottom: spacing.md },
-  connectionDeviceIcon: { width: 68, height: 68, borderRadius: radius.lg, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  connectionHeading: { alignSelf: 'stretch', alignItems: 'center', gap: spacing.xxs },
-  connectionStatus: { ...type.smallStrong, color: colors.muted, textAlign: 'center' },
-  connectionDeviceName: { ...type.title, color: colors.ink, textAlign: 'center' },
-  connectionVersions: { ...type.small, color: colors.muted, alignSelf: 'stretch', marginTop: spacing.xs, textAlign: 'center' },
-  connectionSteps: { marginTop: spacing.xs },
-  connectionStep: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.sm },
-  stepMarker: { width: 30, alignItems: 'center' },
-  stepCircle: { width: 30, height: 30, borderRadius: radius.pill, backgroundColor: colors.surfaceStrong, alignItems: 'center', justifyContent: 'center' },
-  stepCircleActive: { backgroundColor: colors.primarySoft },
-  stepCircleComplete: { backgroundColor: colors.primary },
-  stepCircleFailed: { backgroundColor: colors.dangerSoft },
-  stepDot: { width: 7, height: 7, borderRadius: radius.pill, backgroundColor: colors.subtle },
-  stepDotFailed: { backgroundColor: colors.danger },
-  stepConnector: { width: 2, flex: 1, minHeight: spacing.xxl, marginVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.separator },
-  stepConnectorComplete: { backgroundColor: colors.primary },
-  stepCopy: { flex: 1, paddingBottom: spacing.xl },
-  stepTitle: { ...type.bodyStrong, color: colors.muted },
-  stepTitleCurrent: { color: colors.ink },
-  stepBody: { ...type.small, color: colors.muted, marginTop: 2 },
-  progressRoute: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: spacing.sm },
-  progressRouteSegment: { flexDirection: 'row', alignItems: 'center' },
-  progressRouteArrow: { ...type.small, color: colors.subtle, paddingHorizontal: spacing.xxs },
-  progressRouteLabel: { ...type.small, color: colors.muted },
-  progressRouteLabelActive: { ...type.smallStrong, color: colors.success },
+  connectionHero: { flexGrow: 1, alignItems: 'center', justifyContent: 'flex-end', paddingTop: spacing.xl, paddingBottom: spacing.xxl + spacing.xs, gap: spacing.xl },
+  connectionBottomSpace: { flexGrow: 1.4 },
+  connectionHeroCompact: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.sm },
+  connectionHeading: { alignSelf: 'stretch', alignItems: 'center', gap: spacing.xs },
+  connectionStatusLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  connectionStatusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  connectionStatusDotReady: { backgroundColor: colors.success },
+  connectionStatusDotFailed: { backgroundColor: colors.danger },
+  connectionStatus: { ...type.small, color: colors.muted, textAlign: 'center' },
+  connectionStatusFailed: { color: colors.danger },
+  connectionDeviceName: { ...type.title, color: colors.ink, textAlign: 'center', alignSelf: 'stretch', paddingHorizontal: spacing.xs },
+  connectionVersions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: spacing.md, marginTop: 2 },
+  versionItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  versionLabel: { ...type.small, color: colors.subtle },
+  versionValue: { ...type.small, color: colors.muted },
+  connectionSteps: { alignSelf: 'center', width: '100%', maxWidth: 360, paddingHorizontal: spacing.md, gap: spacing.sm },
+  connectionStep: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  stepMarker: { width: 18, height: 18, marginTop: 2, borderRadius: 9, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  stepMarkerDone: { borderColor: colors.primary, backgroundColor: colors.primary },
+  stepMarkerActive: { borderColor: 'transparent' },
+  stepMarkerFailed: { borderColor: colors.danger, backgroundColor: colors.danger },
+  stepCopy: { flex: 1, gap: 2 },
+  stepTitle: { ...type.small, lineHeight: 22, color: colors.subtle },
+  stepTitleDone: { color: colors.muted },
+  stepTitleCurrent: { ...type.smallStrong, lineHeight: 22, color: colors.ink },
+  stepBody: { ...type.caption, color: colors.muted },
+  stepBodyFailed: { ...type.caption, color: colors.danger },
+  progressRoute: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 2, gap: 2 },
+  progressRouteSegment: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  progressRouteLabel: { ...type.caption, color: colors.muted, paddingHorizontal: 7, paddingVertical: 1, borderRadius: radius.pill, backgroundColor: colors.surfaceStrong, overflow: 'hidden' },
+  progressRouteLabelActive: { color: colors.success, backgroundColor: colors.successSoft },
+  connectionRetry: { marginTop: spacing.xs },
   deviceHero: { paddingVertical: spacing.xxl, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   deviceIcon: { width: 56, height: 56, borderRadius: radius.lg, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   deviceHeroCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
