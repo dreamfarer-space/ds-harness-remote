@@ -202,7 +202,7 @@ const esES = {
   },
   status: { online: "En línea", offline: "Desconectado", disconnected: "Desconectado", lan: "LAN directa", relay: "Retransmisión del servidor", p2p: "P2P directo", turn: "Relé de giro", waiting: "Conectando", running: "En curso" },
   setup: {
-    heroSignIn: 'Inicia sesión en DeepSeek Harness Remote', emailSignIn: 'Iniciar sesión con correo',
+    or: 'o', heroSignIn: 'Inicia sesión en DeepSeek Harness Remote', emailSignIn: 'Iniciar sesión con correo',
     title: "Iniciar sesión", signIn: "Inicia sesión en tu cuenta", signInAgain: "Iniciar sesión nuevamente", lead: "Elige el mismo método de inicio de sesión que en tu dispositivo remoto para continuar tu trabajo.",
     switchServer: "Cambiar servidor", saveServer: "Guardar servidor", switchServerHint: "Al guardar se desconecta la conexión actual y deberá iniciar sesión en el nuevo servidor.",
     google: "Continuar con Google",

@@ -5,7 +5,7 @@ import { File, Paths } from 'expo-file-system'
 import { getContentUriAsync } from 'expo-file-system/legacy'
 import * as IntentLauncher from 'expo-intent-launcher'
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
-import { Check, ChevronRight, Download, ExternalLink, Info, KeyRound, Laptop, LockKeyhole, MoreVertical, QrCode as QrCodeIcon, RotateCcw, Settings, type LucideIcon } from 'lucide-react-native'
+import { Check, ChevronRight, Download, ExternalLink, Info, KeyRound, Laptop, LockKeyhole, Mail, MoreVertical, QrCode as QrCodeIcon, RotateCcw, Settings, type LucideIcon } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { QrLoginStart } from '../state/store-state'
 import { SOURCE_CODE_URL } from '../lib/links'
@@ -332,52 +332,88 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
     else if (method === 'google-oauth') void signInWithGoogle()
   }
 
+  const closeQr = () => {
+    qrRun.current += 1
+    setShowQr(false)
+    setQrLogin(undefined)
+    setQrPhase('idle')
+  }
+
+  const openQr = () => {
+    const method = qrMethods.includes(loginMethod) ? loginMethod : qrMethods[0]
+    if (method === undefined) return
+    setLoginMethod(method)
+    setShowQr(true)
+    void refreshQr(method)
+  }
+
+  // Third-party sign-in is the primary path; email is a collapsed fallback
+  // (the Server has no email sign-up). QR is offered on large screens only.
   const qrVisible = largeScreen && showQr
+  const emailVisible = showPassword || oauthMethods.length === 0
+  const controlsDisabled = busy || oauthBusy || serverDirty
+
+  const providerIcon = (method: SetupLoginMethod, size = 22) => method === 'oauth'
+    ? <ZhihuIcon size={size} color="#1772F6" />
+    : method === 'github-oauth'
+      ? <GithubIcon size={size} color={colors.ink} />
+      : <GoogleIcon size={size} />
+
+  const providerLabel = (method: SetupLoginMethod) => method === 'oauth'
+    ? zhCN.setup.zhihu
+    : method === 'github-oauth' ? zhCN.setup.github : zhCN.setup.google
+
+  const providerShortName = (method: SetupLoginMethod) => method === 'oauth'
+    ? zhCN.setup.oauth
+    : method === 'github-oauth' ? zhCN.setup.githubOAuth : 'Google'
 
   const qrContent = !qrVisible ? null : (
     <View style={styles.qrPanel}>
-      {qrPhase === 'loading'
-        ? <View style={styles.qrPlaceholder}><ActivityIndicator color={colors.primary} accessibilityLabel={zhCN.setup.qrWaiting} /></View>
-        : qrPhase === 'unsupported'
-          ? <Text style={styles.qrMessage}>{zhCN.setup.qrUnsupported}</Text>
-          : qrPhase === 'failed'
-            ? <Text style={styles.qrMessage}>{zhCN.setup.qrFailed}</Text>
-            : qrPhase === 'expired'
-              ? <Text style={styles.qrMessage}>{zhCN.setup.qrExpired}</Text>
-              : qrLogin !== undefined
-                ? <QrCode
-                    value={qrLogin.session.scanUrl}
-                    size={largeScreen ? 260 : 200}
-                    label={`${zhCN.setup.qrScanTitle}. ${zhCN.setup.qrScanHint}`}
-                  />
-                : null}
-      {(qrPhase === 'waiting' || qrPhase === 'expired') && <Text style={styles.qrHint}>{zhCN.setup.qrScanHint}</Text>}
-      <View style={styles.pillAction}>
-        <Button
-          label={zhCN.setup.qrRefresh}
-          variant="secondary"
-          onPress={() => void refreshQr()}
-          loading={qrPhase === 'loading'}
-          disabled={busy || serverDirty}
-        />
+      <Text style={styles.qrTitle} accessibilityRole="header">{zhCN.setup.qrScanTitle}</Text>
+      {qrMethods.length > 1 && (
+        <View style={styles.segmentRow} accessibilityRole="tablist">
+          {qrMethods.map(method => (
+            <Pressable
+              key={method}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: loginMethod === method }}
+              onPress={() => chooseLoginMethod(method)}
+              style={[styles.qrSegment, loginMethod === method && styles.segmentButtonActive]}
+            >
+              {providerIcon(method, 16)}
+              <Text style={[styles.segmentButtonText, loginMethod === method && styles.segmentButtonTextActive]}>{providerShortName(method)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <View style={styles.qrFrame}>
+        {qrPhase === 'waiting' && qrLogin !== undefined
+          ? <QrCode value={qrLogin.session.scanUrl} size={232} label={`${zhCN.setup.qrScanTitle}. ${zhCN.setup.qrScanHint}`} />
+          : qrPhase === 'loading' || qrPhase === 'idle'
+            ? <ActivityIndicator color={colors.primary} accessibilityLabel={zhCN.setup.qrWaiting} />
+            : <Text style={styles.qrMessage}>{qrPhase === 'unsupported' ? zhCN.setup.qrUnsupported : qrPhase === 'expired' ? zhCN.setup.qrExpired : zhCN.setup.qrFailed}</Text>}
       </View>
-      <Pressable accessibilityRole="button" onPress={() => {
-        qrRun.current += 1
-        setShowQr(false)
-        setShowPassword(true)
-        setLoginMethod('password')
-        setQrLogin(undefined)
-        setQrPhase('idle')
-      }} style={styles.textLink}>
-        <Text style={styles.textLinkLabel}>{zhCN.setup.emailSignIn}</Text>
-      </Pressable>
+      <Text style={styles.qrHint}>{zhCN.setup.qrScanHint}</Text>
+      <View style={styles.qrActions}>
+        <Pressable accessibilityRole="button" onPress={closeQr} style={styles.textLink}>
+          <Text style={styles.textLinkLabel}>{zhCN.common.back}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy || serverDirty || qrPhase === 'loading'}
+          onPress={() => void refreshQr()}
+          style={styles.textLink}
+        >
+          <Text style={[styles.textLinkLabel, qrPhase === 'loading' && styles.textLinkDisabled]}>{zhCN.setup.qrRefresh}</Text>
+        </Pressable>
+      </View>
     </View>
   )
 
   const emailContent = (
-    <>
+    <View style={styles.emailForm}>
       <TextInput
-        style={styles.pillInput}
+        style={styles.loginInput}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -389,7 +425,7 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
         accessibilityLabel={zhCN.setup.email}
       />
       <TextInput
-        style={styles.pillInput}
+        style={styles.loginInput}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -406,45 +442,23 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
         accessibilityState={{ disabled: !canSubmit || serverDirty || busy, busy }}
         disabled={!canSubmit || serverDirty || busy}
         onPress={() => void submit()}
-        style={({ pressed }) => [styles.pillButton, canSubmit && styles.pillButtonReady, pressed && styles.pillButtonPressed]}
+        style={({ pressed }) => [styles.emailSubmit, canSubmit && styles.emailSubmitReady, pressed && styles.providerButtonPressed]}
       >
         {busy
-          ? <ActivityIndicator color={canSubmit ? colors.background : colors.muted} />
-          : <Text style={[styles.pillButtonText, canSubmit && styles.pillButtonTextReady]}>{zhCN.setup.title}</Text>}
+          ? <ActivityIndicator color={colors.white} />
+          : <Text style={[styles.emailSubmitText, canSubmit && styles.emailSubmitTextReady]}>{zhCN.setup.title}</Text>}
       </Pressable>
       <Text style={styles.oauthHint}>{zhCN.setup.passwordHint}</Text>
-    </>
+    </View>
   )
 
-  const providerIcon = (method: SetupLoginMethod) => method === 'password'
-    ? <KeyRound size={26} color={colors.background} />
-    : method === 'oauth'
-      ? <ZhihuIcon size={26} color={colors.primary} />
-      : method === 'github-oauth'
-        ? <GithubIcon size={28} color={colors.background} />
-        : <GoogleIcon size={26} />
-
-  const providerLabel = (method: SetupLoginMethod) => method === 'password'
-    ? zhCN.setup.passwordMethod
-    : method === 'oauth'
-    ? zhCN.setup.zhihu
-    : method === 'github-oauth' ? zhCN.setup.github : zhCN.setup.google
-
-  const providerName = (method: SetupLoginMethod) => method === 'password'
-    ? zhCN.setup.passwordMethod
-    : method === 'oauth' ? zhCN.setup.oauth
-      : method === 'github-oauth' ? zhCN.setup.githubOAuth : 'Google'
-  const providerActionLabel = (method: SetupLoginMethod) => language.startsWith('zh-')
-    ? method === 'password' ? '使用邮箱密码登录' : `使用「${providerName(method)}」授权登录`
-    : method === 'password' ? `Sign in with ${providerName(method)}` : `Continue with ${providerName(method)}`
-
-  const whaleWidth = largeScreen ? 240 : 196
+  const whaleWidth = largeScreen ? 168 : 128
 
   return (
     <View style={styles.flex}>
       <BlurHeaderFrame header={<TopBar title="" onBack={onBack} action={<IconButton label={zhCN.settings.more} icon={MoreVertical} onPress={onMore} />} />}>
         <Screen fill refreshing={providersPhase === 'loading'} onRefresh={() => setProviderReload(value => value + 1)}>
-          <View style={[styles.hero, largeScreen && styles.formLarge]}>
+          <View style={styles.hero}>
             <Svg
               width={whaleWidth}
               height={(whaleWidth * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
@@ -456,78 +470,81 @@ export function ServerSetupScreen({ onComplete, onBack, onMore, serverExpanded, 
             <View style={styles.wordmarkRow} accessible accessibilityRole="header" accessibilityLabel="DS Harness Remote">
               <Text style={styles.wordmark}>DSH REMOTE</Text>
             </View>
+            <Text style={styles.heroLead}>{zhCN.setup.lead}</Text>
           </View>
 
-          <View style={[styles.loginCard, largeScreen && styles.formLarge]}>
-            <Text style={styles.loginCardTitle}>{qrVisible ? zhCN.setup.qrScanTitle : (showPassword || loginMethod === 'password' ? zhCN.setup.heroSignIn : (language.startsWith('zh-') ? '请选择登录方式' : 'Choose a sign-in method'))}</Text>
-          {providersPhase === 'ready' && (
-            <>
-              {oauthMethods.length > 0 && (
-                <View style={[styles.providerRow, largeScreen && styles.providerRowWide]}>
-                  {[...oauthMethods, 'password' as const].map(method => (
-                    <Pressable
-                      key={method}
-                      accessibilityRole="button"
-                      accessibilityLabel={providerLabel(method)}
-                      accessibilityState={{ disabled: busy || oauthFlowBusy || serverDirty, selected: loginMethod === method && (method !== 'password' ? !showPassword && !qrVisible : showPassword) }}
-                      disabled={busy || oauthFlowBusy || serverDirty}
-                      onPress={() => {
-                        if (method === 'password') {
-                          qrRun.current += 1
-                          setShowQr(false)
-                          setShowPassword(true)
-                          setLoginMethod('password')
-                          setQrLogin(undefined)
-                          setQrPhase('idle')
-                          return
-                        }
-                        if (showQr) {
-                          qrRun.current += 1
-                          setQrLogin(undefined)
-                          setQrPhase('idle')
-                        }
-                        setShowPassword(false)
-                        setLoginMethod(method)
-                        setShowQr(false)
-                      }}
-                      style={({ pressed }) => [styles.providerButton, loginMethod === method && (method !== 'password' ? !showPassword && !qrVisible : showPassword) && styles.providerButtonSelected, pressed && styles.providerButtonPressed]}
-                    >
-                      {providerIcon(method)}
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              {loginMethod !== 'password' && !showPassword && !qrVisible && (
-                <View style={[styles.providerAction, largeScreen && styles.providerActionWide]}><Button label={providerActionLabel(loginMethod)} onPress={() => signInWithProvider(loginMethod)} loading={oauthFlowBusy} disabled={busy || oauthFlowBusy || serverDirty} /></View>
-              )}
-              {largeScreen && qrMethods.length > 0 && !serverDirty && !qrVisible && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={zhCN.setup.qr}
-                  disabled={busy || oauthFlowBusy || serverDirty}
-                  onPress={() => {
-                    const method = qrMethods.includes(loginMethod) ? loginMethod : qrMethods[0]
-                    if (method !== undefined) {
-                      setLoginMethod(method)
-                      setShowPassword(false)
-                      setShowQr(true)
-                      void refreshQr(method)
-                    }
-                  }}
-                  style={styles.qrEntry}
-                >
-                  <Text style={styles.qrEntryText}>{zhCN.setup.qr}</Text>
-                </Pressable>
-              )}
-            </>
-          )}
-
+          <View style={styles.loginCard}>
             {providersPhase === 'loading'
-              ? <ActivityIndicator color={colors.primary} />
-              : <>
-                  {providersPhase === 'failed' && <Button label={zhCN.common.retry} variant="secondary" onPress={() => setProviderReload(value => value + 1)} />}
-                  {qrVisible ? qrContent : (showPassword || loginMethod === 'password' ? emailContent : null)}
-                </>}
+              ? <View style={styles.loginLoading}><ActivityIndicator color={colors.primary} /></View>
+              : qrVisible
+                ? qrContent
+                : <>
+                    {providersPhase === 'ready' && oauthMethods.map(method => {
+                      const preparing = oauthBusy && loginMethod === method
+                      return (
+                        <Pressable
+                          key={method}
+                          accessibilityRole="button"
+                          accessibilityLabel={providerLabel(method)}
+                          accessibilityState={{ disabled: controlsDisabled, busy: preparing }}
+                          disabled={controlsDisabled}
+                          onPress={() => signInWithProvider(method)}
+                          style={({ pressed }) => [styles.providerButton, pressed && styles.providerButtonPressed, controlsDisabled && !preparing && styles.providerButtonDisabled]}
+                        >
+                          <View style={styles.providerIcon}>
+                            {preparing ? <ActivityIndicator size="small" color={colors.muted} /> : providerIcon(method)}
+                          </View>
+                          <Text style={styles.providerButtonText} numberOfLines={1}>{providerLabel(method)}</Text>
+                        </Pressable>
+                      )
+                    })}
+                    {providersPhase === 'ready' && oauthMethods.length > 0 && (
+                      <Text style={styles.oauthHint}>{zhCN.setup.oauthHint}</Text>
+                    )}
+                    {providersPhase === 'failed' && (
+                      <View style={styles.retryRow}><Button label={zhCN.common.retry} variant="secondary" onPress={() => setProviderReload(value => value + 1)} /></View>
+                    )}
+                    {oauthMethods.length > 0 && (
+                      <View style={styles.orDivider}>
+                        <View style={styles.orLine} />
+                        <Text style={styles.orText}>{zhCN.setup.or}</Text>
+                        <View style={styles.orLine} />
+                      </View>
+                    )}
+                    {emailVisible && emailContent}
+                    {(!emailVisible || (largeScreen && qrMethods.length > 0)) && (
+                      <View style={styles.altRow}>
+                        {largeScreen && qrMethods.length > 0 && (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={zhCN.setup.qr}
+                            accessibilityHint={zhCN.setup.qrEntryHint}
+                            disabled={controlsDisabled}
+                            onPress={openQr}
+                            style={({ pressed }) => [styles.altButton, pressed && styles.providerButtonPressed]}
+                          >
+                            <QrCodeIcon size={18} color={colors.ink} />
+                            <Text style={styles.altButtonText}>{zhCN.setup.qr}</Text>
+                          </Pressable>
+                        )}
+                        {!emailVisible && (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={zhCN.setup.emailSignIn}
+                            disabled={busy}
+                            onPress={() => {
+                              setShowPassword(true)
+                              setLoginMethod('password')
+                            }}
+                            style={({ pressed }) => [styles.altButton, pressed && styles.providerButtonPressed]}
+                          >
+                            <Mail size={18} color={colors.ink} />
+                            <Text style={styles.altButtonText}>{zhCN.setup.emailSignIn}</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+                  </>}
           </View>
 
 
@@ -1203,31 +1220,35 @@ function createStyles(colors: ThemeColors) {
   // Reading cap for wide landscape tablets; the live width style is applied by
   // the screens that opt in (portrait phones never exceed the cap).
   contentColumn: { width: '100%', alignSelf: 'center' },
-  hero: { width: '100%', alignItems: 'center', paddingTop: spacing.lg },
+  hero: { width: '100%', maxWidth: 400, alignSelf: 'center', alignItems: 'center', paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
   wordmarkRow: { alignItems: 'center', marginTop: spacing.md },
-  wordmark: { fontSize: 34, lineHeight: 40, fontWeight: '900', letterSpacing: -1, color: colors.ink },
+  wordmark: { fontSize: 28, lineHeight: 34, fontWeight: '900', letterSpacing: -0.6, color: colors.ink },
   wordmarkSub: { ...type.caption, color: colors.muted, letterSpacing: 2, marginTop: 2, fontWeight: '600' },
-  loginCard: { marginTop: spacing.md, gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
-  loginCardTitle: { ...type.heading, fontSize: 20, color: colors.ink, textAlign: 'center' },
-  pillInput: { minHeight: 52, borderRadius: 26, paddingHorizontal: spacing.lg, backgroundColor: colors.surfaceStrong, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, color: colors.ink, fontSize: 16 },
-  pillButton: { minHeight: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs, backgroundColor: colors.surfaceStrong },
-  pillButtonReady: { backgroundColor: colors.ink },
-  pillButtonPressed: { opacity: 0.8 },
-  pillButtonText: { ...type.smallStrong, color: colors.muted },
-  pillButtonTextReady: { color: colors.background },
-  pillAction: { alignSelf: 'stretch' },
+  heroLead: { ...type.small, color: colors.muted, textAlign: 'center', marginTop: spacing.xs, maxWidth: 340 },
+  loginCard: { width: '100%', maxWidth: 400, alignSelf: 'center', marginTop: spacing.xxl, gap: spacing.sm, paddingHorizontal: spacing.lg },
+  loginLoading: { minHeight: 172, alignItems: 'center', justifyContent: 'center' },
+  providerButton: { minHeight: 52, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 52, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  providerIcon: { position: 'absolute', left: spacing.md + 2, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  providerButtonText: { ...type.smallStrong, fontSize: 16, color: colors.ink },
+  providerButtonPressed: { opacity: 0.7 },
+  providerButtonDisabled: { opacity: 0.5 },
+  oauthHint: { ...type.caption, color: colors.muted, textAlign: 'center', marginTop: spacing.xxs },
+  retryRow: { alignSelf: 'stretch' },
+  orDivider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.sm },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  orText: { ...type.caption, color: colors.muted },
+  altRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xxs },
+  altButton: { flexGrow: 1, flexBasis: 'auto', minHeight: 44, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, backgroundColor: colors.surfaceStrong },
+  altButtonText: { ...type.smallStrong, color: colors.ink },
+  emailForm: { gap: spacing.sm },
+  loginInput: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.md, backgroundColor: colors.surfaceStrong, color: colors.ink, fontSize: 16 },
+  emailSubmit: { minHeight: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xxs, backgroundColor: colors.surfaceStrong },
+  emailSubmitReady: { backgroundColor: colors.primary },
+  emailSubmitText: { ...type.smallStrong, fontSize: 16, color: colors.muted },
+  emailSubmitTextReady: { color: colors.white },
   textLink: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm },
   textLinkLabel: { ...type.smallStrong, color: colors.primary },
-  providerRow: { flexDirection: 'row', justifyContent: 'center', alignSelf: 'center', width: 276, gap: spacing.sm, marginTop: spacing.sm },
-  providerRowWide: { width: 336, gap: spacing.xxl },
-  providerAction: { width: 276, alignSelf: 'center' },
-  providerActionWide: { width: 336 },
-  providerButton: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink },
-  providerButtonSelected: { borderWidth: 2, borderColor: colors.primary },
-  providerButtonPressed: { opacity: 0.75 },
-  qrEntry: { alignSelf: 'center', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  qrEntryText: { ...type.smallStrong, color: colors.primary },
-  qrLinkText: { ...type.small, color: colors.muted },
+  textLinkDisabled: { opacity: 0.5 },
   loginFooter: { marginTop: 'auto', paddingTop: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   loginCredit: { ...type.caption, color: colors.muted },
   loginCreditLink: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.xs },
@@ -1245,11 +1266,12 @@ function createStyles(colors: ThemeColors) {
   serverDialogContent: { gap: spacing.md },
   serverDialogTitle: { ...type.heading, color: colors.ink },
   serverLabel: { ...type.smallStrong, color: colors.muted },
-  oauthHint: { ...type.caption, color: colors.muted, textAlign: 'center' },
   formLarge: { width: '100%', maxWidth: 560, alignSelf: 'center' },
-  qrPanel: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  qrTitle: { ...type.heading, color: colors.ink, textAlign: 'center' },
-  qrPlaceholder: { minHeight: 200, alignItems: 'center', justifyContent: 'center' },
+  qrPanel: { alignItems: 'center', gap: spacing.md },
+  qrTitle: { ...type.heading, fontSize: 18, color: colors.ink, textAlign: 'center' },
+  qrSegment: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: spacing.sm },
+  qrFrame: { width: 264, height: 264, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', padding: spacing.md, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.border },
+  qrActions: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
   qrHint: { ...type.caption, color: colors.muted, textAlign: 'center', maxWidth: 420 },
   qrMessage: { ...type.small, color: colors.muted, textAlign: 'center', maxWidth: 420 },
   securityNoteLarge: { width: '100%', maxWidth: 560, alignSelf: 'center' },

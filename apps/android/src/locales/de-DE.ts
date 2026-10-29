@@ -202,7 +202,7 @@ const deDE = {
   },
   status: { online: "Online", offline: "Offline", disconnected: "Getrennt", lan: "Direktes LAN", relay: "Server-Relay", p2p: "Direktes P2P", turn: "TURN-Relais", waiting: "Verbindung wird hergestellt", running: "In Bearbeitung" },
   setup: {
-    heroSignIn: 'Bei DeepSeek Harness Remote anmelden', emailSignIn: 'Mit E-Mail anmelden',
+    or: 'oder', heroSignIn: 'Bei DeepSeek Harness Remote anmelden', emailSignIn: 'Mit E-Mail anmelden',
     title: "anmelden", signIn: "Melden Sie sich bei Ihrem Konto an", signInAgain: "Melden Sie sich erneut an", lead: "Wählen Sie dieselbe Anmeldemethode wie auf Ihrem Remote-Gerät, um Ihre Arbeit fortzusetzen.",
     switchServer: "Server wechseln", saveServer: "Server speichern", switchServerHint: "Beim Speichern wird die Verbindung getrennt. Melden Sie sich beim neuen Server an.",
     google: "Mit Google fortfahren",
