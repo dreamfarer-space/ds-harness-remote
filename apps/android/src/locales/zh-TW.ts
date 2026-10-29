@@ -295,7 +295,9 @@ const zhTW = {
     moreActions: '更多操作',
     pinFailed: '置頂失敗，請稍後重試',
     unpinFailed: '取消置頂失敗，請稍後重試',
-    renameFailed: '重新命名失敗，請稍後重試',
+    renameFailed: '重命名失敗，請稍後重試',
+    archiveFailed: '封存對話失敗，請稍後重試',
+    unarchiveFailed: '取消封存失敗，請稍後重試',
   },
   plugins: {
     title: '外掛',

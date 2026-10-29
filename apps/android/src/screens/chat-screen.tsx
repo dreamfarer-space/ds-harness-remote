@@ -956,10 +956,37 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
     setToolsMode('files')
   }, [session?.backend])
 
+  const connected = connection.phase === 'connected' && !reconnectingSession
+  const hasActiveChatItem = visibleMessages.some(isActiveChatItem)
+  const replyActive = connected && (busy === 'send-message' || busy === 'stop-session' || (session?.running ?? false) || hasActiveChatItem)
+  const activeRunStartTime = useMemo(() => {
+    if (!replyActive) return undefined
+    if (runStartTimeRef.current !== undefined) return runStartTimeRef.current
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      const item = visibleMessages[i]
+      if (item !== undefined && item.kind === 'message' && item.role === 'user') {
+        return item.createdAt
+      }
+    }
+    return undefined
+  }, [replyActive, visibleMessages])
+
+  useEffect(() => {
+    if (!replyActive) {
+      runStartTimeRef.current = undefined
+    }
+  }, [replyActive])
+
+  useEffect(() => {
+    if (session === undefined) {
+      onBack()
+    }
+  }, [session, onBack])
+
   if (session === undefined) return null
 
   const submit = async () => {
-    if (!sendReady || permissionSelecting) return
+    if (!sendReady || permissionSelecting || session === undefined) return
     // Read the live ref: the render-closure `draft` can lag the last keystrokes
     // typed right before the tap, silently dropping the tail of the message.
     const submittedDraft = draftRef.current
@@ -1330,31 +1357,11 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
       : agentPresetName(currentPresetRow)
 
   const connectionRetrying = reconnectingSession || connection.phase === 'connecting' || connection.phase === 'reconnecting'
-  const connected = connection.phase === 'connected' && !reconnectingSession
   const sendReady = connected && !busy?.startsWith('session:')
-    && (session?.backend !== 'codex' || codexReadySessionId === session.sessionId)
-  const hasActiveChatItem = visibleMessages.some(isActiveChatItem)
+    && (session.backend !== 'codex' || codexReadySessionId === session.sessionId)
   const hasComposerContent = draft.trim().length > 0 || quotes.length > 0 || images.length > 0 || stagedFiles.length > 0
   const canStop = connected && (busy === 'send-message' || busy === 'stop-session' || session.running || hasActiveChatItem) && !hasComposerContent
   const stopping = busy === 'stop-session'
-  const replyActive = connected && (busy === 'send-message' || busy === 'stop-session' || session.running || hasActiveChatItem)
-  const activeRunStartTime = useMemo(() => {
-    if (!replyActive) return undefined
-    if (runStartTimeRef.current !== undefined) return runStartTimeRef.current
-    for (let i = visibleMessages.length - 1; i >= 0; i--) {
-      const item = visibleMessages[i]
-      if (item !== undefined && item.kind === 'message' && item.role === 'user') {
-        return item.createdAt
-      }
-    }
-    return undefined
-  }, [replyActive, visibleMessages])
-
-  useEffect(() => {
-    if (!replyActive) {
-      runStartTimeRef.current = undefined
-    }
-  }, [replyActive])
   const projectedPermissions = sessionPermissions(session)
   const permissions = projectedPermissions === undefined ? undefined : { ...projectedPermissions, options: permissionOptions ?? projectedPermissions.options }
   const currentPermission = permissions?.options.find(option => option.value === permissions.currentValue)

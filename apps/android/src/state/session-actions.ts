@@ -681,6 +681,7 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         // catalog membership, and do not let a second read hide a successful write.
         set(state => ({
           archivedSessionIds,
+          pinnedSessionIds: state.pinnedSessionIds.filter(id => id !== sessionId),
           busyAction: undefined,
           selectedSession: state.selectedSession?.sessionId === sessionId ? undefined : state.selectedSession,
           sessionModels: state.selectedSession?.sessionId === sessionId ? undefined : state.sessionModels,

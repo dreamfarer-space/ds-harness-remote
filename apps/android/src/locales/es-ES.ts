@@ -298,6 +298,8 @@ const esES = {
     pinFailed: 'Error al fijar la sesión, inténtelo de nuevo más tarde',
     unpinFailed: 'Error al desfijar la sesión, inténtelo de nuevo más tarde',
     renameFailed: 'Error al renombrar la sesión, inténtelo de nuevo más tarde',
+    archiveFailed: 'Error al archivar la sesión, inténtelo de nuevo más tarde',
+    unarchiveFailed: 'Error al desarchivar la sesión, inténtelo de nuevo más tarde',
   },
   plugins: {
     title: 'Plugins',

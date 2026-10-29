@@ -296,6 +296,8 @@ const zhCN = {
     pinFailed: '置顶失败，请稍后重试',
     unpinFailed: '取消置顶失败，请稍后重试',
     renameFailed: '重命名失败，请稍后重试',
+    archiveFailed: '归档会话失败，请稍后重试',
+    unarchiveFailed: '取消归档失败，请稍后重试',
   },
   plugins: {
     title: '插件',

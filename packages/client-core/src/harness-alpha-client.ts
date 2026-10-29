@@ -592,8 +592,12 @@ export class HarnessAlphaClient {
     await this.callValue('workspace/delete', { request: { workspaceId } })
   }
 
-  async workspaceArchiveSession(sessionId: string): Promise<string[]> {
-    const result = await this.callValue<{ archivedSessionIds: string[] }>('workspace/archiveSession', { request: { sessionId } })
+  async workspaceArchiveSession(sessionId: string, options?: { stopActivity?: boolean }): Promise<string[]> {
+    const request: { sessionId: string; stopActivity?: boolean } = {
+      sessionId,
+      stopActivity: options?.stopActivity ?? true,
+    }
+    const result = await this.callValue<{ archivedSessionIds: string[] }>('workspace/archiveSession', { request })
     return Array.isArray(result.archivedSessionIds) ? result.archivedSessionIds : []
   }
 

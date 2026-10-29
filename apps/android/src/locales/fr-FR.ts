@@ -298,6 +298,8 @@ const frFR = {
     pinFailed: 'Échec de l\'épinglage de la session, veuillez réessayer plus tard',
     unpinFailed: 'Échec du désépinglage de la session, veuillez réessayer plus tard',
     renameFailed: 'Échec du renommage de la session, veuillez réessayer plus tard',
+    archiveFailed: 'Échec de l\'archivage de la session, veuillez réessayer plus tard',
+    unarchiveFailed: 'Échec du désarchivage de la session, veuillez réessayer plus tard',
   },
   plugins: {
     title: 'Plugins',

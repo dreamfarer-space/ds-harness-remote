@@ -831,11 +831,18 @@ export function HostSessionsDrawer({
                   onPress={async () => {
                     const sid = menuSession.sessionId
                     const wasArchived = menuIsArchived
+                    const isCurrent = sid === selected?.sessionId
                     setMenuSession(null)
                     if (wasArchived) {
-                      await unarchiveSession(sid, menuSession.backend)
+                      const ok = await unarchiveSession(sid, menuSession.backend)
+                      if (!ok) setToastMessage(strings.sessions.unarchiveFailed)
                     } else {
-                      await archiveSession(sid)
+                      const ok = await archiveSession(sid)
+                      if (!ok) {
+                        setToastMessage(strings.sessions.archiveFailed)
+                      } else if (isCurrent) {
+                        closeDrawer()
+                      }
                     }
                   }}
                 >
