@@ -160,7 +160,7 @@ export interface AppState {
   stopSession(): Promise<void>
   respondApproval(itemId: string, outcome: 'allowed-once' | 'rejected'): Promise<void>
   respondQuestion(itemId: string, selected: Record<string, string[]>, custom?: Record<string, string>): Promise<void>
-  createSession(workspaceId?: string): Promise<boolean>
+  createSession(workspaceId?: string, backend?: AgentBackend): Promise<boolean>
   forkSession(sessionId: string, backend?: RemoteSession['backend']): Promise<RemoteSession | undefined>
   archiveSession(sessionId: string): Promise<boolean>
   unarchiveSession(sessionId: string, backend?: RemoteSession['backend']): Promise<boolean>

@@ -47,7 +47,7 @@ import { useThemedStyles } from '../ui/use-themed-styles'
 import { resolveSessionDisplayTitle } from './session-title'
 import { OfficialMenuIcons } from '../ui/official-menu-icons'
 import { browseStatus } from '../lib/backend-groups'
-import { loadHostSessionsDrawerGroups, saveHostSessionsDrawerGroup } from '../services/storage'
+import { loadHostSessionsDrawerGroups, saveHostSessionsDrawerGroup, saveWorkspaceBackend } from '../services/storage'
 import { clampDrawerTranslate, shouldConfirmSwipeLeftClose, shouldStartSwipeLeftToClose } from '../lib/gesture-swipe-rules'
 
 const SESSION_PAGE_SIZE = 3
@@ -186,10 +186,62 @@ export function HostSessionsDrawer({
   const windowDimensions = useWindowDimensions()
   const sheetMaxHeight = Math.min(windowDimensions.height * 0.75, 520)
 
-  const handleSelectHarness = (target: AgentBackend) => {
+  const isBackendAvailable = (target: AgentBackend) => {
+    switch (target) {
+      case 'harness': return true
+      case 'codex': return useAppStore.getState().codexAvailable
+      case 'cursor': return useAppStore.getState().cursorAvailable
+      case 'antigravity': return useAppStore.getState().antigravityAvailable
+      case 'pi': return useAppStore.getState().piAvailable
+      case 'opencode': return useAppStore.getState().opencodeAvailable
+      case 'claude': return useAppStore.getState().claudeAvailable
+      default: return false
+    }
+  }
+
+  const handleSelectHarness = async (target: AgentBackend) => {
     setHarnessPickerOpen(false)
-    if (target === backend) return
-    setBackend(target)
+    if (!isBackendAvailable(target)) {
+      Alert.alert(
+        strings.common.unavailable ?? '平台未启用',
+        `当前连接的主机未启用 ${harnessDisplayName(target)} 服务，请在电脑端配置或启动该智能体。`,
+      )
+      return
+    }
+
+    if (target === backend && selected && (selected.backend ?? 'harness') === target) {
+      closeDrawer()
+      return
+    }
+
+    let success = false
+    const targetSessions = sessions.filter(s => (s.backend ?? 'harness') === target && !archivedIds.includes(s.sessionId))
+    if (targetSessions.length > 0) {
+      const latest = [...targetSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+      if (latest) {
+        await onSelect(latest)
+        success = true
+      }
+    } else {
+      const targetWs = workspaces.find(w => (w.backend ?? 'harness') === target)?.workspaceId
+      success = await createSession(targetWs, target)
+    }
+
+    if (success) {
+      setBackend(target)
+      if (deviceId !== undefined) {
+        void saveWorkspaceBackend(deviceId, target)
+      }
+      if (connected) {
+        void refreshWorkspaces(target)
+      }
+      closeDrawer()
+    } else {
+      Alert.alert(
+        strings.common.unavailable ?? '切换失败',
+        `无法切换到 ${harnessDisplayName(target)} 对话，请稍后重试。`,
+      )
+    }
   }
 
   const [refreshing, setRefreshing] = useState(false)
@@ -294,7 +346,7 @@ export function HostSessionsDrawer({
     creatingSessionRef.current = true
     lastNewSessionTimeRef.current = now
     try {
-      const ok = await createSession(targetWs)
+      const ok = await createSession(targetWs, backend)
       if (ok) onClose()
     } finally {
       creatingSessionRef.current = false
@@ -1084,16 +1136,17 @@ export function HostSessionsDrawer({
               <GroupCard>
                 {HARNESS_OPTIONS.map((option, index) => {
                   const chosen = option.value === backend
+                  const available = isBackendAvailable(option.value)
                   return (
                     <GroupRow
                       key={option.value}
                       first={index === 0}
                       label={option.name}
-                      detail={option.desc}
+                      detail={available ? option.desc : `${option.desc}（未启用）`}
                       selected={chosen}
                       chevron={false}
                       accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
-                      onPress={() => handleSelectHarness(option.value)}
+                      onPress={() => void handleSelectHarness(option.value)}
                     />
                   )
                 })}

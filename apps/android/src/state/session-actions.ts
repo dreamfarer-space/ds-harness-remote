@@ -427,7 +427,7 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
       updateBrowseEntry(scope, targetId, { quotes: [...existing, text.trim()] })
     },
 
-    async createSession(workspaceId) {
+    async createSession(workspaceId, targetBackend) {
       if (get().connection.phase !== 'connected') return false
       if (runtime.createSessionFlight !== undefined || get().busyAction === 'create-session') return false
       const task = (async () => {
@@ -436,10 +436,14 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         set({ busyAction: 'create-session', error: undefined })
         try {
           const workspace = workspaceId === undefined ? undefined : get().workspaces.find(item => item.workspaceId === workspaceId)
-          if (workspace?.backend === 'codex') {
+          const backend = targetBackend ?? workspace?.backend ?? 'harness'
+          const existingPath = workspace?.path || get().workspaces.find(w => !!w.path)?.path
+          const isWin = get().selectedDevice?.platform === 'windows'
+          const cwd = existingPath || (isWin ? 'C:\\' : '/')
+          if (backend === 'codex') {
             const client = runtime.connection.requireCodex()
             const result = record(await client.request('thread/start', {
-              cwd: workspace.path,
+              cwd,
               permissionPreset: defaultPermission === 'default' ? 'workspace-write' : defaultPermission,
             }))
             if (generation !== runtime.connectionGeneration) return false
@@ -454,108 +458,120 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
             if (generation !== runtime.connectionGeneration) return false
             set(state => ({
               sessions: [created, ...state.sessions.filter(item => item.sessionId !== created.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? { ...item, sessionIds: [created.sessionId, ...item.sessionIds.filter(id => id !== created.sessionId)] }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? { ...item, sessionIds: [created.sessionId, ...item.sessionIds.filter(id => id !== created.sessionId)] }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(created)
           }
-          if (workspace?.backend === 'cursor') {
-            const created = await runtime.connection.requireCursor().createSession(workspace.path, 'agent', 'cursor')
+          if (backend === 'cursor') {
+            const created = await runtime.connection.requireCursor().createSession(cwd, 'agent', 'cursor')
             const session = createCursorSession({
               acpSessionId: created.sessionId,
-              cwd: workspace.path,
-              title: workspace.title,
+              cwd,
+              title: workspace?.title ?? 'Cursor',
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? {
-                  ...item,
-                  sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
-                  updatedAt: new Date().toISOString(),
-                }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? {
+                    ...item,
+                    sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
+                    updatedAt: new Date().toISOString(),
+                  }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(session)
           }
-          if (workspace?.backend === 'antigravity') {
-            const created = await runtime.connection.requireAntigravity().createSession(workspace.path, 'agent', 'antigravity')
+          if (backend === 'antigravity') {
+            const created = await runtime.connection.requireAntigravity().createSession(cwd, 'agent', 'antigravity')
             const session = createAntigravitySession({
               acpSessionId: created.sessionId,
-              cwd: workspace.path,
+              cwd,
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? {
-                  ...item,
-                  sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
-                  updatedAt: new Date().toISOString(),
-                }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? {
+                    ...item,
+                    sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
+                    updatedAt: new Date().toISOString(),
+                  }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(session)
           }
-          if (workspace?.backend === 'pi') {
-            const created = await runtime.connection.requirePi().createSession(workspace.path, 'agent', 'pi')
+          if (backend === 'pi') {
+            const created = await runtime.connection.requirePi().createSession(cwd, 'agent', 'pi')
             if (generation !== runtime.connectionGeneration) return false
             const session = createPiSession({
               acpSessionId: created.sessionId,
-              cwd: workspace.path,
+              cwd,
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? {
-                  ...item,
-                  sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
-                  updatedAt: new Date().toISOString(),
-                }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? {
+                    ...item,
+                    sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
+                    updatedAt: new Date().toISOString(),
+                  }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(session)
           }
-          if (workspace?.backend === 'opencode') {
-            const created = await runtime.connection.requireOpencode().createSession(workspace.path, 'agent', 'opencode')
+          if (backend === 'opencode') {
+            const created = await runtime.connection.requireOpencode().createSession(cwd, 'agent', 'opencode')
             if (generation !== runtime.connectionGeneration) return false
             const session = createOpencodeSession({
               acpSessionId: created.sessionId,
-              cwd: workspace.path,
+              cwd,
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? {
-                  ...item,
-                  sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
-                  updatedAt: new Date().toISOString(),
-                }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? {
+                    ...item,
+                    sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
+                    updatedAt: new Date().toISOString(),
+                  }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(session)
           }
-          if (workspace?.backend === 'claude') {
-            const created = await runtime.connection.requireClaude().createSession(workspace.path, 'agent', 'claude')
+          if (backend === 'claude') {
+            const created = await runtime.connection.requireClaude().createSession(cwd, 'agent', 'claude')
             if (generation !== runtime.connectionGeneration) return false
             const session = createClaudeSession({
               acpSessionId: created.sessionId,
-              cwd: workspace.path,
+              cwd,
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
-              workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
-                ? {
-                  ...item,
-                  sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
-                  updatedAt: new Date().toISOString(),
-                }
-                : item),
+              ...(workspace === undefined ? {} : {
+                workspaces: state.workspaces.map(item => item.workspaceId === workspace.workspaceId
+                  ? {
+                    ...item,
+                    sessionIds: [session.sessionId, ...item.sessionIds.filter(id => id !== session.sessionId)],
+                    updatedAt: new Date().toISOString(),
+                  }
+                  : item),
+              }),
               busyAction: undefined,
             }))
             return get().openSession(session)
