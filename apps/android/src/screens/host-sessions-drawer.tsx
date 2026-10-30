@@ -38,7 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '../state/store'
 import type { AgentBackend, RemoteSession, WorkspaceView } from '../types'
 import { strings } from '../locales/i18n'
-import { floatingShadow, radius, spacing, type } from '../ui/theme'
+import { brandGlowShadow, floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
 import { resolveSessionDisplayTitle } from './session-title'
@@ -1069,7 +1069,7 @@ const createStyles = (colors: ThemeColors) =>
     iconBtnRound: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.elevated, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
 
     // Floating black pill, as in the reference sidebar.
-    newSessionFloat: { position: 'absolute', right: spacing.lg, bottom: spacing.lg, zIndex: 20, elevation: 20 },
+    newSessionFloat: { position: 'absolute', right: spacing.lg, bottom: spacing.lg, zIndex: 20 },
     newSessionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1079,7 +1079,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.xl,
       borderRadius: radius.pill,
       backgroundColor: colors.inverse,
-      ...floatingShadow(colors, 'high'),
+      ...brandGlowShadow(colors),
     },
     newSessionText: { ...type.bodyStrong, color: colors.onInverse },
 

@@ -12,25 +12,27 @@ CodeX / ACP 在内存中投影到同一原生 UI，不增加独立会话页面�
 ## 2. 主题与颜色
 
 Android 支持跟随系统、浅色与深色主题；当前 token 是源码中的 sRGB/RGBA 值，不使用早期 OKLCH moss 方案。
-2026-10-30 调整画布与卡片，保留 DeepSeek 黑 / 蓝强调：近黑文字、DeepSeek 蓝 `#4D6BFE` 强调、卡片置于浅雾蓝画布 `#F0F4FD` 上，搭配精致细线边框。浅色卡片使用白色 60% 不透明度，深色卡片使用白色 5% 不透明度；仅背景填充半透明，文字与控件不降低整体 opacity。
+2026-10-30 调整全局色彩系统，对齐高可读性与精简卡片规范：主要文字与图标统一为纯深墨色 `#0F0F0F`、页面画布 `#F8F8F8`、分组卡片 `#FFFFFF`、分组标题与次级说明 `#59606D`、右侧箭头 `#B9B9BB`、细线分隔线 `#EDEDED`，悬浮主操作按钮采用 DeepSeek 蓝调柔和微光投影 `brandGlowShadow`。
 
 | 角色 | 浅色 | 深色 | 用途 |
 | --- | --- | --- | --- |
-| background | `#F0F4FD` | `#0B0D11` | 页面画布 |
+| background | `#F8F8F8` | `#0B0D11` | 页面画布 |
 | surface | `#FFFFFF` | `#161A21` | 不透明浮层与输入框 |
-| card | `rgba(255, 255, 255, 0.60)` | `rgba(255, 255, 255, 0.05)` | 卡片背景 |
-| cardOpaque | `#F9FBFE` | `#17191D` | 卡片与画布合成色，用于遮住滑动删除底层 |
-| grouped | `rgba(255, 255, 255, 0.60)` | `rgba(255, 255, 255, 0.05)` | 设置式分组列表 |
+| card | `#FFFFFF` | `rgba(255, 255, 255, 0.05)` | 卡片背景 |
+| cardOpaque | `#FFFFFF` | `#17191D` | 卡片与画布合成色，用于遮住滑动删除底层 |
+| grouped | `#FFFFFF` | `rgba(255, 255, 255, 0.05)` | 设置式分组列表 |
 | elevated | `#FFFFFF` | `#1D222B` | 浮动标题栏按钮 |
 | surfaceStrong | `#ECEFF4` | `#232832` | 胶囊、按下态 |
-| ink | `#0D1117` | `#F2F4F7` | 主要文字 |
-| muted | `#5B6270` | `#A2A9B6` | 次级文字 |
+| ink | `#0F0F0F` | `#F2F4F7` | 主要文字、图标 |
+| muted | `#59606D` | `#A2A9B6` | 分组标题、次级说明文字 |
+| subtle | `#B9B9BB` | `#7A8291` | 右侧箭头、次级占位 |
 | primary / accent | `#4D6BFE` | `#6F89FF` | 主要操作与选中态 |
-| inverse / onInverse | `#0D1117` / `#FFFFFF` | `#F2F4F7` / `#0B0D11` | 浮动主操作（如侧栏「新建对话」黑色胶囊） |
+| inverse / onInverse | `#0F0F0F` / `#FFFFFF` | `#F2F4F7` / `#0B0D11` | 浮动主操作（如侧栏「新建对话」胶囊） |
 | success | `#1E8449` | `#4CC07D` | 成功 / 在线状态 |
 | warning | `#95600A` | `#E0A53A` | 需注意状态 |
 | danger | `#C2362F` | `#F2736C` | 错误与危险操作 |
-| border | `#DFE3EA` | `#2B313C` | 边界 |
+| border | `#EDEDED` | `#2B313C` | 边框与卡片内分隔线 |
+| separator | `#EDEDED` | `#252B35` | 卡片内分隔线 |
 
 完整 pressed/soft/disabled/separator/scrim 等值引用源码，不在各组件复制新色表。
 状态同时提供文字或图标，不单靠颜色区分在线、重连、权限或选中项。

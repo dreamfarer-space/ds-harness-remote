@@ -62,25 +62,25 @@ export interface ThemeColors {
   shadow: string
 }
 
-// DeepSeek palette: near-black ink, DeepSeek blue (#4D6BFE) accents and white
-// cards on a mist-blue canvas; floating sheets and inputs remain opaque.
+// DeepSeek palette: ink #0F0F0F, DeepSeek blue (#4D6BFE) accents, white cards (#FFFFFF)
+// on a soft canvas (#F8F8F8) with #EDEDED hairline dividers and #59606D readable muted text.
 export const lightColors: ThemeColors = {
-  background: '#F0F4FD',
+  background: '#F8F8F8',
   surface: '#FFFFFF',
-  card: 'rgba(255, 255, 255, 0.60)',
-  cardOpaque: '#F9FBFE',
+  card: '#FFFFFF',
+  cardOpaque: '#FFFFFF',
   surfaceStrong: '#ECEFF4',
-  grouped: 'rgba(255, 255, 255, 0.60)',
+  grouped: '#FFFFFF',
   elevated: '#FFFFFF',
-  ink: '#0D1117',
-  muted: '#5B6270',
-  subtle: '#8A919E',
+  ink: '#0F0F0F',
+  muted: '#59606D',
+  subtle: '#B9B9BB',
   primary: '#4D6BFE',
   primaryPressed: '#3A56E6',
   primarySoft: '#EBEFFF',
   accent: '#4D6BFE',
   accentSoft: '#EBEFFF',
-  inverse: '#0D1117',
+  inverse: '#0F0F0F',
   onInverse: '#FFFFFF',
   success: '#1E8449',
   successSoft: '#E2F3E9',
@@ -88,14 +88,14 @@ export const lightColors: ThemeColors = {
   warningSoft: '#FBEFD5',
   danger: '#C2362F',
   dangerSoft: '#FBE7E5',
-  border: '#DFE3EA',
-  separator: '#E2E5EB',
+  border: '#EDEDED',
+  separator: '#EDEDED',
   disabled: '#B3B9C4',
   white: '#FFFFFF',
-  scrim: 'rgba(13, 17, 23, 0.40)',
-  modalBackdrop: 'rgba(13, 17, 23, 0.42)',
-  menuDismiss: 'rgba(13, 17, 23, 0.14)',
-  shadow: '#0B1220',
+  scrim: 'rgba(15, 15, 15, 0.40)',
+  modalBackdrop: 'rgba(15, 15, 15, 0.42)',
+  menuDismiss: 'rgba(15, 15, 15, 0.14)',
+  shadow: '#1A2638',
 }
 
 export const darkColors: ThemeColors = {
@@ -163,6 +163,17 @@ export function floatingShadow(colors: { shadow: string }, strength: 'low' | 'hi
   return strength === 'high'
     ? { shadowColor: colors.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 }
     : { shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }
+}
+
+/** Soft brand glow for prominent floating call-to-action pills (e.g. create session). */
+export function brandGlowShadow(colors: { primary: string; shadow: string }) {
+  return {
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 4,
+  }
 }
 
 export const standardType = {

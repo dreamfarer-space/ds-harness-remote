@@ -181,7 +181,7 @@ export function TopBar({
         <View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: scheme === 'dark' ? 'rgba(11, 13, 17, 0.72)' : 'rgba(240, 244, 253, 0.85)' }
+            { backgroundColor: scheme === 'dark' ? 'rgba(11, 13, 17, 0.72)' : 'rgba(248, 248, 248, 0.85)' }
           ]}
           pointerEvents="none"
         />
@@ -492,7 +492,7 @@ export function GroupRow({ icon: Icon, iconSpace = false, label, detail, value, 
   const content = ({ pressed }: { pressed: boolean }) => (
     <View style={[styles.groupRow, pressed && styles.groupRowPressed]}>
       {Icon !== undefined
-        ? <View style={styles.groupRowIcon}><Icon size={21} color={danger ? colors.danger : selected ? colors.primary : colors.muted} strokeWidth={1.8} /></View>
+        ? <View style={styles.groupRowIcon}><Icon size={21} color={danger ? colors.danger : selected ? colors.primary : colors.ink} strokeWidth={1.8} /></View>
         : iconSpace && <View style={styles.groupRowIcon} />}
       <View style={[styles.groupRowBody, !first && styles.groupRowDivider]}>
         <View style={styles.groupRowCopy}>
@@ -637,9 +637,9 @@ function createStyles(colors: ThemeColors) {
     rowDetailLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     rowSubtitle: { ...type.small, color: colors.muted },
     rowInlineSubtitle: { flex: 1 },
-    rowMeta: { ...type.caption, color: colors.subtle },
+    rowMeta: { ...type.caption, color: colors.muted },
     sectionTitleRow: { minHeight: 36, marginTop: spacing.xl, marginBottom: spacing.xs, paddingLeft: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    sectionTitle: { ...type.small, fontSize: 15, lineHeight: 20, color: colors.muted },
+    sectionTitle: { ...type.small, fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.muted },
     keyValue: { paddingVertical: spacing.sm, flexDirection: 'row', gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
     keyLabel: { ...type.small, color: colors.muted, maxWidth: '40%' },
     keyValueText: { ...type.smallStrong, color: colors.ink, flex: 1, textAlign: 'right' },

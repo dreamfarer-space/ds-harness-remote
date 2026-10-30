@@ -6,7 +6,7 @@ import { getContentUriAsync } from 'expo-file-system/legacy'
 import * as IntentLauncher from 'expo-intent-launcher'
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Toggle } from '../ui/toggle'
-import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, ExternalLink, Fingerprint, FolderPen, Globe, Hash, History, Info, KeyRound, Languages, Laptop, ListCollapse, LockKeyhole, LogOut, Mail, MoreVertical, PanelTop, QrCode as QrCodeIcon, RotateCcw, Route, Settings, ShieldAlert, ShieldCheck, Smartphone, Type, UserRound, type LucideIcon } from 'lucide-react-native'
+import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, ExternalLink, Fingerprint, FolderPen, Globe, Hash, History, Info, KeyRound, Languages, Laptop, ListCollapse, LockKeyhole, LogOut, Mail, MoreVertical, PanelTop, QrCode as QrCodeIcon, RotateCcw, Route, Settings, ShieldAlert, ShieldCheck, Smartphone, Type, UserRound, X, type LucideIcon } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { QrLoginStart } from '../state/store-state'
 import { SOURCE_CODE_URL } from '../lib/links'
@@ -599,8 +599,8 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const setPreference = useAppStore(state => state.setTransportPreference)
   const languagePreference = useAppStore(state => state.languagePreference)
   const setLanguagePreference = useAppStore(state => state.setLanguagePreference)
-  const [allLanguagesVisible, setAllLanguagesVisible] = useState(false)
-  const showAllLanguages = allLanguagesVisible || !['system', 'zh-CN', 'en-US'].includes(languagePreference)
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false)
+  const currentLanguageLabel = languageOptions().find(o => o.value === languagePreference)?.name ?? zhCN.settings.languageSystem
   const themePreference = useAppStore(state => state.themePreference)
   const setThemePreference = useAppStore(state => state.setThemePreference)
   const typographyDensity = useAppStore(state => state.typographyDensity)
@@ -621,7 +621,7 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const styles = useThemedStyles(createStyles)
   // Cap the read-only info column on wide landscape tablets; phone portrait
   // already fits inside contentMaxWidth, so nothing changes there.
-  const { contentMaxWidth, landscape } = useResponsiveLayout()
+  const { contentMaxWidth, landscape, sheetMaxHeight } = useResponsiveLayout()
 
   const openNotificationSettings = async () => {
     if (Platform.OS === 'android' && Application.applicationId) {
@@ -766,30 +766,14 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
 
             <SectionTitle>{zhCN.settings.language}</SectionTitle>
             <GroupCard>
-              {languageOptions().filter((_, index) => showAllLanguages || index < 3).map((option, index) => {
-                const chosen = option.value === languagePreference
-                return (
-                  <GroupRow
-                    key={option.value}
-                    first={index === 0}
-                    icon={index === 0 ? Languages : undefined}
-                    iconSpace
-                    label={option.name}
-                    selected={chosen}
-                    chevron={false}
-                    accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
-                    onPress={() => void setLanguagePreference(option.value)}
-                  />
-                )
-              })}
-              {!showAllLanguages && (
-                <GroupRow
-                  iconSpace
-                  label="More ..."
-                  accessibilityLabel={zhCN.settings.languageShowAll}
-                  onPress={() => setAllLanguagesVisible(true)}
-                />
-              )}
+              <GroupRow
+                first
+                icon={Languages}
+                label={zhCN.settings.language}
+                value={currentLanguageLabel}
+                chevron
+                onPress={() => setLanguagePickerOpen(true)}
+              />
             </GroupCard>
 
             <SectionTitle>{zhCN.comfort.continueWork}</SectionTitle>
@@ -914,6 +898,38 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
           </View>
         </Screen>
       </BlurHeaderFrame>
+      <Modal visible={languagePickerOpen} transparent animationType="fade" onRequestClose={() => setLanguagePickerOpen(false)} statusBarTranslucent>
+        <View style={styles.languageBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={zhCN.common.close} onPress={() => setLanguagePickerOpen(false)} />
+          <View style={[styles.languageDialog, { maxHeight: sheetMaxHeight }]} accessibilityViewIsModal>
+            <View style={styles.languageHeader}>
+              <Text style={styles.languageTitle} accessibilityRole="header">{zhCN.settings.language}</Text>
+              <IconButton label={zhCN.common.close} icon={X} onPress={() => setLanguagePickerOpen(false)} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.languageList}>
+              <GroupCard>
+                {languageOptions().map((option, index) => {
+                  const chosen = option.value === languagePreference
+                  return (
+                    <GroupRow
+                      key={option.value}
+                      first={index === 0}
+                      label={option.name}
+                      selected={chosen}
+                      chevron={false}
+                      accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
+                      onPress={() => {
+                        setLanguagePickerOpen(false)
+                        void setLanguagePreference(option.value)
+                      }}
+                    />
+                  )
+                })}
+              </GroupCard>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -1373,5 +1389,19 @@ function createStyles(colors: ThemeColors) {
   aboutVersion: { ...type.small, color: colors.muted, textAlign: 'center' },
   resetArea: { marginTop: spacing.xxxl },
   resetGap: { height: spacing.sm },
+  languageBackdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
+  languageDialog: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+    ...floatingShadow(colors, 'high'),
+  },
+  languageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: spacing.xs },
+  languageTitle: { ...type.heading, fontSize: 18, color: colors.ink, fontWeight: '700' },
+  languageList: { paddingBottom: spacing.md },
   })
 }
