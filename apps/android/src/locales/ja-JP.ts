@@ -231,6 +231,7 @@ const jaJP = {
     signOut: "サインアウト", resetLocal: "ローカルデータをクリアする", resetTitle: "この携帯電話のデータを消去しますか?", resetBody: "これにより、サーバー設定、サインイン情報、および信頼されたデバイスが削除されます。再度サインインする必要があります。これを元に戻すことはできません。", reset: "データのクリア", signOutTitle: "このアカウントからサインアウトしますか?", signOutBody: "デバイスにアクセスするには、再度サインインする必要があります。",
   },
   devices: {
+    summary: (total: number, online: number) => `${total} 台 · ${online} 台オンライン`,
     rename: "名前の変更", renameTitle: "デバイスの名前を変更する", namePlaceholder: "デバイス名を入力してください", saveName: "保存", renameHint: "新しい名前は、アカウントのデバイス リスト全体で共有されます。",
     title: "デバイス", myDevices: "私のデバイス", lead: "作業を続けるためのデバイスを選択してください", footer: "いつでも作業を続けてください。", favorites: "お気に入り", recent: "最近アクセスした項目", openFavorite: (title: string, device: string) => `お気に入りから ${device} の「${title}」を開きます`, openRecent: (title: string, device: string) => `${device} で最近アクセスした「${title}」を開きます`, removeFavorite: (title: string) => `「${title}」をお気に入りから削除します`, emptyTitle: "利用可能なデバイスがありません", emptyBody: "DSH リモート プラグインをコンピュータにインストールし、同じアカウントにサインインします。ここにデバイスが表示されます。", options: "デバイスの管理", encrypted: "安全な接続",
     connectionInterrupted: "接続が中断されました", trustExplanation: "確認後、この電話はデバイスの安全な ID を記憶します。その ID が変更されると、データを保護するために接続が停止します。", trust: "信頼して続けてください", connectReady: "接続すると、コンピュータ上で会話を表示したり、会話を継続したりできます。", offlineHelp: "このデバイスはオフラインです。 DSH リモート プラグインがコンピュータ上で実行されていることを確認してください。", secureConnect: "安全に接続する",

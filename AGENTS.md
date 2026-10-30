@@ -20,6 +20,20 @@ Desktop/CLI 安装命令；`scripts/install.sh` 支持 `INTELLIGENT_UI=1` 安装
 保存并持久化、越界本地拦截、恢复默认、插件停用/启用（profile 恢复原状）。未验证真机、Desktop profile
 （其 intelligent-ui 为独立旧副本）与暗色模式人工烟测。
 
+## Android visual refresh (2026-10-29)
+
+重做 Android 前端视觉，仅改前端样式与布局，不改 Host/Server、协议或状态逻辑。
+色板改为 DeepSeek 黑 / 蓝 / 白（`#4D6BFE`），新增 grouped/elevated/inverse token 与 xl/xxl 圆角；
+TopBar 改为浮动圆钮 / 胶囊，新增 GroupCard/GroupRow/FilterChip，新增平滑 Toggle 组件（`src/ui/toggle.tsx`）全量替代 8 处旧 Switch 控件；
+Settings 改为分组列表、外观预览卡与底部红色高危操作行（退出登录/重置配置）；
+列表全面推行扁平设计：首页设备卡与最近访问使用平铺白底块及线性图标，工作区与侧边栏采用扁平文件夹列表（chevron、文件夹、名称、计数）；
+侧边栏改为大标题 + 图标导航 + 右下浮动「新建对话」黑色胶囊（清理了旧版标题下方的状态/版本行）；聊天欢迎页突出蓝鲸 Logo 与大标题（不设上下文胶囊）。
+新增文案仅 `devices.summary`，已补齐 7 种语言。详见 docs/design/DESIGN.md。
+
+本轮验证：Android check（含 tsc）与 42 文件 / 271 tests 通过；模拟器（debug 包 + Metro）浅色/深色
+逐页人工检查。未构建 APK，未验证真机、平板/横屏、大字体、TalkBack；未在会话中实际发送消息，
+用户气泡、工具卡与审批卡新样式未经真实对话验收。
+
 ## WebRTC runtime probe isolation (2026-10-25)
 
 外部原生 WebRTC helper 的候选探测必须显式设置 `ELECTRON_RUN_AS_NODE=1`，不能删除该标记：

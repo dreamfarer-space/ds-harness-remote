@@ -4,29 +4,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import { File } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 import { AnimatedEllipsis } from '../ui/animated-ellipsis'
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  Camera,
-  ChevronDown,
-  ChevronRight,
-  CircleStop,
-  FileText,
-  Folder,
-  Images,
-  Layers,
-  ListTree,
-  Menu,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  ShieldAlert,
-  Sparkles,
-  Terminal,
-  Users,
-  X,
-} from 'lucide-react-native'
+import { ArrowDown, ArrowLeft, ArrowUp, Camera, ChevronDown, ChevronRight, CircleStop, FileText, Folder, Images, Layers, ListTree, Menu, MessageSquare, Plus, RefreshCw, ShieldAlert, Sparkles, Terminal, Users, X, Zap } from 'lucide-react-native'
 import {
   type StagedFile,
   documentImageReadBudget,
@@ -1896,14 +1874,13 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
               disabled={!connected || permissionSelecting}
               onPress={openPromptsPicker}
               hitSlop={{ top: 8, bottom: 8 }}
-              style={({ pressed }) => [styles.quickPromptsButton, pressed && styles.plusPressed, (!connected || permissionSelecting) && styles.plusDisabled]}
+              style={({ pressed }) => [styles.plusButton, pressed && styles.plusPressed, (!connected || permissionSelecting) && styles.plusDisabled]}
             >
-              <Text style={styles.quickPromptsText} numberOfLines={1}>{zhCN.chat.quickPrompts}</Text>
+              <Zap size={18} color={connected ? colors.ink : colors.disabled} strokeWidth={1.9} />
             </Pressable>
             <View style={styles.composerSpacer} />
             {sessionModels !== undefined && (
               <Pressable accessibilityRole="button" accessibilityLabel={zhCN.chat.selectModel} onPress={() => setModelPickerOpen(true)} style={styles.modelChip}>
-                <Sparkles size={14} color={colors.primary} />
                 <Text style={styles.modelChipText} numberOfLines={1}>{currentModelLabel}</Text>
                 {modelSelecting ? <ActivityIndicator size="small" color={colors.muted} /> : <ChevronDown size={14} color={colors.muted} />}
               </Pressable>
@@ -1918,8 +1895,8 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
                   style={({ pressed }) => [styles.stopButton, pressed && !stopping && styles.stopPressed, stopping && styles.sendDisabled]}
                 >
                   {stopping
-                    ? <ActivityIndicator size="small" color={colors.white} />
-                    : <CircleStop size={20} color={colors.white} />}
+                    ? <ActivityIndicator size="small" color={colors.onInverse} />
+                    : <CircleStop size={20} color={colors.onInverse} />}
                 </Pressable>
               : <>
                 {/* With text in the composer the primary action is the send
@@ -1937,7 +1914,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
                   >
                     {stopping
                       ? <ActivityIndicator size="small" color={colors.white} />
-                      : <CircleStop size={17} color={colors.white} />}
+                      : <CircleStop size={17} color={colors.onInverse} />}
                   </Pressable>
                 )}
                 <Pressable
@@ -1948,7 +1925,7 @@ export function ChatScreen({ onBack, onOpenDevices, onNewSession, onOpenWorkspac
                   onPress={() => void submit()}
                   style={({ pressed }) => [styles.sendButton, pressed && styles.sendPressed, (!sendReady || permissionSelecting || !hasComposerContent) && styles.sendDisabled]}
                 >
-                  <ArrowUp size={20} color={colors.white} />
+                  <ArrowUp size={20} color={!sendReady || permissionSelecting || !hasComposerContent ? colors.subtle : colors.white} strokeWidth={2.4} />
                 </Pressable>
                 </>}
           </View>

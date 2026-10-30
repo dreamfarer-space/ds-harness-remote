@@ -28,7 +28,8 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  PlusCircle,
+  LayoutGrid,
+  Plus,
   RefreshCw,
   Search,
   Sliders,
@@ -37,7 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '../state/store'
 import type { AgentBackend, RemoteSession, WorkspaceView } from '../types'
 import { strings } from '../locales/i18n'
-import { radius, spacing, type } from '../ui/theme'
+import { floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
 import { resolveSessionDisplayTitle } from './session-title'
@@ -493,7 +494,7 @@ export function HostSessionsDrawer({
       <View style={styles.brandHeader}>
         <Pressable accessibilityRole="button" accessibilityLabel={`${deviceName ?? strings.devices.title} · ${strings.chat.backToWorkspaces}`}
           onPress={onOpenWorkspaces} hitSlop={8}
-          style={({ pressed }) => [styles.brandLeft, pressed && styles.pressedBg]}>
+          style={({ pressed }) => [styles.brandLeft, pressed && styles.pressedFade]}>
           <Text style={styles.brandTitle} numberOfLines={1}>{deviceName ?? strings.devices.title}</Text>
         </Pressable>
         <View style={styles.brandRight}>
@@ -502,29 +503,27 @@ export function HostSessionsDrawer({
             accessibilityLabel={strings.common.refresh}
             onPress={() => void handleRefresh()}
             hitSlop={8}
-            style={styles.iconBtn}
+            style={({ pressed }) => [styles.iconBtnRound, pressed && styles.pressedBg]}
           >
-            <RefreshCw size={15} color={colors.muted} />
+            <RefreshCw size={17} color={colors.ink} strokeWidth={1.9} />
           </Pressable>
           {onBack && (
-            <Pressable accessibilityRole="button" accessibilityLabel={backLabel ?? 'Back'} onPress={onBack} hitSlop={8} style={styles.iconBtn}>
-              <ArrowLeft size={16} color={colors.muted} />
+            <Pressable accessibilityRole="button" accessibilityLabel={backLabel ?? 'Back'} onPress={onBack} hitSlop={8} style={({ pressed }) => [styles.iconBtnRound, pressed && styles.pressedBg]}>
+              <ArrowLeft size={18} color={colors.ink} strokeWidth={1.9} />
             </Pressable>
           )}
         </View>
       </View>
 
-      {/* New Session 按钮 */}
-      <View style={styles.newSessionWrapper}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void handleNewSession()}
-          style={({ pressed }) => [styles.newSessionBtn, pressed && styles.pressedBg]}
-        >
-          <PlusCircle size={16} color={colors.ink} />
-          <Text style={styles.newSessionText}>{strings.sessions.newSession}</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={strings.sessions.workspaces}
+        onPress={onOpenWorkspaces}
+        style={({ pressed }) => [styles.navItem, pressed && styles.pressedBg]}
+      >
+        <LayoutGrid size={20} color={colors.ink} strokeWidth={1.8} />
+        <Text style={styles.navItemText}>{strings.sessions.workspaces}</Text>
+      </Pressable>
 
       {onOpenPlugins !== undefined && (
         <Pressable
@@ -533,7 +532,7 @@ export function HostSessionsDrawer({
           onPress={onOpenPlugins}
           style={({ pressed }) => [styles.navItem, pressed && styles.pressedBg]}
         >
-          <Puzzle size={16} color={colors.muted} />
+          <Puzzle size={20} color={colors.ink} strokeWidth={1.8} />
           <Text style={styles.navItemText}>{strings.plugins.nav}</Text>
         </Pressable>
       )}
@@ -551,18 +550,18 @@ export function HostSessionsDrawer({
         }}
         style={({ pressed }) => [styles.navItem, pressed && styles.pressedBg]}
       >
-        <Clock size={16} color={colors.muted} />
+        <Clock size={20} color={colors.ink} strokeWidth={1.8} />
         <Text style={styles.navItemText}>{strings.automation.nav}</Text>
       </Pressable>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.xxs }}>
+      {backends.length > 1 && <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, flexShrink: 0, marginTop: spacing.sm }} contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: 4, gap: spacing.xxs }}>
         {backends.map(value => <Pressable key={value} accessibilityRole="tab"
           accessibilityState={{ selected: backend === value }} onPress={() => setBackend(value)}
-          style={({ pressed }) => [styles.backendTab, backend === value && styles.sessionRowSelected, pressed && styles.pressedBg]}>
-          <Text style={styles.navItemText}>{value === 'harness' ? 'DSH' : value === 'codex' ? 'Codex' : value}</Text>
+          style={({ pressed }) => [styles.backendTab, backend === value && styles.backendTabActive, pressed && styles.pressedFade]}>
+          <Text style={[styles.backendTabText, backend === value && styles.backendTabTextActive]}>{backendLabel(value)}</Text>
         </Pressable>)}
-      </ScrollView>
+      </ScrollView>}
 
       {/* Workspaces 标题栏与工具栏 */}
       <View ref={toolbarRef} style={styles.workspacesToolbarArea} collapsable={false}>
@@ -576,7 +575,7 @@ export function HostSessionsDrawer({
               onPress={() => setShowSearch(prev => !prev)}
               style={styles.iconBtn}
             >
-              <Search size={14} color={showSearch ? colors.ink : colors.muted} />
+              <Search size={17} color={showSearch ? colors.ink : colors.muted} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -585,7 +584,7 @@ export function HostSessionsDrawer({
               onPress={() => setShowConfigModal(prev => !prev)}
               style={styles.iconBtn}
             >
-              <Sliders size={14} color={showConfigModal ? colors.ink : colors.muted} />
+              <Sliders size={17} color={showConfigModal ? colors.ink : colors.muted} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -603,7 +602,7 @@ export function HostSessionsDrawer({
               }}
               style={styles.iconBtn}
             >
-              <FolderPlus size={14} color={colors.muted} />
+              <FolderPlus size={17} color={colors.muted} />
             </Pressable>
           </View>
         </View>
@@ -612,7 +611,7 @@ export function HostSessionsDrawer({
       {/* 搜索框 */}
       {showSearch && (
         <View style={styles.searchContainer}>
-          <Search size={14} color={colors.muted} />
+          <Search size={16} color={colors.muted} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -643,12 +642,12 @@ export function HostSessionsDrawer({
               style={({ pressed }) => [styles.workspaceRow, pressed && styles.pressedBg]}
             >
               <View style={styles.workspaceRowLeft}>
-                {isExp ? <FolderOpen size={16} color={colors.muted} /> : <Folder size={16} color={colors.muted} />}
+                {isExp ? <FolderOpen size={18} color={colors.muted} strokeWidth={1.8} /> : <Folder size={18} color={colors.muted} strokeWidth={1.8} />}
                 <Text style={styles.workspaceRowTitle} numberOfLines={1}>
                   {section.title}
                 </Text>
               </View>
-              {isExp ? <ChevronDown size={14} color={colors.muted} /> : <ChevronRight size={14} color={colors.muted} />}
+              {isExp ? <ChevronDown size={16} color={colors.subtle} /> : <ChevronRight size={16} color={colors.subtle} />}
             </Pressable>
           )
         }}
@@ -731,12 +730,24 @@ export function HostSessionsDrawer({
                 }}
                 style={styles.moreActionBtn}
               >
-                <OfficialMenuIcons.ellipsis size={14} color={colors.muted} />
+                <OfficialMenuIcons.ellipsis size={16} color={colors.muted} />
               </Pressable>
             </Pressable>
           )
         }}
       />
+
+      <View style={styles.newSessionFloat} pointerEvents="box-none">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={strings.sessions.newSession}
+          onPress={() => void handleNewSession()}
+          style={({ pressed }) => [styles.newSessionBtn, pressed && styles.pressedFade]}
+        >
+          <Plus size={19} color={colors.onInverse} strokeWidth={2.2} />
+          <Text style={styles.newSessionText}>{strings.sessions.newSession}</Text>
+        </Pressable>
+      </View>
 
       {/* 会话上下文操作浮层/菜单 */}
       {menuSession && (
@@ -1021,111 +1032,133 @@ export function HostSessionsDrawer({
   )
 }
 
+function backendLabel(value: AgentBackend): string {
+  switch (value) {
+    case 'harness': return strings.workspaces.dsh
+    case 'codex': return strings.workspaces.codex
+    case 'cursor': return strings.workspaces.cursor
+    case 'claude': return strings.workspaces.claude
+    case 'opencode': return strings.workspaces.opencode
+    case 'pi': return strings.workspaces.pi
+    case 'antigravity': return strings.workspaces.antigravity
+    default: return value
+  }
+}
+
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     overlayContainer: { flex: 1 },
     overlay: { flex: 1, backgroundColor: colors.scrim },
-    drawer: { flex: 1, width: `${DRAWER_WIDTH_RATIO * 100}%`, maxWidth: DRAWER_MAX_WIDTH, backgroundColor: colors.surface },
-    inlineDrawer: { width: '100%', maxWidth: '100%', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.separator },
+    drawer: { flex: 1, width: `${DRAWER_WIDTH_RATIO * 100}%`, maxWidth: DRAWER_MAX_WIDTH, backgroundColor: colors.background, borderTopRightRadius: radius.xxl, borderBottomRightRadius: radius.xxl, overflow: 'hidden' },
+    inlineDrawer: { width: '100%', maxWidth: '100%', borderRadius: 0, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.separator },
     container: { flex: 1 },
 
     brandHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingLeft: spacing.lg,
+      paddingRight: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
     },
-    brandLeft: { flex: 1, minWidth: 0, marginRight: spacing.sm },
-    brandTitle: { ...type.heading, fontSize: 18, fontWeight: '700', color: colors.ink },
-    brandRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    iconBtn: { padding: 6, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+    brandLeft: { flex: 1, minWidth: 0, marginRight: spacing.sm, gap: 4 },
+    brandTitle: { ...type.heading, fontSize: 20, lineHeight: 26, fontWeight: '700', color: colors.ink },
+    brandRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    iconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+    iconBtnRound: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.elevated, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
 
-    newSessionWrapper: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+    // Floating black pill, as in the reference sidebar.
+    newSessionFloat: { position: 'absolute', right: spacing.lg, bottom: spacing.lg, zIndex: 20, elevation: 20 },
     newSessionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.xs,
-      height: 38,
-      borderWidth: 1,
-      borderColor: colors.separator,
-      borderRadius: radius.sm,
-      backgroundColor: colors.surface,
+      height: 52,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radius.pill,
+      backgroundColor: colors.inverse,
+      ...floatingShadow(colors, 'high'),
     },
-    newSessionText: { ...type.bodyStrong, color: colors.ink },
+    newSessionText: { ...type.bodyStrong, color: colors.onInverse },
 
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      gap: spacing.md,
       paddingHorizontal: spacing.md,
-      height: 36,
+      height: 50,
       marginHorizontal: spacing.xs,
-      borderRadius: radius.sm,
+      borderRadius: radius.lg,
     },
     backendTab: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: spacing.sm,
+      paddingHorizontal: spacing.md,
       height: 36,
-      borderRadius: radius.sm,
+      borderRadius: radius.pill,
     },
-    navItemText: { ...type.body, color: colors.ink },
+    backendTabActive: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
+    backendTabText: { ...type.small, fontSize: 15, color: colors.muted },
+    backendTabTextActive: { color: colors.ink, fontWeight: '600' },
+    navItemText: { ...type.body, fontSize: 17, color: colors.ink },
 
     workspacesToolbarArea: { position: 'relative' },
     workspacesToolbar: {
-      gap: spacing.xs,
-      paddingHorizontal: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingLeft: spacing.lg,
+      paddingRight: spacing.sm,
       paddingTop: spacing.md,
-      paddingBottom: spacing.xs,
+      paddingBottom: spacing.xxs,
     },
-    workspacesTitle: { ...type.heading, color: colors.ink },
-    toolbarActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 2 },
+    workspacesTitle: { ...type.small, fontSize: 15, color: colors.muted },
+    toolbarActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
 
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: spacing.xs,
       marginHorizontal: spacing.md,
       marginBottom: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      height: 32,
-      borderWidth: 1,
-      borderColor: colors.separator,
-      borderRadius: radius.sm,
-      backgroundColor: colors.surfaceStrong,
+      paddingHorizontal: spacing.md,
+      height: 42,
+      borderRadius: radius.pill,
+      backgroundColor: colors.grouped,
     },
-    searchInput: { flex: 1, ...type.small, color: colors.ink, paddingVertical: 0 },
+    searchInput: { flex: 1, ...type.body, fontSize: 15, color: colors.ink, paddingVertical: 0 },
 
-    listContainer: { paddingBottom: spacing.xl },
+    listContainer: { paddingBottom: 104 },
 
     workspaceRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing.md,
-      height: 34,
-      borderRadius: radius.sm,
+      height: 44,
+      marginHorizontal: spacing.xs,
+      borderRadius: radius.lg,
     },
-    workspaceRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
-    workspaceRowTitle: { ...type.bodyStrong, color: colors.ink, flex: 1 },
+    workspaceRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+    workspaceRowTitle: { ...type.bodyStrong, fontSize: 15, color: colors.ink, flex: 1 },
 
     sessionRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingLeft: spacing.lg + spacing.xs,
-      paddingRight: spacing.md,
-      height: 34,
-      borderRadius: radius.sm,
+      paddingRight: spacing.xxs,
+      height: 46,
+      borderRadius: radius.lg,
       marginHorizontal: spacing.xs,
     },
     sessionRowSelected: { backgroundColor: colors.surfaceStrong },
-    statusIndicatorSlot: { width: 12, alignItems: 'flex-start', justifyContent: 'center' },
-    runningDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
-    sessionText: { ...type.small, color: colors.ink, flex: 1, marginRight: spacing.xs },
+    statusIndicatorSlot: { width: 14, alignItems: 'flex-start', justifyContent: 'center' },
+    runningDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
+    sessionText: { ...type.body, fontSize: 16, color: colors.ink, flex: 1, marginRight: spacing.xs },
     sessionTextSelected: { fontWeight: '600' },
-    timeText: { ...type.caption, color: colors.muted, fontSize: 11 },
+    timeText: { ...type.caption, color: colors.subtle },
 
     showMoreRow: {
       paddingLeft: spacing.lg + spacing.md,
@@ -1135,7 +1168,8 @@ const createStyles = (colors: ThemeColors) =>
     },
     showMoreText: { ...type.caption, color: colors.muted },
 
-    pressedBg: { opacity: 0.7, backgroundColor: colors.surfaceStrong },
+    pressedBg: { backgroundColor: colors.surfaceStrong },
+    pressedFade: { opacity: 0.72 },
 
     // 浮窗覆盖层：铺满抽屉内容区，作为唯一命中层，避免跨父级层级问题
     popoverLayer: {
@@ -1147,15 +1181,11 @@ const createStyles = (colors: ThemeColors) =>
       position: 'absolute',
       width: 220,
       backgroundColor: colors.surface,
-      borderRadius: radius.sm,
-      padding: spacing.sm,
-      borderWidth: 1,
+      borderRadius: radius.xl,
+      padding: spacing.md,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.separator,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
+      ...floatingShadow(colors, 'high'),
       zIndex: 1000,
     },
     modalSectionLabel: { ...type.caption, color: colors.muted, marginBottom: 4, fontWeight: '600' },
@@ -1183,7 +1213,7 @@ const createStyles = (colors: ThemeColors) =>
 
     menuBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      backgroundColor: colors.modalBackdrop,
       justifyContent: 'center',
       alignItems: 'center',
       padding: spacing.md,
@@ -1192,15 +1222,11 @@ const createStyles = (colors: ThemeColors) =>
       width: '80%',
       maxWidth: 280,
       backgroundColor: colors.surface,
-      borderRadius: radius.md,
-      borderWidth: 1,
+      borderRadius: radius.xl,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.separator,
       paddingVertical: spacing.xs,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 10,
+      ...floatingShadow(colors, 'high'),
     },
     menuHeader: {
       paddingHorizontal: spacing.md,
@@ -1217,19 +1243,19 @@ const createStyles = (colors: ThemeColors) =>
     menuItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: spacing.md,
-      gap: spacing.sm,
+      minHeight: 48,
+      paddingHorizontal: spacing.lg,
+      gap: spacing.md,
     },
     menuItemText: {
-      ...type.small,
+      ...type.body,
       color: colors.ink,
       flex: 1,
     },
 
     renameBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      backgroundColor: colors.modalBackdrop,
       justifyContent: 'center',
       alignItems: 'center',
       padding: spacing.md,
@@ -1238,15 +1264,11 @@ const createStyles = (colors: ThemeColors) =>
       width: '85%',
       maxWidth: 340,
       backgroundColor: colors.surface,
-      borderRadius: radius.md,
+      borderRadius: radius.xl,
       padding: spacing.lg,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.separator,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 10,
+      ...floatingShadow(colors, 'high'),
     },
     renameModalTitle: {
       ...type.heading,
@@ -1254,15 +1276,13 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '600',
     },
     renameInput: {
-      borderWidth: 1,
-      borderColor: colors.separator,
-      borderRadius: radius.sm,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
+      borderRadius: radius.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
       marginVertical: spacing.md,
-      ...type.small,
+      ...type.body,
       color: colors.ink,
-      backgroundColor: colors.surfaceStrong,
+      backgroundColor: colors.grouped,
     },
     renameErrorText: {
       ...type.caption,
@@ -1276,25 +1296,24 @@ const createStyles = (colors: ThemeColors) =>
       gap: spacing.sm,
     },
     renameCancelBtn: {
-      paddingVertical: 8,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.separator,
+      paddingVertical: 10,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surfaceStrong,
     },
     renameCancelText: {
       ...type.small,
       color: colors.ink,
     },
     renameConfirmBtn: {
-      paddingVertical: 8,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.sm,
-      backgroundColor: colors.ink,
+      paddingVertical: 10,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      backgroundColor: colors.primary,
     },
     renameConfirmText: {
       ...type.small,
-      color: colors.surface,
+      color: colors.white,
       fontWeight: '600',
     },
     btnDisabled: {
@@ -1305,16 +1324,16 @@ const createStyles = (colors: ThemeColors) =>
       position: 'absolute',
       bottom: 60,
       alignSelf: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.85)',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
+      backgroundColor: colors.inverse,
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: radius.pill,
       zIndex: 9999,
       elevation: 9999,
     },
     toastText: {
-      ...type.caption,
-      color: '#fff',
+      ...type.small,
+      color: colors.onInverse,
       fontWeight: '500',
     },
   })

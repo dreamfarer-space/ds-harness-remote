@@ -1,20 +1,5 @@
 import { ChatImageView } from '../../ui/chat-image'
-import {
-  ArrowUp,
-  Bot,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Code2,
-  ListTree,
-  RefreshCw,
-  ShieldAlert,
-  Sparkles,
-  Terminal,
-  User,
-  X,
-} from 'lucide-react-native'
+import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, ChevronUp, Code2, ListTree, RefreshCw, ShieldAlert, Sparkles, Terminal, User, X } from 'lucide-react-native'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
@@ -635,11 +620,11 @@ export function WelcomeMessage() {
   return (
     <View style={styles.welcome}>
       <Svg
-        width={76}
-        height={(76 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
+        width={64}
+        height={(64 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
         viewBox={`0 0 ${FISH_LOGO_VIEWBOX.width} ${FISH_LOGO_VIEWBOX.height}`}
       >
-        <Path d={FISH_LOGO_PATH} fill={colors.ink} />
+        <Path d={FISH_LOGO_PATH} fill={colors.primary} />
       </Svg>
       <View style={styles.welcomeRow}>
         <Text style={styles.welcomeSlogan}>{zhCN.chat.welcomeSlogan}</Text>

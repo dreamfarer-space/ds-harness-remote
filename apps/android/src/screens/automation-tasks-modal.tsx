@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '../state/store'
 import type { RemoteSession, ScheduleCatalogEntry } from '../types'
 import { strings } from '../locales/i18n'
-import { radius, spacing, type } from '../ui/theme'
+import { floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
 
@@ -497,7 +497,7 @@ export function AutomationTasksModal({
                   }}
                   style={({ pressed }) => [styles.emptyActionBtn, pressed && styles.pressedBg]}
                 >
-                  <Plus size={16} color={colors.ink} />
+                  <Plus size={16} color={colors.onInverse} />
                   <Text style={styles.emptyActionBtnText}>{strings.automation.newTask}</Text>
                 </Pressable>
               </View>
@@ -563,7 +563,7 @@ export function AutomationTasksModal({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.surface },
+    container: { flex: 1, backgroundColor: colors.background },
     flex: { flex: 1 },
     header: {
       flexDirection: 'row',
@@ -571,19 +571,22 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'space-between',
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.separator,
     },
     headerBtn: {
-      padding: spacing.xs,
-      borderRadius: radius.sm,
+      width: 44,
+      height: 44,
+      borderRadius: radius.pill,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: colors.elevated,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.separator,
+      ...floatingShadow(colors),
     },
     headerTitle: {
       ...type.heading,
       fontSize: 17,
-      fontWeight: '600',
+      fontWeight: '700',
       color: colors.ink,
       flex: 1,
       textAlign: 'center',
@@ -594,12 +597,14 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.primary,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 5,
-      borderRadius: radius.sm,
+      width: 'auto',
+      paddingHorizontal: spacing.md,
+      height: 44,
+      borderRadius: radius.pill,
+      borderWidth: 0,
       gap: 4,
     },
-    newBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '600' },
+    newBtnText: { ...type.smallStrong, color: colors.white },
     filterTabsRow: {
       flexDirection: 'row',
       paddingHorizontal: spacing.md,
@@ -608,24 +613,23 @@ function createStyles(colors: ThemeColors) {
     },
     filterTab: {
       paddingHorizontal: spacing.md,
-      paddingVertical: 6,
-      borderRadius: radius.sm,
-      backgroundColor: colors.background,
+      height: 36,
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+      backgroundColor: 'transparent',
     },
-    filterTabActive: { backgroundColor: colors.ink },
-    filterTabText: { ...type.caption, color: colors.muted, fontWeight: '500' },
-    filterTabTextActive: { color: colors.surface, fontWeight: '600' },
+    filterTabActive: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
+    filterTabText: { ...type.small, fontSize: 15, color: colors.muted },
+    filterTabTextActive: { color: colors.ink, fontWeight: '600' },
     searchWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.background,
+      backgroundColor: colors.grouped,
       marginHorizontal: spacing.md,
       marginBottom: spacing.sm,
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.sm,
-      height: 38,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.separator,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      height: 46,
     },
     searchIcon: { marginRight: spacing.xs },
     searchInput: { flex: 1, ...type.body, color: colors.ink, paddingVertical: 0 },
@@ -644,13 +648,13 @@ function createStyles(colors: ThemeColors) {
     taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     taskMetaText: { ...type.caption, color: colors.muted },
     taskMetaNext: { ...type.caption, color: colors.muted },
-    smallBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-    smallBadgeText: { fontSize: 11, fontWeight: '600' },
-    statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-    statusBadgeText: { fontSize: 12, fontWeight: '600' },
-    statusBadgeActive: { backgroundColor: '#e6f7ed' },
-    statusTextActive: { color: '#18794e' },
-    statusBadgeInactive: { backgroundColor: colors.background },
+    smallBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: radius.pill },
+    smallBadgeText: { ...type.caption, fontWeight: '600' },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },
+    statusBadgeText: { ...type.caption, fontWeight: '600' },
+    statusBadgeActive: { backgroundColor: colors.successSoft },
+    statusTextActive: { color: colors.success },
+    statusBadgeInactive: { backgroundColor: colors.surfaceStrong },
     statusTextInactive: { color: colors.muted },
     centerContainer: {
       flex: 1,
@@ -665,14 +669,12 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.separator,
-      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.xl,
+      height: 50,
+      borderRadius: radius.pill,
+      backgroundColor: colors.inverse,
     },
-    emptyActionBtnText: { ...type.bodyStrong, color: colors.ink },
+    emptyActionBtnText: { ...type.bodyStrong, color: colors.onInverse },
     tabBar: {
       flexDirection: 'row',
       borderBottomWidth: StyleSheet.hairlineWidth,
@@ -691,8 +693,8 @@ function createStyles(colors: ThemeColors) {
     tabTextActive: { ...type.bodyStrong, color: colors.ink },
     detailContent: { padding: spacing.md, paddingBottom: spacing.xxl },
     card: {
-      backgroundColor: colors.background,
-      borderRadius: radius.md,
+      backgroundColor: colors.surface,
+      borderRadius: radius.xl,
       padding: spacing.md,
       marginBottom: spacing.md,
       borderWidth: StyleSheet.hairlineWidth,
@@ -709,12 +711,10 @@ function createStyles(colors: ThemeColors) {
     linkedSessionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
     linkedSessionTitle: { ...type.body, color: colors.ink, flex: 1 },
     actionButton: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.separator,
-      borderRadius: radius.sm,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
+      backgroundColor: colors.surfaceStrong,
+      borderRadius: radius.pill,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: spacing.xs,
@@ -725,11 +725,9 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.xs,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.danger,
-      backgroundColor: colors.surface,
+      paddingVertical: spacing.sm + 2,
+      borderRadius: radius.pill,
+      backgroundColor: colors.dangerSoft,
       marginTop: spacing.sm,
     },
     deleteBtnText: { ...type.bodyStrong, color: colors.danger },

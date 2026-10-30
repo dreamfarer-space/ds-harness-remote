@@ -229,6 +229,7 @@ const zhTW = {
     signOut: '退出登入', resetLocal: '清除本地資料', resetTitle: '清除此手機上的資料？', resetBody: '將刪除服務設定、登入資訊和已信任的裝置。之後需要重新登入，此操作無法撤銷。', reset: '清除資料', signOutTitle: '退出當前賬號？', signOutBody: '退出後，需要重新登入才能訪問裝置。',
   },
   devices: {
+    summary: (total: number, online: number) => `${total} 台 · ${online} 台在線`,
     rename: '重新命名', renameTitle: '修改裝置名稱', namePlaceholder: '輸入裝置名稱', saveName: '儲存', renameHint: '新名稱會同步到賬號下的裝置列表。',
     title: '裝置', myDevices: '我的裝置', lead: '選擇一臺裝置，繼續你的工作', footer: '隨時繼續你的工作。', favorites: '收藏夾', recent: '最近訪問', openFavorite: (title: string, device: string) => `開啟收藏夾中 ${device} 上的“${title}”`, openRecent: (title: string, device: string) => `開啟最近訪問的“${title}”（${device}）`, removeFavorite: (title: string) => `從收藏夾移除“${title}”`, emptyTitle: '還沒有可用裝置', emptyBody: '在電腦上安裝 DSH Remote 外掛並登入同一賬號，裝置就會出現在這裡。', options: '管理裝置', encrypted: '安全連線',
     connectionInterrupted: '連線已斷開', trustExplanation: '確認後，此手機會記住這臺裝置的安全身份。如果身份發生變化，將停止連線以保護你的資料。', trust: '信任並繼續', connectReady: '連線後即可檢視並繼續電腦上的對話。', offlineHelp: '這臺裝置已離線。請確認電腦上的 DSH Remote 外掛正在執行。', secureConnect: '連線裝置',

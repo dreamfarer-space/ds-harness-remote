@@ -4,22 +4,23 @@ import * as Application from 'expo-application'
 import { File, Paths } from 'expo-file-system'
 import { getContentUriAsync } from 'expo-file-system/legacy'
 import * as IntentLauncher from 'expo-intent-launcher'
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
-import { Check, ChevronRight, Download, ExternalLink, Info, KeyRound, Laptop, LockKeyhole, Mail, MoreVertical, QrCode as QrCodeIcon, RotateCcw, Settings, type LucideIcon } from 'lucide-react-native'
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Toggle } from '../ui/toggle'
+import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, ExternalLink, Fingerprint, FolderPen, Globe, Hash, History, Info, KeyRound, Languages, Laptop, ListCollapse, LockKeyhole, LogOut, Mail, MoreVertical, PanelTop, QrCode as QrCodeIcon, RotateCcw, Route, Settings, ShieldAlert, ShieldCheck, Smartphone, Type, UserRound, type LucideIcon } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { QrLoginStart } from '../state/store-state'
 import { SOURCE_CODE_URL } from '../lib/links'
 import { foregroundService } from '../services/foreground-service'
 import type { OAuthProviderInfo } from '../services/api'
-import { BlurHeaderFrame, Button, Field, IconButton, KeyValue, Screen, TopBar } from '../ui/components'
+import { BlurHeaderFrame, Button, Field, GroupCard, GroupRow, IconButton, KeyValue, Screen, SectionTitle, TopBar } from '../ui/components'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { transportPreferenceOptions } from '../types'
 import type { DefaultPermissionPreset, LoginMethod } from '../types'
 import { QrCode } from '../ui/qr-code'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Path, Polygon } from 'react-native-svg'
 import { FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from '../ui/fish-logo'
 import { GithubIcon, GoogleIcon, ZhihuIcon } from '../ui/brand-icons'
-import { radius, spacing, type } from '../ui/theme'
+import { darkColors, floatingShadow, lightColors, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useResponsiveLayout } from '../ui/responsive'
 import { useThemedStyles } from '../ui/use-themed-styles'
@@ -700,136 +701,132 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
     ],
   )
 
+  const switchColors = { trackColor: { false: colors.disabled, true: colors.primary }, thumbColor: colors.white } as const
+
   return (
     <View style={styles.flex}>
       <BlurHeaderFrame header={<TopBar title={zhCN.settings.title} onBack={onBack} />}>
         <Screen>
           <View style={[styles.contentColumn, landscape && { maxWidth: contentMaxWidth }]}>
-            <Text style={styles.groupLabel}>{zhCN.settings.language}</Text>
-            <View style={styles.preferenceList}>
-              {languageOptions().filter((_, index) => showAllLanguages || index < 3).map(option => {
+            <View style={styles.accountPill}>
+              <Text style={styles.accountPillTitle} numberOfLines={1}>{account ?? zhCN.settings.notSignedIn}</Text>
+              <Text style={styles.accountPillMeta} numberOfLines={1}>{[loginMethodLabel(config?.loginMethod), config?.baseUrl?.replace(/^https?:\/\//, '')].filter(Boolean).join(' · ')}</Text>
+            </View>
+
+            <SectionTitle>{zhCN.settings.appearance}</SectionTitle>
+            <GroupCard style={styles.themeCard}>
+              <View style={styles.themeTiles} accessibilityRole="radiogroup">
+                {themeOptions().map(option => (
+                  <ThemeTile
+                    key={option.value}
+                    value={option.value}
+                    label={option.name}
+                    selected={option.value === themePreference}
+                    onPress={() => void setThemePreference(option.value)}
+                  />
+                ))}
+              </View>
+            </GroupCard>
+            <GroupCard style={styles.settingsGap}>
+              <View style={styles.densityRow}>
+                <View style={styles.densityIcon}><Type size={21} color={colors.muted} strokeWidth={1.8} /></View>
+                <View style={styles.densityCopy}>
+                  <Text style={styles.densityLabel}>{zhCN.settings.typographyDensity}</Text>
+                  <Text style={styles.densityNote} numberOfLines={2}>{zhCN.settings.typographyDensityNote}</Text>
+                </View>
+              </View>
+              <View style={[styles.segmentRow, styles.densitySegments]} accessibilityRole="tablist">
+                {([
+                  { value: 'standard' as const, name: zhCN.settings.densityStandard },
+                  { value: 'compact' as const, name: zhCN.settings.densityCompact },
+                ]).map(option => {
+                  const chosen = option.value === typographyDensity
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: chosen }}
+                      onPress={() => void toggleTypographyDensity(option.value)}
+                      style={[styles.segmentButton, chosen && styles.segmentButtonActive]}
+                    >
+                      <Text style={[styles.segmentButtonText, chosen && styles.segmentButtonTextActive]} numberOfLines={1}>
+                        {option.name}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+              <GroupRow
+                icon={PanelTop}
+                label={zhCN.settings.statusBar}
+                accessory={<Toggle accessibilityLabel={zhCN.settings.statusBar} value={statusBarVisible} disabled={statusBarSaving}
+                  onValueChange={visible => void toggleStatusBar(visible)} {...switchColors} />}
+              />
+            </GroupCard>
+
+            <SectionTitle>{zhCN.settings.language}</SectionTitle>
+            <GroupCard>
+              {languageOptions().filter((_, index) => showAllLanguages || index < 3).map((option, index) => {
                 const chosen = option.value === languagePreference
                 return (
-                  <Pressable
+                  <GroupRow
                     key={option.value}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: chosen }}
+                    first={index === 0}
+                    icon={index === 0 ? Languages : undefined}
+                    iconSpace
+                    label={option.name}
+                    selected={chosen}
+                    chevron={false}
+                    accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
                     onPress={() => void setLanguagePreference(option.value)}
-                    style={[styles.preferenceOption, styles.preferenceAction, chosen && styles.preferenceOptionChosen]}
-                  >
-                    <Text style={[styles.preferenceName, styles.languageName]}>{option.name}</Text>
-                    {chosen && <Check size={17} color={colors.primary} />}
-                  </Pressable>
+                  />
                 )
               })}
               {!showAllLanguages && (
-                <Pressable
-                  accessibilityRole="button"
+                <GroupRow
+                  iconSpace
+                  label="More ..."
                   accessibilityLabel={zhCN.settings.languageShowAll}
-                  accessibilityState={{ expanded: false }}
                   onPress={() => setAllLanguagesVisible(true)}
-                  style={[styles.preferenceOption, styles.preferenceAction]}
-                >
-                  <Text style={styles.preferenceName}>More ...</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <Text style={styles.groupLabel}>{zhCN.settings.appearance}</Text>
-            <View style={[styles.segmentRow, styles.appearanceSegments]} accessibilityRole="tablist">
-              {themeOptions().map(option => {
-                const chosen = option.value === themePreference
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: chosen }}
-                    onPress={() => void setThemePreference(option.value)}
-                    style={[styles.segmentButton, chosen && styles.segmentButtonActive]}
-                  >
-                    <Text style={[styles.segmentButtonText, chosen && styles.segmentButtonTextActive]} numberOfLines={1}>
-                      {option.name}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-
-            <View style={styles.preferenceList}>
-              <View style={styles.preferenceOption}>
-                <View style={styles.preferenceCopy}>
-                  <Text style={styles.preferenceName}>{zhCN.settings.typographyDensity}</Text>
-                  <Text style={styles.preferenceDescription}>{zhCN.settings.typographyDensityNote}</Text>
-                </View>
-              </View>
-            </View>
-            <View style={[styles.segmentRow, styles.appearanceSegments]} accessibilityRole="tablist">
-              {([
-                { value: 'standard' as const, name: zhCN.settings.densityStandard },
-                { value: 'compact' as const, name: zhCN.settings.densityCompact },
-              ]).map(option => {
-                const chosen = option.value === typographyDensity
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: chosen }}
-                    onPress={() => void toggleTypographyDensity(option.value)}
-                    style={[styles.segmentButton, chosen && styles.segmentButtonActive]}
-                  >
-                    <Text style={[styles.segmentButtonText, chosen && styles.segmentButtonTextActive]} numberOfLines={1}>
-                      {option.name}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-
-            <View style={styles.preferenceList}>
-              <View style={styles.preferenceOption}>
-                <Text style={[styles.preferenceName, styles.languageName]}>{zhCN.settings.statusBar}</Text>
-                <Switch
-                  accessibilityLabel={zhCN.settings.statusBar}
-                  value={statusBarVisible}
-                  disabled={statusBarSaving}
-                  onValueChange={visible => void toggleStatusBar(visible)}
-                  trackColor={{ false: colors.disabled, true: colors.primary }} thumbColor={colors.white}
                 />
-              </View>
-            </View>
+              )}
+            </GroupCard>
 
-            <Text style={styles.groupLabel}>{zhCN.comfort.continueWork}</Text>
-            <View style={styles.preferenceList}>
-              <View style={styles.preferenceOption}>
-                <Text style={[styles.preferenceName, styles.languageName]}>{zhCN.comfort.resume}</Text>
-                <Switch accessibilityLabel={zhCN.comfort.resume} value={comfort.resume}
-                  onValueChange={resume => browsePreference({ resume })} trackColor={{ false: colors.disabled, true: colors.primary }} thumbColor={colors.white} />
-              </View>
-              <View style={styles.preferenceOption}>
-                <View style={styles.preferenceCopy}>
-                  <Text style={styles.preferenceName}>{zhCN.settings.compactHistory}</Text>
-                  <Text style={styles.preferenceDescription}>{zhCN.settings.compactHistoryNote}</Text>
-                </View>
-                <Switch accessibilityLabel={zhCN.settings.compactHistory} value={compactHistory}
-                  disabled={compactSaving} onValueChange={value => void toggleCompactHistory(value)}
-                  trackColor={{ false: colors.disabled, true: colors.primary }} thumbColor={colors.white} />
-              </View>
-              <View style={styles.preferenceOption}>
-                <View style={styles.preferenceCopy}>
-                  <Text style={styles.preferenceName}>{zhCN.comfort.notifications}</Text>
-                  <Text style={styles.preferenceDescription}>{zhCN.comfort.notificationsNote}</Text>
-                </View>
-                <Switch accessibilityLabel={zhCN.comfort.notifications} value={comfort.notifications}
-                  onValueChange={notifications => browsePreference({ notifications })} trackColor={{ false: colors.disabled, true: colors.primary }} thumbColor={colors.white} />
-              </View>
-              <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings()}
-                style={({ pressed }) => [styles.preferenceOption, styles.preferenceAction, pressed && styles.preferenceActionPressed]}>
-                <Text style={[styles.preferenceName, styles.languageName]}>{zhCN.comfort.systemNotifications}</Text>
-                <ExternalLink size={17} color={colors.muted} />
-              </Pressable>
+            <SectionTitle>{zhCN.comfort.continueWork}</SectionTitle>
+            <GroupCard>
+              <GroupRow
+                first
+                icon={History}
+                label={zhCN.comfort.resume}
+                accessory={<Toggle accessibilityLabel={zhCN.comfort.resume} value={comfort.resume}
+                  onValueChange={resume => browsePreference({ resume })} {...switchColors} />}
+              />
+              <GroupRow
+                icon={ListCollapse}
+                label={zhCN.settings.compactHistory}
+                detail={zhCN.settings.compactHistoryNote}
+                accessory={<Toggle accessibilityLabel={zhCN.settings.compactHistory} value={compactHistory}
+                  disabled={compactSaving} onValueChange={value => void toggleCompactHistory(value)} {...switchColors} />}
+              />
+              <GroupRow
+                icon={Bell}
+                label={zhCN.comfort.notifications}
+                detail={zhCN.comfort.notificationsNote}
+                accessory={<Toggle accessibilityLabel={zhCN.comfort.notifications} value={comfort.notifications}
+                  onValueChange={notifications => browsePreference({ notifications })} {...switchColors} />}
+              />
+              <GroupRow
+                icon={BellRing}
+                label={zhCN.comfort.systemNotifications}
+                accessory={<ExternalLink size={17} color={colors.subtle} />}
+                onPress={() => void openNotificationSettings()}
+              />
               {Platform.OS === 'android' && (
-                <Pressable
-                  accessibilityRole="button"
+                <GroupRow
+                  icon={BatteryCharging}
+                  label={zhCN.comfort.batteryOptimization}
+                  detail={zhCN.comfort.batteryOptimizationDescription}
+                  accessory={<ExternalLink size={17} color={colors.subtle} />}
                   onPress={async () => {
                     const ok = await foregroundService.requestIgnoreBatteryOptimizations()
                     if (!ok) {
@@ -839,94 +836,122 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
                       )
                     }
                   }}
-                  style={({ pressed }) => [styles.preferenceOption, styles.preferenceAction, pressed && styles.preferenceActionPressed]}
-                >
-                  <View style={styles.preferenceCopy}>
-                    <Text style={[styles.preferenceName, styles.languageName]}>{zhCN.comfort.batteryOptimization}</Text>
-                    <Text style={styles.preferenceDescription}>{zhCN.comfort.batteryOptimizationDescription}</Text>
-                  </View>
-                  <ExternalLink size={17} color={colors.muted} />
-                </Pressable>
+                />
               )}
-              {comfort.error !== undefined && <Text style={styles.preferenceError} accessibilityRole="alert">{comfort.error}</Text>}
-            </View>
+            </GroupCard>
+            {comfort.error !== undefined && <Text style={styles.preferenceError} accessibilityRole="alert">{comfort.error}</Text>}
 
-            <Text style={styles.groupLabel}>{zhCN.settings.defaultPermission}</Text>
-            <View style={styles.preferenceList} accessibilityRole="radiogroup">
-              {([
-                { value: 'default', name: zhCN.settings.defaultPermissionHost, description: zhCN.settings.defaultPermissionHostDescription },
-                { value: 'workspace-write', name: zhCN.chat.permissionWorkspaceWrite, description: zhCN.chat.permissionWorkspaceWriteDescription },
-                { value: 'danger-full-access', name: zhCN.chat.permissionFullAccess, description: zhCN.chat.permissionFullAccessDescription },
-              ] satisfies Array<{ value: DefaultPermissionPreset; name: string; description: string }>).map(option => {
-                const chosen = option.value === defaultPermission
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: chosen, disabled: permissionSaving }}
-                    disabled={permissionSaving}
-                    onPress={() => pickDefaultPermission(option.value)}
-                    style={[styles.preferenceOption, styles.permissionOption, chosen && styles.preferenceOptionChosen]}
-                  >
-                    <View style={styles.preferenceCopy}>
-                      <Text style={styles.preferenceName}>{option.name}</Text>
-                      <Text style={styles.preferenceDescription}>{option.description}</Text>
-                    </View>
-                    {chosen && <Check size={17} color={colors.primary} />}
-                  </Pressable>
-                )
-              })}
-              <Text style={styles.preferenceNote}>{zhCN.settings.defaultPermissionNote}</Text>
-            </View>
+            <SectionTitle>{zhCN.settings.defaultPermission}</SectionTitle>
+            <GroupCard>
+              <View accessibilityRole="radiogroup">
+                {([
+                  { value: 'default', name: zhCN.settings.defaultPermissionHost, description: zhCN.settings.defaultPermissionHostDescription, icon: ShieldCheck },
+                  { value: 'workspace-write', name: zhCN.chat.permissionWorkspaceWrite, description: zhCN.chat.permissionWorkspaceWriteDescription, icon: FolderPen },
+                  { value: 'danger-full-access', name: zhCN.chat.permissionFullAccess, description: zhCN.chat.permissionFullAccessDescription, icon: ShieldAlert },
+                ] satisfies Array<{ value: DefaultPermissionPreset; name: string; description: string; icon: LucideIcon }>).map((option, index) => {
+                  const chosen = option.value === defaultPermission
+                  return (
+                    <GroupRow
+                      key={option.value}
+                      first={index === 0}
+                      icon={option.icon}
+                      label={option.name}
+                      detail={option.description}
+                      selected={chosen}
+                      chevron={false}
+                      disabled={permissionSaving}
+                      accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
+                      onPress={() => pickDefaultPermission(option.value)}
+                    />
+                  )
+                })}
+              </View>
+            </GroupCard>
+            <Text style={styles.preferenceNote}>{zhCN.settings.defaultPermissionNote}</Text>
 
-            <Text style={styles.groupLabel}>{zhCN.settings.connection}</Text>
-            <View style={styles.group}>
-              <KeyValue label={zhCN.settings.server} value={config?.baseUrl ?? zhCN.settings.notConfigured} />
-              <KeyValue label={zhCN.settings.account} value={account ?? zhCN.settings.notSignedIn} />
-              <KeyValue label={zhCN.settings.loginMethod} value={loginMethodLabel(config?.loginMethod)} />
-              <KeyValue label={zhCN.settings.protocol} value="DSH Remote v1" />
-            </View>
+            <SectionTitle>{zhCN.settings.connection}</SectionTitle>
+            <GroupCard>
+              <GroupRow first icon={Globe} label={zhCN.settings.server} value={config?.baseUrl?.replace(/^https?:\/\//, '') ?? zhCN.settings.notConfigured} />
+              <GroupRow icon={UserRound} label={zhCN.settings.account} value={account ?? zhCN.settings.notSignedIn} />
+              <GroupRow icon={KeyRound} label={zhCN.settings.loginMethod} value={loginMethodLabel(config?.loginMethod)} />
+              <GroupRow icon={Cable} label={zhCN.settings.protocol} value="DSH Remote v1" />
+            </GroupCard>
 
-            <Text style={styles.groupLabel}>{zhCN.settings.transport}</Text>
-            <View style={styles.preferenceList}>
-              {transportPreferenceOptions().map(option => {
+            <SectionTitle>{zhCN.settings.transport}</SectionTitle>
+            <GroupCard>
+              {transportPreferenceOptions().map((option, index) => {
                 const chosen = option.value === preference
                 return (
-                  <Pressable
+                  <GroupRow
                     key={option.value}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: chosen }}
+                    first={index === 0}
+                    icon={index === 0 ? Route : undefined}
+                    iconSpace
+                    label={option.name}
+                    detail={option.description}
+                    selected={chosen}
+                    chevron={false}
+                    accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
                     onPress={() => void setPreference(option.value)}
-                    style={[styles.preferenceOption, chosen && styles.preferenceOptionChosen]}
-                  >
-                    <View style={styles.preferenceCopy}>
-                      <Text style={styles.preferenceName}>{option.name}</Text>
-                      <Text style={styles.preferenceDescription}>{option.description}</Text>
-                    </View>
-                    {chosen && <Check size={17} color={colors.primary} />}
-                  </Pressable>
+                  />
                 )
               })}
-              <Text style={styles.preferenceNote}>{zhCN.settings.transportNote}</Text>
-            </View>
+            </GroupCard>
+            <Text style={styles.preferenceNote}>{zhCN.settings.transportNote}</Text>
 
-            <Text style={styles.groupLabel}>{zhCN.settings.identity}</Text>
-            <View style={styles.group}>
-              <KeyValue label={zhCN.settings.thisPhone} value={identity?.name ?? zhCN.settings.androidDevice} />
-              <KeyValue label={zhCN.settings.deviceId} value={shorten(identity?.deviceId)} mono />
-              <KeyValue label={zhCN.settings.publicKey} value={fingerprint(identity?.publicKey)} mono />
-              <View style={styles.keyNote}><KeyRound size={17} color={colors.muted} /><Text style={styles.keyNoteText}>{zhCN.settings.keyNote}</Text></View>
-            </View>
+            <SectionTitle>{zhCN.settings.identity}</SectionTitle>
+            <GroupCard>
+              <GroupRow first icon={Smartphone} label={zhCN.settings.thisPhone} value={identity?.name ?? zhCN.settings.androidDevice} />
+              <GroupRow icon={Hash} label={zhCN.settings.deviceId} value={shorten(identity?.deviceId)} />
+              <GroupRow icon={Fingerprint} label={zhCN.settings.publicKey} value={fingerprint(identity?.publicKey)} />
+            </GroupCard>
+            <Text style={styles.preferenceNote}>{zhCN.settings.keyNote}</Text>
 
-            <View style={styles.resetArea}>
-              <Button label={zhCN.settings.signOut} variant="secondary" onPress={confirmSignOut} />
-              <View style={styles.resetGap} />
-              <Button label={zhCN.settings.resetLocal} icon={RotateCcw} variant="danger" onPress={confirmReset} />
-            </View>
+            <GroupCard style={styles.signOutCard}>
+              <GroupRow first icon={LogOut} label={zhCN.settings.signOut} danger chevron={false} onPress={confirmSignOut} />
+              <GroupRow icon={RotateCcw} label={zhCN.settings.resetLocal} danger chevron={false} onPress={confirmReset} />
+            </GroupCard>
           </View>
         </Screen>
       </BlurHeaderFrame>
     </View>
+  )
+}
+
+/** Appearance choice drawn as a miniature page, as in the reference settings. */
+function ThemeTile({ value, label, selected, onPress }: { value: ThemePreference; label: string; selected: boolean; onPress: () => void }) {
+  const styles = useThemedStyles(createStyles)
+  const light = lightColors
+  const dark = darkColors
+  const page = (palette: typeof lightColors) => (
+    <View style={[StyleSheet.absoluteFill, styles.themeTilePage]}>
+      <View style={[styles.themeTileLine, { width: '58%', backgroundColor: palette.subtle }]} />
+      <View style={[styles.themeTileLine, { width: '38%', backgroundColor: palette.subtle, opacity: 0.6 }]} />
+      <View style={[styles.themeTileDot, { backgroundColor: palette.primary }]} />
+    </View>
+  )
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.themeTile, pressed && { opacity: 0.8 }]}
+    >
+      <View style={[styles.themeTileFrame, selected && styles.themeTileFrameSelected]}>
+        <View style={[styles.themeTileScreen, { backgroundColor: value === 'dark' ? dark.surface : light.surface }]}>
+          {value !== 'system' && page(value === 'dark' ? dark : light)}
+          {value === 'system' && <>
+            {page(light)}
+            <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 64" preserveAspectRatio="none">
+              <Polygon points="100,0 100,64 0,64" fill={dark.surface} />
+            </Svg>
+            <View style={[styles.themeTileDot, { backgroundColor: dark.primary }]} />
+          </>}
+        </View>
+      </View>
+      <Text style={[styles.themeTileLabel, selected && styles.themeTileLabelSelected]} numberOfLines={1}>{label}</Text>
+    </Pressable>
   )
 }
 
@@ -1099,14 +1124,14 @@ function HomeMenuRow({ icon: Icon, label, subtitle, onPress, disabled = false, l
         disabled && styles.homeMenuRowDisabled,
       ]}
     >
-      <View style={styles.homeMenuRowIcon}><Icon size={19} color={colors.primary} /></View>
+      <View style={styles.homeMenuRowIcon}><Icon size={20} color={colors.ink} strokeWidth={1.8} /></View>
       <View style={styles.homeMenuRowCopy}>
         <Text style={styles.homeMenuRowLabel}>{label}</Text>
         {subtitle !== undefined && <Text style={styles.homeMenuRowSubtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
       {disabled
         ? <ActivityIndicator size="small" color={colors.primary} />
-        : <ChevronRight size={20} color={colors.subtle} />}
+        : null}
     </Pressable>
   )
 }
@@ -1279,8 +1304,8 @@ function createStyles(colors: ThemeColors) {
   securityHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   securityTitle: { ...type.smallStrong, color: colors.ink },
   securityBody: { ...type.small, color: colors.muted, marginTop: 2 },
-  groupLabel: { ...type.smallStrong, color: colors.muted, marginTop: spacing.xl, marginBottom: spacing.xs },
-  group: { borderRadius: radius.lg, backgroundColor: colors.surface, paddingHorizontal: spacing.md },
+  groupLabel: { ...type.small, fontSize: 15, color: colors.muted, marginTop: spacing.xl, marginBottom: spacing.xs, paddingLeft: spacing.md },
+  group: { borderRadius: radius.xl, backgroundColor: colors.grouped, paddingHorizontal: spacing.md },
   preferenceList: { gap: spacing.xs },
   preferenceOption: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   preferenceAction: { minHeight: 48 },
@@ -1292,14 +1317,36 @@ function createStyles(colors: ThemeColors) {
   preferenceName: { ...type.smallStrong, color: colors.ink },
   languageName: { flex: 1 },
   preferenceDescription: { ...type.caption, color: colors.muted, marginTop: 2 },
-  preferenceNote: { ...type.caption, color: colors.muted, marginTop: spacing.xs },
+  preferenceNote: { ...type.caption, fontSize: 13, lineHeight: 18, color: colors.muted, marginTop: spacing.xs, paddingHorizontal: spacing.md },
   appearanceSegments: { marginBottom: spacing.xs },
-  segmentRow: { flexDirection: 'row', padding: 4, borderRadius: radius.md, backgroundColor: colors.surfaceStrong },
-  segmentButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: spacing.xs },
-  segmentButtonActive: { backgroundColor: colors.surface },
-  segmentButtonText: { ...type.smallStrong, color: colors.muted, textAlign: 'center' },
-  segmentButtonTextActive: { color: colors.primary },
+  segmentRow: { flexDirection: 'row', padding: 3, borderRadius: radius.pill, backgroundColor: colors.surfaceStrong },
+  segmentButton: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, paddingHorizontal: spacing.xs },
+  segmentButtonActive: { backgroundColor: colors.surface, ...floatingShadow(colors) },
+  segmentButtonText: { ...type.small, fontSize: 15, color: colors.muted, textAlign: 'center' },
+  segmentButtonTextActive: { color: colors.ink, fontWeight: '600' },
   keyNote: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.md },
+  accountPill: { marginTop: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.xl, backgroundColor: colors.grouped, gap: 3 },
+  accountPillTitle: { ...type.bodyStrong, fontSize: 17, color: colors.ink },
+  accountPillMeta: { ...type.small, fontSize: 13, color: colors.muted },
+  settingsGap: { marginTop: spacing.sm },
+  themeCard: { paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
+  themeTiles: { flexDirection: 'row', gap: spacing.sm },
+  themeTile: { flex: 1, alignItems: 'center', gap: spacing.xs },
+  themeTileFrame: { alignSelf: 'stretch', padding: 3, borderRadius: radius.lg + 2, borderWidth: 2, borderColor: 'transparent' },
+  themeTileFrameSelected: { borderColor: colors.primary },
+  themeTileScreen: { aspectRatio: 1.55, borderRadius: radius.md, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  themeTilePage: { padding: 10, gap: 5 },
+  themeTileLine: { height: 4, borderRadius: 2 },
+  themeTileDot: { position: 'absolute', right: 10, bottom: 10, width: 12, height: 12, borderRadius: 6 },
+  themeTileLabel: { ...type.small, fontSize: 15, color: colors.ink },
+  themeTileLabelSelected: { color: colors.primary, fontWeight: '600' },
+  densityRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingRight: spacing.md, paddingTop: spacing.md },
+  densityIcon: { width: 28, marginRight: spacing.sm, alignItems: 'center' },
+  densityCopy: { flex: 1, gap: 2 },
+  densityLabel: { ...type.body, fontSize: 16, color: colors.ink },
+  densityNote: { ...type.small, fontSize: 13, lineHeight: 18, color: colors.muted },
+  densitySegments: { marginRight: spacing.md, marginTop: spacing.sm, marginBottom: spacing.md, marginLeft: 56 },
+  signOutCard: { marginTop: spacing.xxl },
   keyNoteText: { ...type.small, color: colors.muted, flex: 1 },
   settingsLink: { minHeight: 68, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
   settingsLinkPressed: { opacity: 0.68 },
@@ -1308,20 +1355,20 @@ function createStyles(colors: ThemeColors) {
   settingsLinkUrl: { ...type.caption, color: colors.primary },
   homeMenuLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, elevation: 20 },
   homeMenuDismiss: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.menuDismiss },
-  homeMenuCard: { position: 'absolute', right: spacing.sm, width: 236, paddingHorizontal: spacing.xs, borderRadius: radius.lg, backgroundColor: colors.surface, zIndex: 1, elevation: 8, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.14, shadowRadius: 14 },
+  homeMenuCard: { position: 'absolute', right: spacing.md, width: 260, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, zIndex: 1, ...floatingShadow(colors, 'high') },
   // flexGrow 0 keeps the card content-sized in portrait; flexShrink lets the
   // capped landscape card scroll instead of clipping its last row.
   homeMenuScroll: { flexGrow: 0, flexShrink: 1 },
-  homeMenuRow: { minHeight: 56, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  homeMenuRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
-  homeMenuRowPressed: { opacity: 0.68 },
+  homeMenuRow: { minHeight: 52, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg },
+  homeMenuRowBorder: {},
+  homeMenuRowPressed: { backgroundColor: colors.surfaceStrong },
   homeMenuRowDisabled: { opacity: 0.6 },
-  homeMenuRowIcon: { width: 32, height: 32, borderRadius: radius.md, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  homeMenuRowIcon: { width: 24, alignItems: 'center', justifyContent: 'center' },
   homeMenuRowCopy: { flex: 1 },
-  homeMenuRowLabel: { ...type.smallStrong, color: colors.ink },
+  homeMenuRowLabel: { ...type.body, color: colors.ink },
   homeMenuRowSubtitle: { ...type.caption, color: colors.muted, marginTop: 1 },
   aboutHero: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.xs },
-  aboutLogo: { width: 84, height: 84, borderRadius: radius.lg, marginBottom: spacing.sm },
+  aboutLogo: { width: 84, height: 84, borderRadius: radius.xl, marginBottom: spacing.sm },
   aboutProductName: { ...type.title, color: colors.ink, textAlign: 'center' },
   aboutVersion: { ...type.small, color: colors.muted, textAlign: 'center' },
   resetArea: { marginTop: spacing.xxxl },

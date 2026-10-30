@@ -7,11 +7,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native'
+import { Toggle } from '../ui/toggle'
 import { ArrowLeft, Check, ChevronRight, Copy, Download, Puzzle, RefreshCw, Smartphone, X } from 'lucide-react-native'
 import { SvgXml } from 'react-native-svg'
 import * as Clipboard from 'expo-clipboard'
@@ -30,7 +30,7 @@ import {
   type SchemaField,
 } from '../services/plugin-inventory'
 import { sessionToolsError } from './session-tools-error'
-import { radius, spacing, type } from '../ui/theme'
+import { floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
 
@@ -274,7 +274,7 @@ function BundleCard({ bundle, busy, first, onToggle, onOpen }: {
         {bundle.error !== undefined && <Text style={styles.errorText}>{bundle.error}</Text>}
       </View>
       {busy ? <ActivityIndicator size="small" color={colors.muted} /> : (
-        <Switch
+        <Toggle
           accessibilityLabel={bundle.title}
           value={bundle.enabled}
           disabled={locked}
@@ -360,7 +360,7 @@ function RowCard({ row, bundleEnabled, single, busy, writable, onToggle, onSaved
           <Text style={styles.meta} numberOfLines={1}>{row.moduleName}</Text>
         </View>
         {busy ? <ActivityIndicator size="small" color={colors.muted} /> : (
-          <Switch
+          <Toggle
             accessibilityLabel={row.title}
             value={row.enabled}
             disabled={row.readOnly || !bundleEnabled}
@@ -485,7 +485,7 @@ function SettingsForm({ settings, writable, onSaved }: {
               <Text style={styles.fieldKey}>{field.key}</Text>
             </View>
             {field.kind === 'boolean' && (
-              <Switch
+              <Toggle
                 accessibilityLabel={field.key}
                 value={draft[field.key] === true}
                 disabled={!editable}
@@ -550,27 +550,26 @@ function SettingsForm({ settings, writable, onSaved }: {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.surface },
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: spacing.sm,
-      height: 52,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.separator,
+      paddingHorizontal: spacing.md,
+      height: 64,
+      backgroundColor: colors.background,
     },
-    headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { ...type.bodyStrong, flex: 1, color: colors.ink, textAlign: 'center' },
+    headerBtn: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.elevated, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
+    headerTitle: { ...type.heading, fontSize: 17, fontWeight: '700', flex: 1, color: colors.ink, textAlign: 'center' },
     content: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.sm },
-    subtitle: { ...type.caption, color: colors.muted, marginBottom: spacing.xs },
-    sectionTitle: { ...type.bodyStrong, color: colors.ink, marginTop: spacing.sm },
+    subtitle: { ...type.small, fontSize: 14, color: colors.muted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
+    sectionTitle: { ...type.small, fontSize: 15, color: colors.muted, marginTop: spacing.md, paddingHorizontal: spacing.md },
     section: { gap: spacing.xs },
-    sectionHint: { ...type.caption, color: colors.muted },
+    sectionHint: { ...type.caption, fontSize: 13, color: colors.subtle, paddingHorizontal: spacing.md },
     group: {
       backgroundColor: colors.surface,
-      borderRadius: radius.md,
+      borderRadius: radius.xl,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
+      borderColor: colors.separator,
       overflow: 'hidden',
     },
     item: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
@@ -582,8 +581,8 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       alignItems: 'flex-start',
       backgroundColor: colors.primarySoft,
-      borderRadius: radius.sm,
-      padding: spacing.sm,
+      borderRadius: radius.lg,
+      padding: spacing.md,
       marginTop: spacing.xs,
     },
     featureText: { ...type.caption, color: colors.ink, flex: 1 },
@@ -597,7 +596,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: spacing.sm,
       backgroundColor: colors.surface,
-      borderRadius: radius.sm,
+      borderRadius: radius.md,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
       paddingHorizontal: spacing.sm,
@@ -609,27 +608,26 @@ function createStyles(colors: ThemeColors) {
     muted: { ...type.body, color: colors.muted },
     errorText: { ...type.caption, color: colors.danger },
     outlineBtn: {
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.separator,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.sm + 2,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surfaceStrong,
     },
     outlineBtnText: { ...type.bodyStrong, color: colors.ink },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: radius.md,
+      borderRadius: radius.xl,
       padding: spacing.md,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
+      borderColor: colors.separator,
       gap: spacing.sm,
     },
     pressed: { opacity: 0.7 },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     icon: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.sm,
+      width: 42,
+      height: 42,
+      borderRadius: radius.md,
       backgroundColor: colors.primarySoft,
       alignItems: 'center',
       justifyContent: 'center',
@@ -638,17 +636,17 @@ function createStyles(colors: ThemeColors) {
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     cardTitle: { ...type.bodyStrong, color: colors.ink, flexShrink: 1 },
     badge: {
-      fontSize: 11,
+      ...type.caption,
       fontWeight: '600',
       color: colors.primary,
       backgroundColor: colors.primarySoft,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: radius.pill,
       overflow: 'hidden',
     },
-    cardDescription: { ...type.caption, color: colors.muted },
-    meta: { fontSize: 11, color: colors.subtle },
+    cardDescription: { ...type.small, fontSize: 13, lineHeight: 18, color: colors.muted },
+    meta: { ...type.caption, color: colors.subtle },
     form: { gap: spacing.sm },
     field: {
       gap: spacing.xs,
@@ -657,26 +655,26 @@ function createStyles(colors: ThemeColors) {
       borderTopColor: colors.separator,
     },
     fieldHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    fieldKey: { fontFamily: 'monospace', fontSize: 11, color: colors.subtle },
+    fieldKey: { fontFamily: 'monospace', fontSize: 12, color: colors.subtle },
     fieldDescription: { ...type.caption, color: colors.muted },
-    fieldHint: { fontSize: 11, color: colors.subtle },
+    fieldHint: { ...type.caption, color: colors.subtle },
     errorHint: { color: colors.danger },
     input: {
       ...type.body,
       color: colors.ink,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: radius.sm,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 8,
-      backgroundColor: colors.background,
+      borderRadius: radius.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      backgroundColor: colors.surface,
     },
     inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
     inputInvalid: { borderColor: colors.danger },
     saveBtn: {
       backgroundColor: colors.primary,
-      borderRadius: radius.sm,
-      paddingVertical: spacing.sm,
+      borderRadius: radius.pill,
+      paddingVertical: spacing.sm + 2,
       alignItems: 'center',
       marginTop: spacing.xs,
     },

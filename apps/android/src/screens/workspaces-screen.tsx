@@ -1,12 +1,12 @@
 import { isSubagentSession } from '../lib/session-kind'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, type StyleProp, type ViewStyle, View } from 'react-native'
-import { ArrowDown, ArrowUp, Bot, ChevronDown, ChevronRight, CircleAlert, CirclePlus, Code2, Eye, EyeOff, Folder, FolderOpen, MoreVertical, Pencil, Puzzle, RefreshCw, Search, Sparkles, Star, Trash2, WifiOff, X } from 'lucide-react-native'
+import { ArrowDown, ArrowUp, Bot, ChevronDown, ChevronRight, CircleAlert, CirclePlus, Code2, Eye, EyeOff, Folder, FolderOpen, MoreVertical, Pencil, Plus, Puzzle, RefreshCw, Search, Sparkles, Star, Trash2, WifiOff, X } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { DirectoryListing, RemoteSession, WorkspaceView } from '../types'
 import { BlurHeaderFrame, Button, EmptyState, IconButton, Screen, TopBar } from '../ui/components'
 import { AnimatedEllipsis } from '../ui/animated-ellipsis'
-import { radius, spacing, type } from '../ui/theme'
+import { floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useResponsiveLayout } from '../ui/responsive'
 import { useThemedStyles } from '../ui/use-themed-styles'
@@ -351,7 +351,7 @@ export function WorkspacesScreen({ onBack, onOpenDevices, onSession, onDeviceInf
         titleLines={1}
         onTitlePress={onDeviceInfo}
         onBack={onBack}
-        action={<>{connected && <IconButton dense label={zhCN.plugins.title} icon={Puzzle} tint={colors.primary} onPress={() => setPluginsOpen(true)} />}<IconButton dense label={zhCN.bots.mode} icon={Bot} tint={colors.primary} onPress={() => onBotMode(true)} /><IconButton dense label={zhCN.workspaces.create} icon={CirclePlus} tint={colors.primary} onPress={() => setCreateOpen(true)} /></>}
+        action={<>{connected && <IconButton dense label={zhCN.plugins.title} icon={Puzzle} onPress={() => setPluginsOpen(true)} />}<IconButton dense label={zhCN.bots.mode} icon={Bot} onPress={() => onBotMode(true)} /><IconButton dense label={zhCN.workspaces.create} icon={CirclePlus} onPress={() => setCreateOpen(true)} /></>}
       />}>
         <Screen scrollRef={scrollRef} refreshing={refreshing} onRefresh={() => void refresh()}>
           {showBackendTabs && <View style={[styles.backendTabs, styles.contentTop]} accessibilityRole="tablist">
@@ -519,14 +519,17 @@ export function WorkspacesScreen({ onBack, onOpenDevices, onSession, onDeviceInf
                         onPress={() => toggleWorkspace(workspace)}
                         style={({ pressed }) => [styles.workspaceToggle, pressed && styles.workspaceRowPressed]}
                       >
+                        {collapsed
+                          ? <ChevronRight size={20} color={colors.ink} strokeWidth={1.8} />
+                          : <ChevronDown size={20} color={colors.ink} strokeWidth={1.8} />}
                         <View style={styles.workspaceIcon}>
                           {workspace.backend === 'codex'
-                            ? <Code2 size={18} color={colors.primary} />
+                            ? <Code2 size={21} color={colors.ink} strokeWidth={1.7} />
                             : workspace.backend === 'cursor' || workspace.backend === 'antigravity' || workspace.backend === 'pi' || workspace.backend === 'opencode' || workspace.backend === 'claude'
-                              ? <Sparkles size={18} color={colors.primary} />
+                              ? <Sparkles size={21} color={colors.ink} strokeWidth={1.7} />
                               : collapsed
-                                ? <Folder size={18} color={colors.primary} />
-                                : <FolderOpen size={18} color={colors.primary} />}
+                                ? <Folder size={21} color={colors.ink} strokeWidth={1.7} />
+                                : <FolderOpen size={21} color={colors.ink} strokeWidth={1.7} />}
                         </View>
                         <View style={styles.workspaceCopy}>
                           <Text style={styles.workspaceTitle} numberOfLines={1}>{workspace.title}</Text>
@@ -534,31 +537,30 @@ export function WorkspacesScreen({ onBack, onOpenDevices, onSession, onDeviceInf
                             {workspaceParentPath(workspace.path)}
                           </Text>
                         </View>
-                        {collapsed
-                          ? <ChevronRight size={18} color={colors.subtle} />
-                          : <ChevronDown size={18} color={colors.subtle} />}
+                        {workspaceSessions.length > 0 && <Text style={styles.workspaceCount}>{workspaceSessions.length}</Text>}
                       </Pressable>
                       <View style={styles.workspaceRowActions}>
                         <IconButton
                           dense
                           label={favorited ? zhCN.workspaces.removeFavorite(workspace.title) : zhCN.workspaces.addFavorite(workspace.title)}
                           icon={Star}
-                          tint={favorited ? colors.primary : colors.subtle}
+                          tint={favorited ? colors.primary : colors.muted}
                           fill={favorited ? colors.primary : 'none'}
                           onPress={() => toggleFavorite(workspace)}
                         />
-                        <IconButton dense label={zhCN.workspaces.newSessionIn(workspace.title)} icon={CirclePlus} tint={colors.primary} onPress={() => void createInWorkspace(workspace.workspaceId)} />
-                        {workspace.backend !== 'codex' && <IconButton dense label={zhCN.workspaces.options} icon={MoreVertical} onPress={() => setActionsTarget(workspace)} />}
+                        <IconButton dense label={zhCN.workspaces.newSessionIn(workspace.title)} icon={CirclePlus} tint={colors.muted} onPress={() => void createInWorkspace(workspace.workspaceId)} />
+                        {workspace.backend !== 'codex' && <IconButton dense label={zhCN.workspaces.options} icon={MoreVertical} tint={colors.muted} onPress={() => setActionsTarget(workspace)} />}
                       </View>
                     </View>
                     {!collapsed && (workspaceSessions.length === 0
-                      ? <Pressable onPress={() => void createInWorkspace(workspace.workspaceId)} style={styles.noSessions}><Text style={styles.noSessionsText}>{zhCN.workspaces.noSessions}</Text></Pressable>
+                      ? <Pressable onPress={() => void createInWorkspace(workspace.workspaceId)} style={({ pressed }) => [styles.noSessions, pressed && styles.workspaceRowPressed]}><Plus size={16} color={colors.primary} /><Text style={styles.noSessionsText}>{zhCN.workspaces.noSessions}</Text></Pressable>
                       : <>
-                          {visibleWorkspaceSessions.map(session => {
+                          {visibleWorkspaceSessions.map((session, sessionIndex) => {
                             return <SwipeableSessionRow
                               key={session.sessionId}
                               session={session}
                               compact
+                              first={sessionIndex === 0}
                               title={resolveSessionTitle(session)}
                               meta={relativeTime(session.updatedAt)}
                               open={openSessionId === session.sessionId}
@@ -1139,48 +1141,49 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   contentTop: { marginTop: spacing.md },
-  backendTabs: { flexDirection: 'row', padding: spacing.xxs, borderRadius: radius.md, backgroundColor: colors.surfaceStrong, marginBottom: spacing.md },
-  backendTab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: spacing.xs },
-  backendTabActive: { backgroundColor: colors.surface },
-  backendTabText: { ...type.smallStrong, color: colors.muted, textAlign: 'center' },
-  backendTabTextActive: { color: colors.primary },
-  searchField: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.sm, marginBottom: spacing.lg },
+  // Filter pills: the active harness floats on a white chip.
+  backendTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xxs, marginBottom: spacing.md },
+  backendTab: { height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, paddingHorizontal: spacing.md },
+  backendTabActive: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
+  backendTabText: { ...type.small, fontSize: 15, color: colors.muted, textAlign: 'center' },
+  backendTabTextActive: { color: colors.ink, fontWeight: '600' },
+  searchField: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.grouped, borderRadius: radius.pill, paddingHorizontal: spacing.md, marginBottom: spacing.lg },
   searchInput: { flex: 1, ...type.body, color: colors.ink, paddingVertical: spacing.sm },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
-  workspaceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+  workspaceRow: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 64, paddingVertical: spacing.xs },
   workspaceRowActions: { flexDirection: 'row', alignItems: 'center' },
-  workspaceToggle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  workspaceToggle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xxs },
   workspaceRowPressed: { opacity: 0.7 },
   disabled: { opacity: 0.55 },
-  workspaceIcon: { width: 38, height: 38, borderRadius: radius.md, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  workspaceIcon: { width: 24, alignItems: 'center', justifyContent: 'center' },
   workspaceCopy: { flex: 1, gap: 2 },
-  workspaceTitle: { ...type.bodyStrong, color: colors.ink },
-  workspacePath: { ...type.caption, color: colors.muted, fontFamily: 'monospace', writingDirection: 'ltr' },
+  workspaceTitle: { ...type.body, fontSize: 17, lineHeight: 22, fontWeight: '500', color: colors.ink },
+  workspaceCount: { ...type.body, fontSize: 15, color: colors.subtle, marginLeft: spacing.xs },
+  workspacePath: { ...type.caption, fontSize: 13, color: colors.muted, writingDirection: 'ltr' },
   workspaceMeta: { ...type.caption, color: colors.muted },
+  // Flat folder list: groups are separated by a full-width hairline, no raised cards.
   workspaceGroup: {
-    marginBottom: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    paddingHorizontal: spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xxs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  workspaceGroupFocused: { borderColor: colors.primary },
-  noSessions: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
-  noSessionsText: { ...type.small, color: colors.primary },
-  loadAllSessions: { minHeight: 48, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
+  workspaceGroupFocused: { backgroundColor: colors.primarySoft },
+  noSessions: { minHeight: 48, paddingLeft: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  noSessionsText: { ...type.small, color: colors.muted },
+  loadAllSessions: { minHeight: 48, paddingVertical: spacing.sm, paddingLeft: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   loadAllSessionsText: { ...type.smallStrong, color: colors.primary },
   primaryArea: { marginTop: spacing.xxl },
   backdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.background, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  sheet: { backgroundColor: colors.background, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   // The sheet is capped by the live window height; the body scrolls inside it
   // so fixed header/footer rows stay reachable on short landscape windows.
   // flexGrow 0 keeps the body content-sized in portrait and only shrinks when
   // the capped sheet cannot fit it.
   sheetScroll: { flexGrow: 0, flexShrink: 1 },
   sheetScrollContent: { gap: spacing.md },
-  browserSheet: { backgroundColor: colors.background, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, paddingBottom: spacing.lg },
+  browserSheet: { backgroundColor: colors.background, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.lg, paddingBottom: spacing.lg },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { ...type.heading, color: colors.ink },
   workspaceActionHeading: { flex: 1, minWidth: 0 },
