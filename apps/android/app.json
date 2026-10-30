@@ -40,7 +40,7 @@
           "image": "./assets/splash-brand.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F7F8FA"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [

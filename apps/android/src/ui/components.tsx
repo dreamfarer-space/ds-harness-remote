@@ -181,7 +181,7 @@ export function TopBar({
         <View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: scheme === 'dark' ? 'rgba(11, 13, 17, 0.72)' : 'rgba(247, 248, 250, 0.74)' }
+            { backgroundColor: scheme === 'dark' ? 'rgba(11, 13, 17, 0.72)' : 'rgba(255, 255, 255, 0.85)' }
           ]}
           pointerEvents="none"
         />
@@ -654,7 +654,7 @@ function createStyles(colors: ThemeColors) {
     skeletonText: { width: '78%', height: 11, borderRadius: 4, backgroundColor: colors.surface },
     successNotice: { padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.successSoft, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     successNoticeText: { ...type.small, color: colors.ink, flex: 1 },
-    groupCard: { borderRadius: radius.xl, backgroundColor: colors.grouped, overflow: 'hidden' },
+    groupCard: { borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: 'hidden' },
     groupCardRaised: { borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
     groupCardClip: { borderRadius: radius.xl, overflow: 'hidden' },
     groupRow: { minHeight: 58, paddingLeft: spacing.md, flexDirection: 'row', alignItems: 'center' },

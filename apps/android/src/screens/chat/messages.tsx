@@ -624,7 +624,7 @@ export function WelcomeMessage() {
         height={(64 * FISH_LOGO_VIEWBOX.height) / FISH_LOGO_VIEWBOX.width}
         viewBox={`0 0 ${FISH_LOGO_VIEWBOX.width} ${FISH_LOGO_VIEWBOX.height}`}
       >
-        <Path d={FISH_LOGO_PATH} fill={colors.primary} />
+        <Path d={FISH_LOGO_PATH} fill={colors.ink} />
       </Svg>
       <View style={styles.welcomeRow}>
         <Text style={styles.welcomeSlogan}>{zhCN.chat.welcomeSlogan}</Text>

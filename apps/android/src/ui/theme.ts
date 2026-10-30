@@ -59,12 +59,12 @@ export interface ThemeColors {
 }
 
 // DeepSeek palette: near-black ink, DeepSeek blue (#4D6BFE) accents and white
-// surfaces on a cool off-white canvas.
+// surfaces on a clean white canvas.
 export const lightColors: ThemeColors = {
-  background: '#F7F8FA',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
   surfaceStrong: '#ECEFF4',
-  grouped: '#EFF1F5',
+  grouped: '#FFFFFF',
   elevated: '#FFFFFF',
   ink: '#0D1117',
   muted: '#5B6270',

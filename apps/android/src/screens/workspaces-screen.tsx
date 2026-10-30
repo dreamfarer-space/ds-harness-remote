@@ -1144,7 +1144,7 @@ function createStyles(colors: ThemeColors) {
   backendTabActive: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, ...floatingShadow(colors) },
   backendTabText: { ...type.small, fontSize: 15, color: colors.muted, textAlign: 'center' },
   backendTabTextActive: { color: colors.ink, fontWeight: '600' },
-  searchField: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.grouped, borderRadius: radius.pill, paddingHorizontal: spacing.md, marginBottom: spacing.lg },
+  searchField: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surfaceStrong, borderRadius: radius.pill, paddingHorizontal: spacing.md, marginBottom: spacing.lg },
   searchInput: { flex: 1, ...type.body, color: colors.ink, paddingVertical: spacing.sm },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   workspaceRow: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 64, paddingVertical: spacing.xs },

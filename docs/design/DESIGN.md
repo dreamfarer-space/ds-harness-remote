@@ -12,13 +12,13 @@ CodeX / ACP 在内存中投影到同一原生 UI，不增加独立会话页面�
 ## 2. 主题与颜色
 
 Android 支持跟随系统、浅色与深色主题；当前 token 是源码中的 sRGB/RGBA 值，不使用早期 OKLCH moss 方案。
-2026-10-29 起采用 DeepSeek 黑 / 蓝 / 白色板：近黑文字、DeepSeek 蓝 `#4D6BFE` 强调、白色卡片置于冷调浅灰画布上。
+2026-10-29 起采用 DeepSeek 黑 / 蓝 / 白色板：近黑文字、DeepSeek 蓝 `#4D6BFE` 强调、纯白卡片置于通透纯白画布上，搭配精致细线边框。
 
 | 角色 | 浅色 | 深色 | 用途 |
 | --- | --- | --- | --- |
-| background | `#F7F8FA` | `#0B0D11` | 页面画布 |
+| background | `#FFFFFF` | `#0B0D11` | 页面画布 |
 | surface | `#FFFFFF` | `#161A21` | 卡片、浮层与输入框 |
-| grouped | `#EFF1F5` | `#15191F` | 设置式分组列表 |
+| grouped | `#FFFFFF` | `#15191F` | 设置式分组列表 |
 | elevated | `#FFFFFF` | `#1D222B` | 浮动标题栏按钮 |
 | surfaceStrong | `#ECEFF4` | `#232832` | 胶囊、按下态 |
 | ink | `#0D1117` | `#F2F4F7` | 主要文字 |

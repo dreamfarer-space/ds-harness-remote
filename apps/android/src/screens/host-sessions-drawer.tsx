@@ -1126,7 +1126,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.md,
       height: 42,
       borderRadius: radius.pill,
-      backgroundColor: colors.grouped,
+      backgroundColor: colors.surfaceStrong,
     },
     searchInput: { flex: 1, ...type.body, fontSize: 15, color: colors.ink, paddingVertical: 0 },
 
@@ -1282,7 +1282,9 @@ const createStyles = (colors: ThemeColors) =>
       marginVertical: spacing.md,
       ...type.body,
       color: colors.ink,
-      backgroundColor: colors.grouped,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     renameErrorText: {
       ...type.caption,
