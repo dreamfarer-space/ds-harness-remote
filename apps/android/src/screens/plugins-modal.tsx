@@ -583,7 +583,7 @@ function createStyles(colors: ThemeColors) {
     section: { gap: spacing.xs },
     sectionHint: { ...type.caption, fontSize: 13, color: colors.subtle, paddingHorizontal: spacing.md },
     group: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.card,
       borderRadius: radius.xl,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.separator,
@@ -635,7 +635,7 @@ function createStyles(colors: ThemeColors) {
     },
     outlineBtnText: { ...type.bodyStrong, color: colors.ink },
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.card,
       borderRadius: radius.xl,
       padding: spacing.md,
       borderWidth: StyleSheet.hairlineWidth,

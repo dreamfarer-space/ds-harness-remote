@@ -15,7 +15,7 @@ export const createBotStyles = (colors: ThemeColors) => StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: spacing.xs, paddingTop: spacing.xxs },
   choice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.lg, borderWidth: 1, borderColor: 'transparent', backgroundColor: colors.grouped },
   choicePressed: { opacity: 0.75 },
-  card: { padding: spacing.md, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, backgroundColor: colors.surface, gap: spacing.sm },
+  card: { padding: spacing.md, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, backgroundColor: colors.card, gap: spacing.sm },
   rosterHeader: { paddingTop: 8, gap: 8 },
   rosterTitle: { ...type.title, color: colors.ink },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.grouped },

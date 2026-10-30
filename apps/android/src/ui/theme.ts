@@ -23,8 +23,12 @@ export function resolveColorScheme(
 export interface ThemeColors {
   /** Page canvas behind cards and grouped lists. */
   background: string
-  /** Raised cards, sheets and the composer. */
+  /** Opaque sheets, inputs and the composer. */
   surface: string
+  /** White card fill; alpha applies only to the background, never its children. */
+  card: string
+  /** Card composited over the canvas, for swipe rows that must hide actions underneath. */
+  cardOpaque: string
   /** Pills, pressed rows and other fills drawn on a surface. */
   surfaceStrong: string
   /** Inset grouped lists (settings-style sections) drawn on the canvas. */
@@ -59,12 +63,14 @@ export interface ThemeColors {
 }
 
 // DeepSeek palette: near-black ink, DeepSeek blue (#4D6BFE) accents and white
-// surfaces on a clean white canvas.
+// cards on a mist-blue canvas; floating sheets and inputs remain opaque.
 export const lightColors: ThemeColors = {
-  background: '#FFFFFF',
+  background: '#F0F4FD',
   surface: '#FFFFFF',
+  card: 'rgba(255, 255, 255, 0.60)',
+  cardOpaque: '#F9FBFE',
   surfaceStrong: '#ECEFF4',
-  grouped: '#FFFFFF',
+  grouped: 'rgba(255, 255, 255, 0.60)',
   elevated: '#FFFFFF',
   ink: '#0D1117',
   muted: '#5B6270',
@@ -95,8 +101,10 @@ export const lightColors: ThemeColors = {
 export const darkColors: ThemeColors = {
   background: '#0B0D11',
   surface: '#161A21',
+  card: 'rgba(255, 255, 255, 0.05)',
+  cardOpaque: '#17191D',
   surfaceStrong: '#232832',
-  grouped: '#15191F',
+  grouped: 'rgba(255, 255, 255, 0.05)',
   elevated: '#1D222B',
   ink: '#F2F4F7',
   muted: '#A2A9B6',

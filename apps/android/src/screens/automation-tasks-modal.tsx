@@ -693,7 +693,7 @@ function createStyles(colors: ThemeColors) {
     tabTextActive: { ...type.bodyStrong, color: colors.ink },
     detailContent: { padding: spacing.md, paddingBottom: spacing.xxl },
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.card,
       borderRadius: radius.xl,
       padding: spacing.md,
       marginBottom: spacing.md,

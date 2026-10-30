@@ -26,9 +26,16 @@ Desktop/CLI 安装命令；`scripts/install.sh` 支持 `INTELLIGENT_UI=1` 安装
 色板改为 DeepSeek 黑 / 蓝 / 白（`#4D6BFE`），新增 grouped/elevated/inverse token 与 xl/xxl 圆角；
 TopBar 改为浮动圆钮 / 胶囊，新增 GroupCard/GroupRow/FilterChip，新增平滑 Toggle 组件（`src/ui/toggle.tsx`）全量替代 8 处旧 Switch 控件；
 Settings 改为分组列表、外观预览卡与底部红色高危操作行（退出登录/重置配置）；
-列表全面推行扁平设计：首页设备卡与最近访问使用平铺白底块及线性图标，工作区与侧边栏采用扁平文件夹列表（chevron、文件夹、名称、计数）；
+列表全面推行扁平设计：首页设备卡与最近访问使用半透明白色卡片及线性图标，工作区与侧边栏采用扁平文件夹列表（chevron、文件夹、名称、计数）；
 侧边栏改为大标题 + 图标导航 + 右下浮动「新建对话」黑色胶囊（清理了旧版标题下方的状态/版本行）；聊天欢迎页突出蓝鲸 Logo 与大标题（不设上下文胶囊）。
 新增文案仅 `devices.summary`，已补齐 7 种语言。详见 docs/design/DESIGN.md。
+
+2026-10-30 配色调整：浅色画布与 splash 使用 `#F0F4FD`；卡片使用独立 `card` token，
+浅色白色 60%、深色白色 5%，不设置容器整体 opacity。`surface` 继续用于不透明浮层和输入框。
+设备滑动行使用卡片与画布的合成实色 `cardOpaque`，避免下方红色删除层透出；其他卡片直接使用 RGBA。
+本轮共享包/Plugin build、Android renderer 构建（Intelligent UI 未安装，走安全 fallback）、
+workspace data-plane 校验、`tsc --noEmit`、DSH bundle 与 diff check 通过。因宿主默认 pnpm 11
+与仓库 pnpm 9 安装布局不一致，check 的各子步骤直接执行；未增加 UI 测试、构建 APK 或真机验收。
 
 本轮验证：Android check（含 tsc）与 42 文件 / 271 tests 通过；模拟器（debug 包 + Metro）浅色/深色
 逐页人工检查。未构建 APK，未验证真机、平板/横屏、大字体、TalkBack；未在会话中实际发送消息，

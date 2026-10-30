@@ -1325,7 +1325,7 @@ function createStyles(colors: ThemeColors) {
   segmentButtonText: { ...type.small, fontSize: 15, color: colors.muted, textAlign: 'center' },
   segmentButtonTextActive: { color: colors.ink, fontWeight: '600' },
   keyNote: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.md },
-  accountPill: { marginTop: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, gap: 3 },
+  accountPill: { marginTop: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.xl, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, gap: 3 },
   accountPillTitle: { ...type.bodyStrong, fontSize: 17, color: colors.ink },
   accountPillMeta: { ...type.small, fontSize: 13, color: colors.muted },
   settingsGap: { marginTop: spacing.sm },
