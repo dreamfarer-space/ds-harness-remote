@@ -33,7 +33,7 @@ type Route =
   | { name: 'devices' }
   | { name: 'device'; deviceId: string; source?: 'workspaces' }
   | { name: 'connecting'; deviceId: string; focusWorkspaceKey?: string; sessionId?: string }
-  | { name: 'workspaces'; focusWorkspaceKey?: string; botConversationId?: string }
+  | { name: 'workspaces'; focusWorkspaceKey?: string; botConversationId?: string; source?: 'chat' }
   | { name: 'chat' }
   | { name: 'settings' }
   | { name: 'about' }
@@ -422,7 +422,7 @@ function AppNavigator() {
           setRoutes(current => current.map((entry, index) => index === current.length - 1 && entry.name === 'workspaces' ? { ...entry, botConversationId: undefined } : entry))
         }}
         onSelectBot={botConversationId => setRoutes(current => current.map((entry, index) => index === current.length - 1 && entry.name === 'workspaces' ? { ...entry, botConversationId } : entry))}
-        onBack={backFromWorkspaces}
+        onBack={route.source === 'chat' ? () => reset({ name: 'devices' }) : backFromWorkspaces}
         onOpenDevices={() => reset({ name: 'devices' })}
         onSession={() => push({ name: 'chat' })}
         focusWorkspaceKey={route.focusWorkspaceKey}
@@ -430,7 +430,7 @@ function AppNavigator() {
           if (selectedDevice !== undefined) push({ name: 'device', deviceId: selectedDevice.deviceId, source: 'workspaces' })
         }}
       />}
-      {route.name === 'chat' && <ChatScreen onBack={pop} onOpenDevices={() => reset({ name: 'devices' })} onOpenWorkspaces={focusWorkspaceKey => push({ name: 'workspaces', focusWorkspaceKey })} />}
+      {route.name === 'chat' && <ChatScreen onBack={pop} onOpenDevices={() => reset({ name: 'devices' })} onOpenWorkspaces={focusWorkspaceKey => push({ name: 'workspaces', focusWorkspaceKey, source: 'chat' })} />}
       {route.name === 'settings' && <SettingsScreen onBack={pop} onReset={() => reset({ name: 'server' })} />}
       {route.name === 'about' && <AboutScreen onBack={pop} />}
       {error !== undefined && route.name !== 'connecting' && route.name !== 'chat' && (
