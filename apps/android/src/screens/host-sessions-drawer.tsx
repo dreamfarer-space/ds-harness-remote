@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics'
 import * as Clipboard from 'expo-clipboard'
 import {
   ArrowLeft,
+  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -33,11 +34,13 @@ import {
   RefreshCw,
   Search,
   Sliders,
+  X,
 } from 'lucide-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '../state/store'
 import type { AgentBackend, RemoteSession, WorkspaceView } from '../types'
 import { strings } from '../locales/i18n'
+import { GroupCard, GroupRow, IconButton } from '../ui/components'
 import { brandGlowShadow, floatingShadow, radius, spacing, type } from '../ui/theme'
 import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useThemedStyles } from '../ui/use-themed-styles'
@@ -67,6 +70,35 @@ function formatRelativeTime(timestamp?: number | string): string {
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   return `${days}d`
+}
+
+interface HarnessOption {
+  value: AgentBackend
+  name: string
+  desc: string
+}
+
+const HARNESS_OPTIONS: HarnessOption[] = [
+  { value: 'harness', name: 'DeepSeek Harness', desc: '官方 DeepSeek 智能体框架' },
+  { value: 'codex', name: 'CodeX', desc: 'OpenAI CodeX 编程智能体' },
+  { value: 'claude', name: 'Claude', desc: 'Anthropic Claude 智能体' },
+  { value: 'cursor', name: 'Cursor', desc: 'Cursor IDE 交互智能体' },
+  { value: 'antigravity', name: 'Antigravity', desc: 'Antigravity 研发框架' },
+  { value: 'opencode', name: 'OpenCode', desc: 'OpenCode 开源智能体' },
+  { value: 'pi', name: 'Pi', desc: 'Personal Intelligence 智能体' },
+]
+
+function harnessDisplayName(value: AgentBackend): string {
+  switch (value) {
+    case 'harness': return 'DeepSeek'
+    case 'codex': return 'CodeX'
+    case 'claude': return 'Claude'
+    case 'cursor': return 'Cursor'
+    case 'antigravity': return 'Antigravity'
+    case 'opencode': return 'OpenCode'
+    case 'pi': return 'Pi'
+    default: return value
+  }
 }
 
 export function HostSessionsDrawer({
@@ -149,6 +181,16 @@ export function HostSessionsDrawer({
   useEffect(() => {
     if (connected) void refreshWorkspaces(backend)
   }, [backend, connected, deviceId, refreshWorkspaces])
+
+  const [harnessPickerOpen, setHarnessPickerOpen] = useState(false)
+  const windowDimensions = useWindowDimensions()
+  const sheetMaxHeight = Math.min(windowDimensions.height * 0.75, 520)
+
+  const handleSelectHarness = (target: AgentBackend) => {
+    setHarnessPickerOpen(false)
+    if (target === backend) return
+    setBackend(target)
+  }
 
   const [refreshing, setRefreshing] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -514,6 +556,21 @@ export function HostSessionsDrawer({
           )}
         </View>
       </View>
+
+      {/* 智能体平台切换 */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`智能体平台，当前 ${harnessDisplayName(backend)}`}
+        onPress={() => setHarnessPickerOpen(true)}
+        style={({ pressed }) => [styles.navItem, pressed && styles.pressedBg]}
+      >
+        <Bot size={20} color={colors.ink} strokeWidth={1.8} />
+        <Text style={[styles.navItemText, styles.harnessLabel]}>智能体平台</Text>
+        <View style={styles.harnessTrailing}>
+          <Text style={styles.harnessTrailingText} numberOfLines={1}>{harnessDisplayName(backend)}</Text>
+          <ChevronDown size={15} color={colors.muted} strokeWidth={1.8} />
+        </View>
+      </Pressable>
 
       <Pressable
         accessibilityRole="button"
@@ -1007,6 +1064,44 @@ export function HostSessionsDrawer({
           {configPopover}
         </View>
       )}
+
+      {/* 切换 Harness 模态弹窗 */}
+      <Modal
+        visible={harnessPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHarnessPickerOpen(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.harnessBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={strings.common.close} onPress={() => setHarnessPickerOpen(false)} />
+          <View style={[styles.harnessDialog, { maxHeight: sheetMaxHeight }]} accessibilityViewIsModal>
+            <View style={styles.harnessHeader}>
+              <Text style={styles.harnessTitle} accessibilityRole="header">切换 Harness</Text>
+              <IconButton label={strings.common.close} icon={X} onPress={() => setHarnessPickerOpen(false)} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.harnessList}>
+              <GroupCard>
+                {HARNESS_OPTIONS.map((option, index) => {
+                  const chosen = option.value === backend
+                  return (
+                    <GroupRow
+                      key={option.value}
+                      first={index === 0}
+                      label={option.name}
+                      detail={option.desc}
+                      selected={chosen}
+                      chevron={false}
+                      accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
+                      onPress={() => handleSelectHarness(option.value)}
+                    />
+                  )
+                })}
+              </GroupCard>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 
@@ -1337,5 +1432,82 @@ const createStyles = (colors: ThemeColors) =>
       ...type.small,
       color: colors.onInverse,
       fontWeight: '500',
+    },
+    harnessLabel: {
+      flex: 1,
+    },
+    harnessTrailing: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      flexShrink: 0,
+    },
+    harnessTrailingText: {
+      ...type.small,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.muted,
+      maxWidth: 100,
+    },
+    harnessBackdrop: {
+      flex: 1,
+      backgroundColor: colors.modalBackdrop,
+      justifyContent: 'flex-end',
+    },
+    harnessDialog: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: radius.xxl,
+      borderTopRightRadius: radius.xxl,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xxl,
+      gap: spacing.md,
+      ...floatingShadow(colors, 'high'),
+    },
+    harnessHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingLeft: spacing.xs,
+    },
+    harnessTitle: {
+      ...type.heading,
+      fontSize: 18,
+      color: colors.ink,
+      fontWeight: '700',
+    },
+    harnessList: {
+      paddingBottom: spacing.md,
+    },
+    harnessOptionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    harnessOptionDivider: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.separator,
+    },
+    harnessOptionInfo: {
+      flex: 1,
+      gap: 2,
+      marginRight: spacing.sm,
+    },
+    harnessOptionName: {
+      ...type.body,
+      fontSize: 16,
+      color: colors.ink,
+    },
+    harnessOptionNameActive: {
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    harnessOptionDesc: {
+      ...type.small,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.muted,
     },
   })
