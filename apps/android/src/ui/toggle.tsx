@@ -46,7 +46,10 @@ export function Toggle({ value, onValueChange, disabled = false, accessibilityLa
       accessibilityState={{ checked: value, disabled }}
       disabled={disabled}
       hitSlop={8}
-      onPress={() => onValueChange?.(!value)}
+      onPress={(e) => {
+        e?.stopPropagation?.()
+        onValueChange?.(!value)
+      }}
       style={disabled ? styles.disabled : undefined}
     >
       <Animated.View style={[styles.track, { backgroundColor: trackColor }]}>

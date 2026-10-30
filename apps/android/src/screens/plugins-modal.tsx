@@ -243,48 +243,65 @@ function BundleCard({ bundle, busy, first, onToggle, onOpen }: {
     ? strings.plugins.installOnDesktop
     : bundle.readOnly ? strings.plugins.readOnly : undefined
   return (
-    <Pressable
-      accessibilityRole={detail ? undefined : 'button'}
-      onPress={onOpen}
-      disabled={detail}
-      style={({ pressed }) => [styles.item, first !== true && styles.itemDivider, pressed && !detail && styles.pressed]}
-    >
-      <PluginIcon icon={bundle.icon} remote={bundle.category === 'remote'} />
-      <View style={styles.cardText}>
-        <View style={styles.titleRow}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{bundle.title}</Text>
-          {bundle.category === 'experimental' && <Text style={styles.badge}>{strings.plugins.experimental}</Text>}
-          {bundle.category === 'remote' && <Text style={[styles.badge, styles.badgeRemote]}>{strings.plugins.remoteBadge}</Text>}
-        </View>
-        {bundle.description !== undefined && (
-          <Text style={styles.cardDescription} numberOfLines={detail ? undefined : 2}>{bundle.description}</Text>
-        )}
-        {detail && bundle.remoteFeature !== undefined && (
-          <View style={styles.featureBox}>
-            <Smartphone size={14} color={colors.primary} />
-            <Text style={styles.featureText}>{bundle.remoteFeature}</Text>
+    <View style={[styles.item, first !== true && styles.itemDivider]}>
+      <Pressable
+        accessibilityRole={detail ? undefined : 'button'}
+        accessibilityLabel={bundle.title}
+        onPress={onOpen}
+        disabled={detail}
+        style={({ pressed }) => [styles.itemMain, pressed && !detail && styles.pressed]}
+      >
+        <PluginIcon icon={bundle.icon} remote={bundle.category === 'remote'} />
+        <View style={styles.cardText}>
+          <View style={styles.titleRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{bundle.title}</Text>
+            {bundle.category === 'experimental' && <Text style={styles.badge}>{strings.plugins.experimental}</Text>}
+            {bundle.category === 'remote' && <Text style={[styles.badge, styles.badgeRemote]}>{strings.plugins.remoteBadge}</Text>}
           </View>
-        )}
-        {(detail || status !== undefined) && (
-          <Text style={[styles.meta, !bundle.available && styles.metaWarning]} numberOfLines={2}>
-            {[status, detail && bundle.version !== undefined ? `${strings.plugins.version} ${bundle.version}` : undefined,
-              detail ? bundle.name : undefined].filter(Boolean).join(' · ')}
-          </Text>
-        )}
-        {bundle.error !== undefined && <Text style={styles.errorText}>{bundle.error}</Text>}
-      </View>
-      {busy ? <ActivityIndicator size="small" color={colors.muted} /> : (
-        <Toggle
-          accessibilityLabel={bundle.title}
-          value={bundle.enabled}
-          disabled={locked}
-          onValueChange={onToggle}
-          trackColor={{ true: colors.primary, false: colors.border }}
+          {bundle.description !== undefined && (
+            <Text style={styles.cardDescription} numberOfLines={detail ? undefined : 2}>{bundle.description}</Text>
+          )}
+          {detail && bundle.remoteFeature !== undefined && (
+            <View style={styles.featureBox}>
+              <Smartphone size={14} color={colors.primary} />
+              <Text style={styles.featureText}>{bundle.remoteFeature}</Text>
+            </View>
+          )}
+          {(detail || status !== undefined) && (
+            <Text style={[styles.meta, !bundle.available && styles.metaWarning]} numberOfLines={2}>
+              {[status, detail && bundle.version !== undefined ? `${strings.plugins.version} ${bundle.version}` : undefined,
+                detail ? bundle.name : undefined].filter(Boolean).join(' · ')}
+            </Text>
+          )}
+          {bundle.error !== undefined && <Text style={styles.errorText}>{bundle.error}</Text>}
+        </View>
+      </Pressable>
+      <View style={styles.itemAction}>
+        {busy ? <ActivityIndicator size="small" color={colors.muted} /> : (
+          <Toggle
+            accessibilityLabel={bundle.title}
+            value={bundle.enabled}
+            disabled={locked}
+            onValueChange={onToggle}
+            trackColor={{ true: colors.primary, false: colors.border }}
             thumbColor={colors.white}
-        />
-      )}
-      {!detail && <ChevronRight size={16} color={colors.subtle} />}
-    </Pressable>
+          />
+        )}
+        {!detail && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={bundle.title}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            onPress={onOpen}
+            hitSlop={8}
+            style={({ pressed }) => [styles.itemChevron, pressed && styles.pressed]}
+          >
+            <ChevronRight size={16} color={colors.subtle} />
+          </Pressable>
+        )}
+      </View>
+    </View>
   )
 }
 
@@ -572,7 +589,10 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.separator,
       overflow: 'hidden',
     },
-    item: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
+    item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
+    itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0, paddingRight: spacing.xs },
+    itemAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 0 },
+    itemChevron: { padding: spacing.xs, alignItems: 'center', justifyContent: 'center' },
     itemDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
     iconImage: { width: 26, height: 26 },
     badgeRemote: { color: colors.success, backgroundColor: colors.successSoft },
