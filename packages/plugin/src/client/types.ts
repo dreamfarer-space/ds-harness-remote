@@ -222,7 +222,7 @@ export interface PluginAssociation {
   account?: string
 }
 
-interface PluginConfigureResult {
+export interface PluginConfigureResult {
   status: 'authorized'
   role: 'host' | 'client'
   account?: string

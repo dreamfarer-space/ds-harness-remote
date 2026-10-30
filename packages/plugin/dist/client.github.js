@@ -1582,7 +1582,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   // node_modules/qrcode/lib/browser.js
   var require_browser = __commonJS({
     "node_modules/qrcode/lib/browser.js"(exports) {
-      var canPromise = require_can_promise(), QRCode2 = require_qrcode(), CanvasRenderer = require_canvas(), SvgRenderer = require_svg_tag();
+      var canPromise = require_can_promise(), QRCode3 = require_qrcode(), CanvasRenderer = require_canvas(), SvgRenderer = require_svg_tag();
       function renderCanvas(renderFunc, canvas, text, opts, cb) {
         let args = [].slice.call(arguments, 1), argsNum = args.length, isLastArgCb = typeof args[argsNum - 1] == "function";
         if (!isLastArgCb && !canPromise())
@@ -1596,7 +1596,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
             throw new Error("Too few arguments provided");
           return argsNum === 1 ? (text = canvas, canvas = opts = void 0) : argsNum === 2 && !canvas.getContext && (opts = text, text = canvas, canvas = void 0), new Promise(function(resolve, reject) {
             try {
-              let data = QRCode2.create(text, opts);
+              let data = QRCode3.create(text, opts);
               resolve(renderFunc(data, canvas, opts));
             } catch (e) {
               reject(e);
@@ -1604,13 +1604,13 @@ Minimum version required to store current data is: ` + bestVersion + `.
           });
         }
         try {
-          let data = QRCode2.create(text, opts);
+          let data = QRCode3.create(text, opts);
           cb(null, renderFunc(data, canvas, opts));
         } catch (e) {
           cb(e);
         }
       }
-      exports.create = QRCode2.create;
+      exports.create = QRCode3.create;
       exports.toCanvas = renderCanvas.bind(null, CanvasRenderer.render);
       exports.toDataURL = renderCanvas.bind(null, CanvasRenderer.renderToDataURL);
       exports.toString = renderCanvas.bind(null, function(data, _, opts) {
@@ -2606,9 +2606,10 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/client/settings.ts
+  var import_qrcode = __toESM(require_browser(), 1);
   function createRemotePluginOptions(React) {
     function RemotePluginOptions(props) {
-      let { t } = props, [open, setOpen] = React.useState(props.view === "page"), [serverUrl, setServerUrl] = React.useState(""), [remoteToolsBusy, setRemoteToolsBusy] = React.useState(!1), [remoteToolsEnabled, setRemoteToolsEnabled] = React.useState(!0), role = "host", [associations, setAssociations] = React.useState({}), [loaded, setLoaded] = React.useState(!1), [writable, setWritable] = React.useState(!1), [busy, setBusy] = React.useState(!1), [terminalEnabled, setTerminalEnabled] = React.useState(!1), [terminalBusy, setTerminalBusy] = React.useState(!1), [acpBackends, setAcpBackends] = React.useState([]), [acpAvailability, setAcpAvailability] = React.useState({}), [acpChecking, setAcpChecking] = React.useState({}), [acpCheckResults, setAcpCheckResults] = React.useState({}), [reconnectBusy, setReconnectBusy] = React.useState(!1), [hostStatus, setHostStatus] = React.useState(void 0), [hostName, setHostName] = React.useState(""), [hostDeviceId, setHostDeviceId] = React.useState(""), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0), [settingsView, setSettingsView] = React.useState(void 0), associationReadRun = React.useRef(0), association = associations.client ?? associations.host, applyAssociations = (view) => {
+      let { t } = props, [open, setOpen] = React.useState(props.view === "page"), [serverUrl, setServerUrl] = React.useState(""), [remoteToolsBusy, setRemoteToolsBusy] = React.useState(!1), [remoteToolsEnabled, setRemoteToolsEnabled] = React.useState(!0), [associations, setAssociations] = React.useState({}), [loaded, setLoaded] = React.useState(!1), [writable, setWritable] = React.useState(!1), [busy, setBusy] = React.useState(!1), [terminalEnabled, setTerminalEnabled] = React.useState(!1), [terminalBusy, setTerminalBusy] = React.useState(!1), [acpBackends, setAcpBackends] = React.useState([]), [acpAvailability, setAcpAvailability] = React.useState({}), [acpChecking, setAcpChecking] = React.useState({}), [acpCheckResults, setAcpCheckResults] = React.useState({}), [reconnectBusy, setReconnectBusy] = React.useState(!1), [hostStatus, setHostStatus] = React.useState(void 0), [hostName, setHostName] = React.useState(""), [hostDeviceId, setHostDeviceId] = React.useState(""), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0), [settingsView, setSettingsView] = React.useState(void 0), [signInOpen, setSignInOpen] = React.useState(!1), [loginEmail, setLoginEmail] = React.useState(""), [loginPassword, setLoginPassword] = React.useState(""), [loginMethod, setLoginMethod] = React.useState("password"), [oauthProviders, setOAuthProviders] = React.useState([]), [providersLoading, setProvidersLoading] = React.useState(!1), [providersFailed, setProvidersFailed] = React.useState(!1), [qrSession, setQrSession] = React.useState(void 0), [qrImage, setQrImage] = React.useState(void 0), [qrExpired, setQrExpired] = React.useState(!1), [qrFailed, setQrFailed] = React.useState(!1), [qrBusy, setQrBusy] = React.useState(!1), [qrCompleted, setQrCompleted] = React.useState(!1), [providerReload, setProviderReload] = React.useState(0), [completionReload, setCompletionReload] = React.useState(0), qrFlowRun = React.useRef(0), providerRequestRun = React.useRef(0), loginMethodManuallySelected = React.useRef(!1), associationReadRun = React.useRef(0), association = associations.client ?? associations.host, applyAssociations = (view) => {
         setAssociations(view.associations ?? (view.association === void 0 ? {} : { host: view.association }));
       }, applyView = (view, updateAssociations = !0) => {
         setSettingsView(view), setServerUrl(view.config.serverUrl ?? "https://dsh.r2049.cn"), setTerminalEnabled(view.config.terminal?.enabled ?? !0), setRemoteToolsEnabled(view.config.remoteTools?.enabled ?? !0), setAcpBackends((view.config.acp?.backends ?? []).map((item) => ({ id: item.id, enabled: item.enabled !== !1 }))), setAcpAvailability(view.acpAvailability ?? {}), updateAssociations && applyAssociations(view), setWritable(view.writable), setLoaded(!0);
@@ -2643,13 +2644,92 @@ Minimum version required to store current data is: ` + bestVersion + `.
         return () => {
           active = !1, unsubscribe();
         };
-      }, [props.statusFeed]);
-      let logout = async () => {
+      }, [props.statusFeed]), React.useEffect(() => {
+        if (!signInOpen) return;
+        let active = !0, run = ++providerRequestRun.current;
+        return qrFlowRun.current += 1, setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setQrFailed(!1), setQrBusy(!1), setQrCompleted(!1), setOAuthProviders([]), setProvidersLoading(!0), setProvidersFailed(!1), props.control("client.account.providers").then((items) => {
+          if (!active || run !== providerRequestRun.current) return;
+          let available = items.filter((item) => item.qrStartUrl != null);
+          setOAuthProviders(available), setLoginMethod((current) => {
+            if (loginMethodManuallySelected.current && (current === "password" || available.some((item) => `oauth:${item.id}` === current))) return current;
+            let preferred = available.find((item) => item.id === props.preferredQrProvider) ?? available[0];
+            return preferred === void 0 ? "password" : `oauth:${preferred.id}`;
+          });
+        }).catch((reason) => {
+          !active || run !== providerRequestRun.current || (setProvidersFailed(!0), setLoginMethod("password"), setError(messageOf(reason)));
+        }).finally(() => {
+          active && run === providerRequestRun.current && setProvidersLoading(!1);
+        }), () => {
+          active = !1;
+        };
+      }, [signInOpen, props.preferredQrProvider, providerReload]), React.useEffect(() => {
+        if (!signInOpen || providersLoading || loginMethod === "password" || !oauthProviders.some((item) => `oauth:${item.id}` === loginMethod) || qrSession !== void 0 || qrExpired || qrFailed || qrCompleted) return;
+        let active = !0, run = ++qrFlowRun.current;
+        return setQrBusy(!0), setQrFailed(!1), setError(void 0), setQrExpired(!1), props.control("client.account.qr.start", { provider: loginMethod.slice(6) }).then(async (session) => {
+          if (!active || run !== qrFlowRun.current) return;
+          let image = await import_qrcode.default.toDataURL(session.scanUrl, {
+            width: 184,
+            margin: 1,
+            errorCorrectionLevel: "L"
+          });
+          !active || run !== qrFlowRun.current || (setQrSession(session), setQrImage(image));
+        }).catch((reason) => {
+          !active || run !== qrFlowRun.current || (setQrFailed(!0), setError(messageOf(reason)));
+        }).finally(() => {
+          active && run === qrFlowRun.current && setQrBusy(!1);
+        }), () => {
+          active = !1;
+        };
+      }, [signInOpen, providersLoading, oauthProviders, loginMethod, qrSession, qrExpired, qrFailed, providerReload]), React.useEffect(() => {
+        if (!signInOpen || loginMethod === "password" || qrSession === void 0) return;
+        let active = !0, polling = !1, settled = !1, run = qrFlowRun.current, timer, poll = () => {
+          polling || settled || !active || run !== qrFlowRun.current || (polling = !0, props.control("client.account.qr.poll", { qrId: qrSession.qrId }).then((result) => {
+            !active || settled || run !== qrFlowRun.current || (result.status === "complete" ? (settled = !0, timer !== void 0 && clearInterval(timer), setError(void 0), setQrExpired(!1), setQrCompleted(!0), setQrSession(void 0), setQrImage(void 0), setQrBusy(!1)) : result.status === "expired" && (settled = !0, timer !== void 0 && clearInterval(timer), setQrExpired(!0), setQrSession(void 0), setQrImage(void 0), setQrBusy(!1)));
+          }).catch((reason) => {
+            active && !settled && run === qrFlowRun.current && setError(messageOf(reason));
+          }).finally(() => {
+            polling = !1;
+          }));
+        };
+        return poll(), timer = setInterval(poll, 1500), () => {
+          active = !1, settled = !0, timer !== void 0 && clearInterval(timer);
+        };
+      }, [signInOpen, loginMethod, qrSession]), React.useEffect(() => {
+        if (!signInOpen || !qrCompleted) return;
+        let active = !0;
+        return setError(void 0), props.control("settings.get").then((view) => {
+          active && (applyView(view), setSignInOpen(!1), setQrCompleted(!1), setLoginPassword(""), setNotice({ key: "authorizationComplete" }));
+        }).catch((reason) => {
+          active && setError(messageOf(reason));
+        }), () => {
+          active = !1;
+        };
+      }, [signInOpen, qrCompleted, completionReload]);
+      let signInClient = async () => {
+        if (!(loginEmail.trim() === "" || loginPassword === "")) {
+          setBusy(!0), setError(void 0);
+          try {
+            let result = await props.control("settings.configure", {
+              role: "client",
+              serverUrl: serverUrl.trim() || "https://dsh.r2049.cn",
+              email: loginEmail.trim(),
+              password: loginPassword
+            });
+            applyView(result.settings), setSignInOpen(!1), setLoginPassword(""), setNotice({ key: "authorizationComplete" });
+          } catch (reason) {
+            setError(messageOf(reason));
+          } finally {
+            setBusy(!1);
+          }
+        }
+      }, selectLoginMethod = (method) => {
+        loginMethodManuallySelected.current = !0, method !== loginMethod && (qrFlowRun.current += 1, setLoginMethod(method), setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setQrFailed(!1), setQrBusy(!1), setQrCompleted(!1), setError(void 0));
+      }, logout = async () => {
         let run = ++associationReadRun.current;
         setBusy(!0), setError(void 0), setNotice(void 0);
         try {
           let view = await props.control("settings.logout");
-          applyView(view, run === associationReadRun.current), setNotice({ key: "signedOut" });
+          applyView(view, run === associationReadRun.current), setSignInOpen(!1), setNotice({ key: "signedOut" });
         } catch (reason) {
           setError(messageOf(reason));
         } finally {
@@ -2703,7 +2783,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
             let view = await props.control("settings.get");
             applyView(view);
             let available = view.acpAvailability?.[backend] === !0;
-            !available && view.writable && view.config.acp?.backends?.some((item) => item.id === backend && item.enabled !== !1) && applyView(await props.control("settings.acp.set", { backend, enabled: !1 })), setAcpCheckResults((current) => ({ ...current, [backend]: available })), setNotice({ key: available ? "acpAvailable" : "acpUnavailable" }), window.setTimeout(() => setAcpCheckResults((current) => ({ ...current, [backend]: void 0 })), 5e3);
+            !available && view.writable && view.config.acp?.backends?.some((item) => item.id === backend && item.enabled !== !1) && applyView(await props.control("settings.acp.set", { backend, enabled: !1 })), setAcpCheckResults((current) => ({ ...current, [backend]: available })), setNotice({ key: available ? "acpAvailable" : "acpUnavailable" }), setTimeout(() => setAcpCheckResults((current) => ({ ...current, [backend]: void 0 })), 5e3);
           } catch (reason) {
             setError(messageOf(reason));
           } finally {
@@ -2744,11 +2824,23 @@ Minimum version required to store current data is: ` + bestVersion + `.
         React.createElement(
           "div",
           { className: "dshRemoteAuthorizationSetting" },
-          React.createElement("div", null, React.createElement("strong", null, t("remoteTools")), React.createElement("p", null, t("remoteToolsHint"))),
-          React.createElement("input", { type: "checkbox", role: "switch", checked: remoteToolsEnabled, disabled: remoteToolsBusy || !writable, "aria-label": t("remoteTools"), onChange: (event) => {
-            let enabled = event.target.checked;
-            setRemoteToolsEnabled(enabled), setRemoteTools(enabled);
-          } })
+          React.createElement(
+            "div",
+            null,
+            React.createElement("strong", null, t("remoteTools")),
+            React.createElement("p", null, t("remoteToolsHint"))
+          ),
+          React.createElement("input", {
+            type: "checkbox",
+            role: "switch",
+            checked: remoteToolsEnabled,
+            disabled: remoteToolsBusy || !writable,
+            "aria-label": t("remoteTools"),
+            onChange: (event) => {
+              let enabled = event.target.checked;
+              setRemoteToolsEnabled(enabled), setRemoteTools(enabled);
+            }
+          })
         )
       ), acpSetting = React.createElement(
         "details",
@@ -2802,7 +2894,148 @@ Minimum version required to store current data is: ` + bestVersion + `.
           ))
         )
       );
-      return props.view === "summary" ? React.createElement("span", null, t("pluginDescription")) : React.createElement(
+      if (props.view === "summary") return React.createElement("span", null, t("pluginDescription"));
+      let orderedQrProviders = [...oauthProviders].sort((a, b) => +(b.id === props.preferredQrProvider) - +(a.id === props.preferredQrProvider)), selectedProvider = oauthProviders.find((item) => `oauth:${item.id}` === loginMethod), scanLabel = t("scanWithProvider", { provider: selectedProvider?.displayName ?? "" }), qrLoginTab = (provider) => React.createElement("button", {
+        key: provider.id,
+        type: "button",
+        role: "tab",
+        id: `dsh-remote-settings-oauth:${provider.id}-tab`,
+        "aria-selected": loginMethod === `oauth:${provider.id}`,
+        "aria-controls": `dsh-remote-settings-oauth:${provider.id}-panel`,
+        className: loginMethod === `oauth:${provider.id}` ? "isActive" : "",
+        disabled: busy,
+        onClick: () => selectLoginMethod(`oauth:${provider.id}`)
+      }, provider.displayName), inlineSignIn = signInOpen ? React.createElement(
+        "div",
+        {
+          id: "dsh-remote-inline-signin",
+          className: "dshRemoteInlineSignIn"
+        },
+        oauthProviders.length === 0 && !providersLoading ? null : React.createElement(
+          "div",
+          { className: "dshRemoteLoginTabs", role: "tablist" },
+          ...orderedQrProviders.map(qrLoginTab),
+          React.createElement("button", {
+            type: "button",
+            role: "tab",
+            id: "dsh-remote-settings-password-tab",
+            "aria-selected": loginMethod === "password",
+            "aria-controls": "dsh-remote-settings-password-panel",
+            className: loginMethod === "password" ? "isActive" : "",
+            disabled: busy,
+            onClick: () => selectLoginMethod("password")
+          }, t("accountPasswordLogin"))
+        ),
+        providersLoading ? React.createElement("p", { className: "dshRemoteSettingsState", role: "status" }, t("loadingLoginProviders")) : null,
+        providersFailed ? React.createElement("button", {
+          type: "button",
+          className: "dshRemoteReconnect",
+          disabled: busy,
+          onClick: () => {
+            setError(void 0), setProviderReload((v) => v + 1);
+          }
+        }, t("retryLoginProviders")) : null,
+        loginMethod !== "password" && selectedProvider !== void 0 ? React.createElement(
+          "div",
+          {
+            className: "dshRemoteQrLogin",
+            role: "tabpanel",
+            id: `dsh-remote-settings-${loginMethod}-panel`,
+            "aria-labelledby": `dsh-remote-settings-${loginMethod}-tab`
+          },
+          qrCompleted ? React.createElement(
+            "div",
+            { className: "dshRemoteInlineSignInQrState" },
+            React.createElement("p", null, t("loadingSettings")),
+            React.createElement("button", {
+              type: "button",
+              className: "dshRemoteReconnect",
+              disabled: busy,
+              onClick: () => {
+                setError(void 0), setCompletionReload((v) => v + 1);
+              }
+            }, t("retryLoginProviders"))
+          ) : qrFailed ? React.createElement(
+            "div",
+            { className: "dshRemoteInlineSignInQrState" },
+            React.createElement("p", null, t("retryLoginProviders")),
+            React.createElement("button", {
+              type: "button",
+              className: "dshRemoteReconnect",
+              disabled: qrBusy,
+              onClick: () => {
+                setQrFailed(!1), setQrExpired(!1), setQrSession(void 0), setQrImage(void 0);
+              }
+            }, t("retryLoginProviders"))
+          ) : qrExpired ? React.createElement(
+            "div",
+            { className: "dshRemoteInlineSignInQrState" },
+            React.createElement("p", null, t("qrLoginExpired")),
+            React.createElement("button", {
+              type: "button",
+              className: "dshRemoteReconnect",
+              disabled: qrBusy,
+              onClick: () => {
+                setQrExpired(!1), setQrFailed(!1), setQrSession(void 0), setQrImage(void 0);
+              }
+            }, t("refreshQrCode"))
+          ) : qrImage === void 0 ? React.createElement(
+            "div",
+            { className: "dshRemoteQrPlaceholder", "aria-busy": qrBusy },
+            React.createElement("span", null, t("checkingConnection"))
+          ) : qrSession !== void 0 ? React.createElement(
+            "a",
+            {
+              className: "dshRemoteQrOpen",
+              href: qrSession.scanUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              "aria-label": t("openInBrowser")
+            },
+            React.createElement("img", {
+              src: qrImage,
+              width: 184,
+              height: 184,
+              alt: scanLabel
+            }),
+            React.createElement("span", null, t("openInBrowser"), " \u2197")
+          ) : null,
+          React.createElement("strong", null, scanLabel),
+          React.createElement("p", null, t("scanLoginHint"))
+        ) : React.createElement(
+          "div",
+          {
+            className: "dshRemoteClientLogin",
+            role: "tabpanel",
+            id: "dsh-remote-settings-password-panel",
+            "aria-labelledby": "dsh-remote-settings-password-tab"
+          },
+          React.createElement("input", {
+            type: "email",
+            value: loginEmail,
+            disabled: busy,
+            autoComplete: "username",
+            placeholder: t("account"),
+            "aria-label": t("account"),
+            onChange: (event) => setLoginEmail(event.target.value)
+          }),
+          React.createElement("input", {
+            type: "password",
+            value: loginPassword,
+            disabled: busy,
+            autoComplete: "current-password",
+            placeholder: t("password"),
+            "aria-label": t("password"),
+            onChange: (event) => setLoginPassword(event.target.value)
+          }),
+          React.createElement("button", {
+            type: "button",
+            disabled: busy || loginEmail.trim() === "" || loginPassword === "",
+            onClick: () => void signInClient()
+          }, t(busy ? "signingIn" : "startSignIn"))
+        )
+      ) : null;
+      return React.createElement(
         props.view === "page" ? "div" : "li",
         { className: `dshRemotePluginCard${open ? " isOpen" : ""}${props.view === "page" ? " dshRemotePluginModern" : ""}` },
         React.createElement(
@@ -2950,11 +3183,16 @@ Minimum version required to store current data is: ` + bestVersion + `.
               React.createElement("p", { className: "dshRemoteSettingsState" }, t("authorizeFromRemote")),
               React.createElement("button", {
                 type: "button",
-                className: "dshRemoteSave",
+                className: signInOpen ? "dshRemoteDiscard" : "dshRemoteSave",
                 disabled: busy || !loaded,
-                onClick: props.onSignIn
-              }, t("signInAccount"))
+                "aria-expanded": signInOpen,
+                "aria-controls": "dsh-remote-inline-signin",
+                onClick: () => {
+                  setError(void 0), setSignInOpen((current) => !current);
+                }
+              }, t(signInOpen ? "close" : "signInAccount"))
             ),
+            inlineSignIn,
             writable ? null : React.createElement("p", { className: "dshRemoteError" }, t("readOnly")),
             error !== void 0 || notice !== void 0 ? React.createElement(
               "div",
@@ -3065,6 +3303,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
       ".dshRemotePluginCardBody{border-top:1px solid var(--dsw-alias-border-l2);margin:0 16px;padding-bottom:8px}.dshRemoteSettings{display:flex;flex-direction:column;max-width:none}.dshRemoteSettingsTop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:0 0 12px}.dshRemoteSettingsState{margin:0;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:1.5}",
       ".dshRemotePluginModern .dshRemoteField input{border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md,8px);height:40px}.dshRemotePluginModern .dshRemoteSettingsFooter button{border-radius:var(--dsw-radius-md,8px);min-height:32px}",
       ".dshRemoteSettingsSignIn{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;padding:16px 0 12px;border-top:1px solid var(--dsw-alias-border-l2)}.dshRemoteSettingsSignIn p{max-width:70ch}.dshRemoteSettingsSignIn button{flex-shrink:0}",
+      ".dshRemoteInlineSignIn{box-sizing:border-box;width:100%;margin-top:4px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2)}.dshRemoteInlineSignIn .dshRemoteClientLogin,.dshRemoteInlineSignIn .dshRemoteQrLogin{height:auto;min-height:0;padding-bottom:8px}",
       ".dshRemoteHostIdentity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2)}.dshRemoteHostIdentity>div{min-width:0;display:flex;flex-direction:column;gap:3px}.dshRemoteHostIdentity span{color:var(--dsw-alias-label-tertiary);font-size:12px}.dshRemoteHostIdentity strong,.dshRemoteHostIdentity code{min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500}.dshRemoteHostIdentity code{font-family:var(--dsw-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-weight:400}",
       ".dshRemoteField{display:flex;flex-direction:column;gap:6px;padding:12px 0}.dshRemoteField+.dshRemoteField{border-top:1px solid var(--dsw-alias-border-l2)}.dshRemoteField label{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500;line-height:1.5}.dshRemoteField input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}.dshRemoteField input:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}.dshRemoteField input:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}.dshRemoteFieldValue{min-width:0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5;overflow-wrap:anywhere}.dshRemoteField p{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.5}",
       '.dshRemoteAuthorizationSetting{border-top:1px solid var(--dsw-alias-border-l2);display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0}.dshRemoteAuthorizationSetting>div{min-width:0}.dshRemoteAuthorizationSetting strong{font-size:13px;font-weight:500}.dshRemoteAuthorizationSetting p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px}.dshRemoteAuthorizationSetting>input{appearance:none;position:relative;width:38px;height:22px;flex:0 0 auto;margin:0;border:1px solid var(--dsw-alias-label-secondary);border-radius:999px;background:var(--dsw-alias-bg-layer-3);cursor:pointer;box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);transition:background .16s ease-out,border-color .16s ease-out,box-shadow .16s ease-out}.dshRemoteAuthorizationSetting>input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .16s ease-out,background .16s ease-out}.dshRemoteAuthorizationSetting>input:checked{border-color:var(--dsw-alias-state-success-primary);background:var(--dsw-alias-state-success-primary);box-shadow:none}.dshRemoteAuthorizationSetting>input:checked::after{transform:translateX(16px);background:var(--dsw-alias-bg-layer-1)}.dshRemoteAuthorizationSetting>input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.dshRemoteAuthorizationSetting>input:disabled{opacity:.5;cursor:default}@media(prefers-reduced-motion:reduce){.dshRemoteAuthorizationSetting>input,.dshRemoteAuthorizationSetting>input::after{transition:none}}',
@@ -3091,7 +3330,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/client/workspaces.ts
-  var import_qrcode = __toESM(require_browser(), 1);
+  var import_qrcode2 = __toESM(require_browser(), 1);
 
   // src/client/icons.ts
   var deepSeekWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAACVBMVEUAAADy8vXx8fUsA3vyAAAAAXRSTlMAQObYZgAAAOxJREFUWMPtlsEOwyAMQxP+/6OnTZMGxHGcot3wDYgfhkJbs6urprzveGtu9d1NgEdto8w93GuA7zPS2RFg7ynsCOAokbtAmLr2YaeKgJ6fxpT8jCAC0qSqPyNoO5DXdvyouj4ClFAdYaDxK09uiBDCIYBf6CxLesnR0uF2pG+JmhCqrUb0AOvjjoQaYDTCEAAgMg5grhAeAQIB+/M15IcKlnUIp4CkTCd0AKb4zVsRSJVGYEVzT0agK107IMGMEurvromEpaX4wzk/IKw378kq4LafED6Oowxfk7AP2q8W16EdM3p29Eyvrv6vF0WIBfBziKyCAAAAAElFTkSuQmCC", gptWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAclBMVEX////v7+++wMf////s7O3k5OTExcrX2Ny6vMTv8PPW19yXmqRqboJmaHd3eoaqrLPs7fGMjpfb3eKlpq1eYXOxs7pWWWd+gY5HSVdRVGVub3k+QU74+Pg4OkcvMT1ISlUoKjUiIy4fICueoKkaGyUSFB21Bp+qAAAAAXRSTlMAQObYZgAABChJREFUWMPtl916qjoQhlsdEwIECEgMYCBxx/u/xT1DrFUL1LO1DtY8LSLJvPnmB4gfH//sr7TPDfvdebf/xXZbkE/4zZ0MVhGHd9zJDsv+7F3//Z69tT5wljAu3tXw+TIlzXKJlhflYmJ+5uF5WpWhb54X+C/zZCmT2wJA4dJZwus0UYjIGqWyMhVbEp4yKNRRqlv0opW5PJLJ4rFJXvP4JKDRMqturBZjkMVJFYjR6iHQDQDI4+k2k51wZbWrqwp4mR/1CVYATyko9TFGxBUqL5IvMbXSWt0T8bkGgFLqgqZBI/Uxbx5UAxLaNcCNLBpttM7wbCc1pmJOpWAsDtey68UaQMyrFgb9uxLPjqg3+nGluyKN0XUdWw0BJ0NvTFFqgzpr9J+Dh4w0Ga1qkqBNswagxdRgFPAbgHRQG5jumGWyMxrTIaRRa4AzFs0YrNMXgI4MJWnsKYFhGNMnIh/mBOPsV8CZBFjN9w8ArowxnZzDr5IcvxTaKpxJCVsoI3SWysz1UM4AqQdzlCgho1IKrK+x1mKFzisANtgEU8E7GwHDgOqxe4w9tnM166wbaA2xBMBLrTWcAGYGdCiYVUJUrMCF+7l6gklrW1RwPi8ByjuActANqhKzVWoYrFGcCFzbDgNaBrTWpncFQMcI2DfWoAiDqRCiHcYM/ZdCEKkZqfR8spj4F0CiJjv2gHL6URNoCQDaYacL6O1oFDO2eQDUFP7AKdCRdC4CRDZaNifbjA41l/uYb/SZMAFNTBGzY7sG4J2jTsJgToOzIzXF3HZqBpSOAGduXbkGEKV1OqVGqRJpRxtvwbSw5IqAiUJItwBCOT9R32FCGo3nCkAN3t0UTBRC6zDONcBeOee9pr4T+ASbnDOdc5OmtREwEEB5w8Wqgt4bOV5c7Lt9iiK8zdP/IsBbutUGX4gNwEVCqd3FUt/xYnRWt7BvPBYQjwjAGXa3ASguHVAZ/WXKlA3eZDX1wRegFsr7E2wAlB9xFbx/7MV70kFT8aqNgLL3F8nFBmA3hrn/IJHjKJOK2oj1WI4Z4FzwN/81AOhgYD6v2xbIvaZIurLC9AfvB1WLTYAoXejF1xeBL5cpBIyEbmxkZymIXwDQh1BAfOrhI1lfwtgz8tozF5T4ttf3+32AyxC6klwAgw/YVTHpoK82xYt3wLP/Bw4AAI4D7/01TLKXBj9NEz2wEuGiKpoy68S/FwCLMQAZ3gXhihaCa25vQo6RyToOz9PE6wYjJgGi1YnqZX8qMIK+TDlnargGzSv4NvFjlwXf/nfLLMrAB4O/Xl3BH0d+RIASFgDA8IYMIXgr2+cBsbDdPSwAAHjSZFmb3txETCKIxc0uWwI8rxsLJcTiVndNwyMgKljbbNN2/zcEAja2+4RgIDYN2Bu/WtAOaEodnu2dnzz/7I/Y/w/LaEcX/MdfAAAAAElFTkSuQmCC";
@@ -3149,7 +3388,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
         let run = ++qrFlowRun.current;
         setBusy(!0), setError(void 0), setQrExpired(!1);
         try {
-          let session = await props.control("client.account.qr.start", { provider }), image = await import_qrcode.default.toDataURL(session.scanUrl, {
+          let session = await props.control("client.account.qr.start", { provider }), image = await import_qrcode2.default.toDataURL(session.scanUrl, {
             width: 184,
             margin: 1,
             errorCorrectionLevel: "L"
@@ -4977,12 +5216,22 @@ Minimum version required to store current data is: ` + bestVersion + `.
           name: "plugins.row.config",
           key: "ds-harness-remote#ds-harness-remote",
           locale: localeNamespace,
-          inject: () => ({ control, statusFeed, onSignIn: openRemote })
+          inject: () => ({
+            control,
+            statusFeed,
+            onSignIn: openRemote,
+            preferredQrProvider: ctx.locale.getLocale().active === "zh" ? "zhihu" : "github"
+          })
         }, RemotePluginOptions)), ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
           name: "plugins.bundle.config",
           key: "ds-harness-remote",
           locale: localeNamespace,
-          inject: () => ({ control, statusFeed, onSignIn: openRemote })
+          inject: () => ({
+            control,
+            statusFeed,
+            onSignIn: openRemote,
+            preferredQrProvider: ctx.locale.getLocale().active === "zh" ? "zhihu" : "github"
+          })
         }, RemotePluginOptions));
       }
       function isMissingControlRoute(reason) {

@@ -584,7 +584,12 @@ window.__ModuleLoader__.load({
         name: 'plugins.row.config',
         key: 'ds-harness-remote#ds-harness-remote',
         locale: localeNamespace,
-        inject: () => ({ control, statusFeed, onSignIn: openRemote }),
+        inject: () => ({
+          control,
+          statusFeed,
+          onSignIn: openRemote,
+          preferredQrProvider: ctx.locale.getLocale().active === 'zh' ? 'zhihu' : 'github',
+        }),
       }, RemotePluginOptions))
       // Bundle-scoped: installed-bundle details resolve configuration by
       // package name.
@@ -592,7 +597,12 @@ window.__ModuleLoader__.load({
         name: 'plugins.bundle.config',
         key: 'ds-harness-remote',
         locale: localeNamespace,
-        inject: () => ({ control, statusFeed, onSignIn: openRemote }),
+        inject: () => ({
+          control,
+          statusFeed,
+          onSignIn: openRemote,
+          preferredQrProvider: ctx.locale.getLocale().active === 'zh' ? 'zhihu' : 'github',
+        }),
       }, RemotePluginOptions))
     }
 
