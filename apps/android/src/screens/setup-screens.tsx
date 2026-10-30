@@ -606,6 +606,8 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const typographyDensity = useAppStore(state => state.typographyDensity)
   const setTypographyDensity = useAppStore(state => state.setTypographyDensity)
   const [densitySaving, setDensitySaving] = useState(false)
+  const [densityPickerOpen, setDensityPickerOpen] = useState(false)
+  const currentDensityLabel = typographyDensity === 'compact' ? zhCN.settings.densityCompact : zhCN.settings.densityStandard
   const compactHistory = useAppStore(state => state.compactHistory)
   const setCompactHistory = useAppStore(state => state.setCompactHistory)
   const [compactSaving, setCompactSaving] = useState(false)
@@ -728,34 +730,14 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
               </View>
             </GroupCard>
             <GroupCard style={styles.settingsGap}>
-              <View style={styles.densityRow}>
-                <View style={styles.densityIcon}><Type size={21} color={colors.muted} strokeWidth={1.8} /></View>
-                <View style={styles.densityCopy}>
-                  <Text style={styles.densityLabel}>{zhCN.settings.typographyDensity}</Text>
-                  <Text style={styles.densityNote} numberOfLines={2}>{zhCN.settings.typographyDensityNote}</Text>
-                </View>
-              </View>
-              <View style={[styles.segmentRow, styles.densitySegments]} accessibilityRole="tablist">
-                {([
-                  { value: 'standard' as const, name: zhCN.settings.densityStandard },
-                  { value: 'compact' as const, name: zhCN.settings.densityCompact },
-                ]).map(option => {
-                  const chosen = option.value === typographyDensity
-                  return (
-                    <Pressable
-                      key={option.value}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: chosen }}
-                      onPress={() => void toggleTypographyDensity(option.value)}
-                      style={[styles.segmentButton, chosen && styles.segmentButtonActive]}
-                    >
-                      <Text style={[styles.segmentButtonText, chosen && styles.segmentButtonTextActive]} numberOfLines={1}>
-                        {option.name}
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </View>
+              <GroupRow
+                first
+                icon={Type}
+                label={zhCN.settings.typographyDensity}
+                value={currentDensityLabel}
+                chevron
+                onPress={() => setDensityPickerOpen(true)}
+              />
               <GroupRow
                 icon={PanelTop}
                 label={zhCN.settings.statusBar}
@@ -921,6 +903,41 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
                       onPress={() => {
                         setLanguagePickerOpen(false)
                         void setLanguagePreference(option.value)
+                      }}
+                    />
+                  )
+                })}
+              </GroupCard>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={densityPickerOpen} transparent animationType="fade" onRequestClose={() => setDensityPickerOpen(false)} statusBarTranslucent>
+        <View style={styles.languageBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={zhCN.common.close} onPress={() => setDensityPickerOpen(false)} />
+          <View style={[styles.languageDialog, { maxHeight: sheetMaxHeight }]} accessibilityViewIsModal>
+            <View style={styles.languageHeader}>
+              <Text style={styles.languageTitle} accessibilityRole="header">{zhCN.settings.typographyDensity}</Text>
+              <IconButton label={zhCN.common.close} icon={X} onPress={() => setDensityPickerOpen(false)} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.languageList}>
+              <GroupCard>
+                {([
+                  { value: 'standard' as const, name: zhCN.settings.densityStandard },
+                  { value: 'compact' as const, name: zhCN.settings.densityCompact },
+                ]).map((option, index) => {
+                  const chosen = option.value === typographyDensity
+                  return (
+                    <GroupRow
+                      key={option.value}
+                      first={index === 0}
+                      label={option.name}
+                      selected={chosen}
+                      chevron={false}
+                      accessory={chosen ? <Check size={19} color={colors.primary} strokeWidth={2.2} /> : undefined}
+                      onPress={() => {
+                        setDensityPickerOpen(false)
+                        void toggleTypographyDensity(option.value)
                       }}
                     />
                   )
