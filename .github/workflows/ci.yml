@@ -256,13 +256,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: dreamfarer-space/deepseek-harness-intelligent-ui
-          # Pinned upstream PR #82 merge commit; update only after auditing the new artifact.
-          ref: f3735efffd823f8c34817f4e8554743ac3276225
+          # Pinned upstream v0.2.13 release commit; update only after auditing the new artifact.
+          ref: 0e2091ced5fa2d4af279fbe67ecbb5d122020384
           path: .deps/deepseek-harness-intelligent-ui
 
       - name: Verify pinned Intelligent UI renderer
         run: |
-          test "$(git -C .deps/deepseek-harness-intelligent-ui rev-parse HEAD)" = "f3735efffd823f8c34817f4e8554743ac3276225" || { echo '::error::Unexpected renderer source commit'; exit 1; }
+          test "$(git -C .deps/deepseek-harness-intelligent-ui rev-parse HEAD)" = "0e2091ced5fa2d4af279fbe67ecbb5d122020384" || { echo '::error::Unexpected renderer source commit'; exit 1; }
           test "$(git -C .deps/deepseek-harness-intelligent-ui hash-object renderer/renderer.js)" = "ebac4a4c2199383458d4e1fa2121be0e6043c5c0" || { echo '::error::Unexpected renderer file content'; exit 1; }
 
       - name: Bundle local Android renderers
