@@ -301,6 +301,23 @@ DS Bot 是一个基于 DeepSeek Harness（简称 dsh）的 bot 插件，插件�
  </picture>
 </a>
 
+## 贡献者
+
+本区块展示为本项目的开发与维护做出贡献的人员。
+
+- 通过 GitHub Issues 反馈缺陷或提交功能建议。
+- 完善项目文档，维护英文、中文及日文版本的 README。
+- 在各类环境下测试 npm 包、Android 客户端或 Web 客户端。
+- 提交代码修复与功能改进，或审查现有的 Pull Request。
+
+<p align="center">
+  <a href="https://github.com/liguobao/ds-harness-remote/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=liguobao/ds-harness-remote&max=30" alt="贡献者" />
+  </a>
+</p>
+
+该头像墙由 contrib.rocks 自动生成，随贡献合入自动更新，无需手动维护名单。
+
 ## 项目声明与商标
 
 本项目是独立的社区项目，不是 DeepSeek 官方产品。DeepSeek 及相关名称和商标归其各自权利人所有。
