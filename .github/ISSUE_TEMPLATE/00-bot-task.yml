@@ -1,0 +1,58 @@
+name: 🤖 交给 VPS 自动修复 (Bot task)
+description: 提交后会自动打上 bot:fix，VPS 流水线 1 分钟内开工；没写验收条件不会开工。
+title: "[Bot][Android] "
+labels: ["bot:fix"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **一个 Issue 只做一件事。** 业务代码预计超过 300 行或 10 个文件时，流水线不会动手，会请你拆分。
+        界面效果（动画、提示停留时间等）VPS 上确认不了，PR 合入前请在手机上点一遍。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题
+      description: 现在哪里不对，或者缺了什么。
+      placeholder: 会话列表里长按一条会话，弹出的菜单没有「复制标题」，想把标题发给别人只能手打。
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 缺陷才需要填；功能需求可以留空。
+      placeholder: |
+        1. 打开任意会话，关闭手机网络
+        2. 在输入框输入「测试草稿」
+        3. 打开网络，等待显示已连接
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收条件
+      description: 每行写一个能检查的结果——拿着手机能明确说出「做到了 / 没做到」。不要写「更好看」「优化一下」。最后一条写清楚不能动什么。
+      placeholder: |
+        - 长按会话列表中的任意一条会话，菜单里出现「复制标题」
+        - 点击后，剪贴板内容与该会话标题完全一致
+        - 点击后出现短提示「已复制」，约 2 秒后自动消失
+        - 7 种语言都有这项菜单和提示的翻译
+        - 不改动会话列表的其他菜单项和排序
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围
+      description: 只允许改哪里、哪些地方不要动。
+      placeholder: 只改 Android 端会话列表的长按菜单；不改服务端、插件、桌面端。
+    validations:
+      required: false
+  - type: input
+    id: upstream
+    attributes:
+      label: 上游 Issue 编号
+      description: liguobao/ds-harness-remote 上对应的 Issue 编号，PR 会自动关联并在合入后关闭它；没有就留空。
+      placeholder: "999"
+    validations:
+      required: false
