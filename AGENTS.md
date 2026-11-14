@@ -1,4 +1,143 @@
+## LAN TCP workspace uploads (2026-11-14)
+
+Host 新增 `workspace.upload.lan.v1` 与 `workspace.upload.lan.open`，Android 对至少
+1 MiB、真实路径为 LAN、原生 sender 可用的二进制文件上传启用独立 Noise/TCP WebSocket。
+原认证通道协商的票据绑定 connection/device static key/session/upload；10 秒未使用过期、
+一次 upgrade 消耗，仅绑定本机 RFC1918 IPv4 网卡地址。Client 将入口固定到实际 RTC
+选中的 Host IPv4 地址，不接受 DNS、公共/loopback 地址或任意 URL。握手与普通上传 RPC
+沿用 Noise / SecureMessageCodec，原生 `RemoteWebSocketBinary` 避免 JS Base64 转码。
+数据通道只允许固定 open/binary-chunk/commit/abort，不转发其他业务；仍用原连接拥有的
+WorkspaceUploadHost 校验会话权限、目录、偏移、总量、fsync 与不覆盖发布。原连接关闭、
+替换或撤销会销毁监听器与临时文件；开始上传后出错不得换通道重放。仅文件 open 尚未发送、
+入口不支持或不可达时可回原通道。上传 RPC caller 绑定连接代次，不能跨 Host/重连继续调用。
+P2P、TURN/Relay、IPv6、小文件、旧 Host 和缺少原生模块的 APK 沿用原路径。
+
+验证：Protocol 109 tests；Plugin 724 pass / 3 skipped；Android 680 tests；类型检查、
+全 packages 生产构建、普通 Android APK、DSH bundle 与 diff check 通过。正式上传组件在
+新手机经隔离认证上下文完成两次 200 MiB（15.617s / 11.560s），SHA-256 均一致；没有依赖
+账号登录。普通 APK 已安装，Host bundle 已重建；未替换/重启用户现有 DSH profile，未发布。
+这不等同真实登录/Server membership E2E，也未做公网 P2P 或 iOS 真机验收。协议及边界见
+`docs/protocol.md`，详细实测与复现见 `scripts/transport-bench/README.md`。
+
+## DS-Bot v0.3.6 Host endpoint forwarding (2026-11-13)
+
+按用户要求，`plugin-route-bridge.ts` 固定白名单覆盖上游 v0.3.6 `channel.js`
+与 `computerEndpoint` 的全部 161 个命名接口，另保留旧 Host 的 btw/btw-cancel/room-continue。
+管理、凭据、更新、电脑控制与审批 choice 交由已认证通道后的 DS-Bot handler 校验；
+旧“本地管理/仅单次审批”限制被本次明确需求取代。路径仍限固定路由，未知 endpoint
+拒绝，消息大小、30 秒预算与不重放 mutation 保持不变。接口快照在
+`packages/plugin/tests/fixtures/ds-bot-v0.3.6-endpoints.json`，Android UI 未在本轮扩展。
+验证：25 项转发测试、Plugin check/build、DSH bundle 校验与 diff check 通过。
+Plugin 全套 698 pass / 3 fail / 3 skipped，另 2 个异步错误，尚未全部排查；
+这是初次运行记录。WSL 复查先重建过期的 Protocol dist，消除已复现的两项能力断言失败。
+凭据锁测试增加活动句柄，并在杀死子进程前订阅退出事件。Plugin 全套连续 5 轮
+704 pass；check 与 diff check 通过。初次运行的第三项失败和两个异步错误未复现，
+根因仍未确认。
+
+WSL 隔离 profile 运行 DSH 0.2.2-rc.1、DS-Bot 0.3.6 和本插件。
+安装包源码的 161 个接口与仓库快照一致。PluginRouteBridge 经本机 HTTP 路由调用
+真实 DS-Bot handler：state、models、providers、diagnostics 和 computer-system-status
+返回成功；无效 approval-answer 返回 bot/stale；未知 endpoint 在桥接层拒绝。
+本轮未验证加密远程通道、跨设备、真实审批或电脑控制操作，也未扩展 Android UI。
+
 # Repository Guide for Agents
+
+## Local plugin online upgrade (2026-11-05)
+
+Harness `0.2.2-rc.1` 的 `pluginManager.updateBundle` 可以替换从 npm registry 安装、
+且被标记 `updatable` 的第三方 bundle。本机 Remote 弹窗在 registry 检查确认有新版本、
+并且官方 `listBundles` 认定当前安装可更新时，footer 的「{latest} 可用」调用该接口，
+旁边保留「发布页」链接。GitHub、本地路径和其他非 registry 安装仍只打开 Releases。只接受本次 registry 检查得到的
+`latest`，不接受调用方自报版本。升级走本机 loopback `plugin.update`。官方管理器先检查
+再卸载，检查失败不改安装；进入卸载后由管理器继续安装，失败时按其自身规则回滚。
+加密 Remote 通道仍然拒绝替换 Remote 自身或拥有它的 bundle。旧 Host 没有该接口时保持
+原来的 Releases 链接。
+
+`plugin.update` 的响应丢失有歧义：管理器卸载本插件时响应会随之断开，但请求未到达 Host
+前的断网表现相同，不能凭错误文案（`failed to fetch`、`ECONNRESET` 等）判定升级已开始。
+弹窗改为轮询 `status`：Host 报告版本不低于目标版本才显示重新加载；控制通道不可达时
+最多等待 60 秒；存活的 Host 连续三次仍报告旧版本，或等待超时，则恢复按钮并提示
+「升级状态未知，点击重试」。响应明确返回 `started` 的路径不变。回归测试
+`plugin-upgrade-settle.test.ts` 覆盖请求未到达即断网、卸载后重载、等待超时和新装插件
+尚无 registry 快照；未做真实 Desktop 升级中途断网的人工验收。
+
+## Remote async compaction (Issue #416 / PR #420, 2026-11-12)
+
+Remote 转发 `commands/execute` 的 60s deadline 会中止合法的长压缩（本地 prefill 约 1k tok/s，
+500K 上下文单次压缩需数分钟）。本改动不统一拉长 RPC 超时，而是新增 Remote 自有异步契约：
+capability `remote.compaction.async.v1` 与
+`harness.remote.compaction.submit|status|cancel`（见 `docs/protocol.md` §17 与
+`harness.remote.compaction.*`）。
+
+Host：`packages/plugin/src/remote-compaction-operations.ts` 的 `RemoteCompactionOperations` 挂在
+`HostPluginRuntime`（不是连接）。后台用独立 owner Peer 执行固定 `/compact`，`requestId` 在
+`(deviceId, sessionId)` 内幂等去重；同一 Session 只接纳一个未结束操作（新 requestId 返回
+`AGENT_BUSY`），最多跟踪 32 个操作（超出 `RATE_LIMITED`）；预算默认 30 分钟且与 RPC 超时分离。
+
+取消收尾：Harness `commands/execute` 经 `withAbort()` 在 abort 后立即停止等待 handler，而
+handler 仍会继续压缩/持锁/持久化，所以“命令调用结束”不等于“压缩收尾”。取消或预算中止后，
+Host 读取 `session/events` 中同一 `sourceCommandId` 的 `command/run` 与 `compaction/end`
+确认：确认失败→`cancelled`（取消）/`failed`（预算）；确认已提交但取消期间无法确认持久化
+→`unconfirmed`；仍无法确认→保持 `cancelling` 并继续由状态查询触发确认。成功结果优先于
+取消标记（取消与完成竞争时保留 `succeeded`）。
+
+Client：`client-core` 的 `HarnessAlphaClient.compactSessionTracked()` 在提交前持久化
+`requestId`、响应后持久化 `operationId`，按 Host scope 隔离；提交响应丢失时用同一
+`requestId` 重试，重连后 `resumeCompactions()` 只查询原操作；观察失败返回
+`unconfirmed`，不得当作失败或再次提交。Android 用 `services/compaction-store.ts`
+（SecureStore，懒加载以避开单元测试的 Expo 依赖）接入，`prompt-actions` 对 `/compact`
+走 tracked 路径，连接建立后自动恢复。未声明能力的旧 Host 完全保持原 `commands/execute`
+行为，普通查询、插件清单校验、提醒创建等仍用 60s RPC 超时。
+
+验证：`remote-compaction-operations.test.ts`（提交/结算、不伪造成功、requestId 去重、
+同会话互斥、跨设备拒绝、取消需生命周期确认、取消/成功竞争、committed-but-unconfirmed、
+预算超时、重启 interrupted、shutdown、session/events 解析）；client-core 新增 7 个
+async/tracked 测试（含丢响应同 requestId 重试、断线恢复不重提、过期不重放）；Android
+connection/message-actions 回归通过。2026-11-13 已完成跨设备真机验收：Host 为隔离 DSH
+profile（Mac，DSH 0.2.2-rc.1 + 本插件 + GLM-5.3），Client 为另一台 DGX Spark-01，经自托管
+Remote Server 以 Relay 连接；600K 字符上下文下长压缩 137.66s 成功、断线重连用同一
+operationId 继续且 accepted/command-run 均 1、显式取消经 compaction/end 确认后 6.18s
+进入 cancelled。契约与取消边界见 docs/protocol.md 的异步压缩部分。
+
+## Android coherent transitions (Issue #8, 2026-11-12)
+
+Android 把“状态突变”改为同一界面的连续过渡，未改路由架构、协议、Host 或持久化。
+新增 `apps/android/src/ui/motion.ts`：动效令牌（全屏 480ms、Sheet 380/260ms、指示器 420ms、
+微位移 160ms、stagger 25ms、`cubic-bezier(.32,.72,0,1)`）、`resolveMotion` 的 reduced-motion
+降级（≤150ms、位移/缩放归零）、Sheet 相位机 `nextSheetPhase`、锚点/共享矩形/分段指示器几何。
+`ui/use-reduce-motion.ts` 抽出原先在 `connection-hero` 与聊天回复点中各自复制的系统设置订阅。
+
+新增 `ui/sheet.tsx` 的 `SheetModal`：`animationType="none"`、遮罩淡入、面板只做 `translateY`
+（保持不透明），关闭时先播完退出动画再卸载，退出期间沿用最后一次 children 快照。
+`chat/pickers.tsx`、`chat/session-info.tsx`、`chat/action-menu.tsx`、`workspace-modals.tsx`、
+`host-switcher-sheet.tsx`、设置页语言/字号/活动坞选择器改用该组件；“+”菜单按 composer 的
+`measureInWindow` 锚点决定升起方向。`chat/modal.tsx` 的 `ModalSurface` 保持原签名，改为挂载时
+播放同一入场曲线（Bot 等仍自带外层 Modal 的调用点沿用原生淡入）。
+
+抽屉新增单一分段指示器（`indicatorGeometry` + 平移/拉伸，无 elevation 以免盖住标签文字）、
+搜索行展开与排序浮窗入场；轨迹视图、全屏输入框、首页菜单与图片灯箱改为短位移+淡入。
+未改 `browse-memory`、手势阈值、`workspace-tree` 纯函数、`composer-gate`、i18n 文案与
+`packages/plugin`（dist 未重建）。
+
+验证：新增纯函数回归 `tests/motion.test.ts`、`tests/sheet-transition.test.ts`；Android 65 文件 /
+605 tests、`pnpm --filter @dsh-remote/android check`、`/opt/dsh-autopilot/run-gate.sh`（含全仓
+build/check/bundle/664 Plugin tests）退出码 0。未构建 APK，未做真机、TalkBack、大字体、
+横竖屏往返与真实跨设备人工验收。
+
+## Android offline composer drafts (Issue #7 / upstream #409, 2026-11-12)
+
+Android 聊天输入框不再随连接状态禁用。新增 `apps/android/src/screens/chat/composer-gate.ts`
+（`composerEditable` / `submitIntent`）把「可编辑」与 `connected` 解耦：只有权限切换与
+上传中才锁定输入。离线时 `submit()` 在 `applyDraft('')` 之前返回，草稿留在既有按会话
+加密保存的 `browse-memory` 条目中；发送按钮保持禁用，并在输入框下方显示新增的
+`chat.offlineSendBlocked`（七种语言）。`sendMessage` 在插入 `local:` 乐观行之前对非
+`connected` 状态失败关闭并返回 `'rejected'`，避免离线调用留下幽灵行，或让调用方把结果
+当成禁止回填草稿的 `'kept'`。全屏输入框只在会话切换时收起，不再因 carrier 掉线重置。
+未改 Host、协议、allowlist、Bot 模式（其草稿仍是组件本地状态、不落盘），未重打 Plugin
+bundle dist。
+
+验证：Android check（renderer 生成 + 工作区数据面校验 + `tsc --noEmit`）、62 文件 /
+581 tests 与 `git diff --check` 通过。未构建 APK，未做真机、后台/Doze、TalkBack 或跨设备验收。
 
 ## Compact history keeps DS-Bot group rounds (Issue #4, 2026-11-11)
 
@@ -359,7 +498,7 @@ Desktop，探测超时关闭 stdout 后可能触发 `write EPIPE`。探测脚本
 
 当前仓库实现：
 
-- DeepSeek Harness Plugin（Remote Host + 本地 Remote 工作区入口；dsh-TUI 集成自 0.6.3 起移除，计划下一版本单独提供；无用户可见的 Client 模式）
+- DeepSeek Harness Plugin（Remote Host + 本地 Remote 工作区入口；dsh-TUI Host 使用同版本独立 `ds-harness-remote-tui` 组合包，授权使用独立 CLI；无用户可见的 Client 模式）
 - Android Client（账号授权 + Adaptive transport + v0.1.2 alpha.1–rc.1 / v0.1.5 rc.1 与 v0.1.6 alpha.1 Session V3 Typert Remote + 可选 CodeX Remote）
 - VS Code Client（账号授权 + Host 信任固定 + rc.2 ApiProxy / v0.1.2 alpha.1–rc.1 / v0.1.5 rc.1 与 v0.1.6 alpha.1 Session V3 Typert Remote 会话/Prompt）
 - Protocol、Crypto、WebRTC、Client Core 等共享能力
@@ -571,7 +710,7 @@ fixtures 全部保留，按操作及 Control frame 类型注册为 24 个契约�
 - 调试、验收截图与录屏不提交到仓库；本地留档使用已忽略的 `artifacts/` 或 `docs/screenshots/`。README 使用的 `docs/images/` 展示图与应用运行所需图片资源保留。
 - 对外发布说明与新版本 Changelog 只写用户可感知的功能、修复、兼容性变化和贡献者；不附测试数量、构建命令、bundle 校验、未验收清单或构建警告等验证流水账。内部验证结果与边界保留在 AGENTS.md / TODO。
 - `README.md`：面向用户的默认英文入口，也是 GitHub 默认 README；写项目介绍、特性、安全边界、Plugin/Client 使用和开源 Server 自部署入口。
-- `README.en.md`：保留的英文入口，与默认 `README.md` 保持内容一致。
+- 英文入口统一为默认 `README.md`，不另维护同内容的根目录英文副本；包内 locale 详情文件按发布元数据保留。
 - `README.zh.md`：保留的中文入口，与默认 `README.md` 保持功能和版本信息一致。
 - `AGENTS.md`：面向编码 Agent，写仓库结构、进度、命令和实现约束。
 - `docs/TODO.md`：未完成任务与优先级。
@@ -582,7 +721,6 @@ fixtures 全部保留，按操作及 Control frame 类型注册为 24 个契约�
 - `docs/server.md`：完整 Server 项目的产品/功能设计，并说明本仓库自部署版本的范围。
 - `docs/plugin-integration.md`：Host Plugin 对接 Server 的账号认证、设备认证与凭证状态机，以及最小自部署版本支持的子集。
 - `docs/protocol.md`：跨仓库协议规范。
-- `docs/archive/vibe-coding.md`：原始需求背景，当前边界以 `README.md`、`AGENTS.md` 和 `docs/README.md` 为准。
 
 文档发生范围变化时，应同时检查以上入口，避免 README、TODO、设计文档和实际目录互相冲突。
 
@@ -695,7 +833,7 @@ Plugin 类型检查、42 个测试文件 / 372 个测试和 `git diff --check` �
 
 `docs/design/` 按当前源码更新，不再使用早期 MVP 草案作为当前边界。CodeX 会话只读文件与终端由 `codex-workspace-bridge.ts` 基于 Host 验证的 Thread cwd 提供；ACP 只读文件与终端使用独立 `dsh/toolCall` / tool stream 和 session/backend scope。两者都遵循固定 allowlist、路径/realpath 校验和终端归属/输入权，不扩大 App Server 或 Harness 通用 RPC。上述源码能力不代表已完成 Windows、APK、真机或加密跨设备验收。旧日期的“不对 CodeX 投影开放”记录仅描述当时范围；当前线协议以 `docs/protocol.md` 为准。
 
-界面设计 `docs/design/DESIGN.md` 引用 Android 当前 theme 和 App 导航；Files/Terminal 从输入栏「＋」的工具访问进入，快捷提示词独立展示，轨迹另有标题栏入口。原始需求归档到 `docs/archive/vibe-coding.md`，不作为当前实现任务。
+界面设计 `docs/design/DESIGN.md` 引用 Android 当前 theme 和 App 导航；Files/Terminal 从输入栏「＋」的工具访问进入，快捷提示词独立展示，轨迹另有标题栏入口。原始需求提示词已移除，当前实现边界以 `docs/README.md`、协议和源码为准。
 
 ## Harness 0.2.1 compatibility (2026-10-09)
 
@@ -832,7 +970,7 @@ HTTP API，仅允许经 Host catalog/realpath 验证会话的 GET 与 PATCH `tim
 持久保存，不建立 Host 归档索引；其他 ACP 后端不能返回本地伪归档成功。
 归档与加载/Prompt/模型写入/审批互斥，历史读取不抢 owner；不提供恢复归档或已归档列表。
 真实 v1.19.3 隔离临时目录验证了原生确认、跨连接、幂等、重启隐藏及历史读取；Windows、
-APK/真机、跨设备和独立 Remote Web 尚未验收。详细边界见 `docs/design/acp-session-archive.md`。
+APK/真机、跨设备和独立 Remote Web 尚未验收。详细边界见 `docs/acp-remote.md#opencode-与原生归档`。
 本次 Plugin check/build、359 个测试、client-core 41 个测试、Protocol 78 个测试、Android
 check/132 个测试及 Hermes export、DSH bundle 校验通过；Metro 的 noble/hashes exports
 fallback 警告仍存在。
@@ -1148,8 +1286,7 @@ The phone is simulated in Node: this is not Dart/Android acceptance. The actual
 React pairing component was checked in an isolated desktop/narrow preview; not a
 full Harness UI acceptance. Loopback/isTrusted cannot prove human presence against
 OS automation; a trusted native user-presence primitive would be required.
-Protocol and DSH-Go handoff are docs/device-pairing-v1.md and
-docs/dsh-go-pairing-integration.md. No production deployment/restart or real-user
+Protocol and mobile integration share docs/device-pairing-v1.md. No production deployment/restart or real-user
 pairing approval was performed.
 
 ## Pairing sign-in placement (2026-11-08)

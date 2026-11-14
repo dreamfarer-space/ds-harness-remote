@@ -1,7 +1,10 @@
 import { applyLanguagePreference, updateSystemLocales } from '../locales/i18n'
+import { DEFAULT_CHAT_APPEARANCE, normalizeChatAppearance } from '../ui/theme'
 import {
   saveActivityDockMode,
+  saveChatAppearance,
   saveDefaultPermissionPreset,
+  saveDrawerLayoutMode,
   saveCompactHistory,
   saveLanguagePreference,
   saveThemePreference,
@@ -13,7 +16,7 @@ import type { AppState } from './store-state'
 import type { SessionAccess } from './session-runtime'
 
 export function createPreferenceActions({ set, get, runtime }: SessionAccess): Pick<AppState,
-  'setCompactHistory' | 'setTransportPreference' | 'setLanguagePreference' | 'setThemePreference' | 'setTypographyDensity' | 'setActivityDockMode' | 'setStatusBarVisible' | 'setDefaultPermissionPreset' | 'syncSystemLocales'> {
+  'setCompactHistory' | 'setTransportPreference' | 'setLanguagePreference' | 'setThemePreference' | 'setTypographyDensity' | 'setChatAppearance' | 'resetChatAppearance' | 'setActivityDockMode' | 'setDrawerLayoutMode' | 'setStatusBarVisible' | 'setDefaultPermissionPreset' | 'syncSystemLocales'> {
   return {
     async setCompactHistory(compactHistory) {
       await saveCompactHistory(compactHistory)
@@ -22,6 +25,10 @@ export function createPreferenceActions({ set, get, runtime }: SessionAccess): P
     async setActivityDockMode(activityDockMode) {
       await saveActivityDockMode(activityDockMode)
       set({ activityDockMode })
+    },
+    async setDrawerLayoutMode(drawerLayoutMode) {
+      await saveDrawerLayoutMode(drawerLayoutMode)
+      set({ drawerLayoutMode })
     },
     async setTransportPreference(preference) {
       await saveTransportPreference(preference)
@@ -62,6 +69,18 @@ export function createPreferenceActions({ set, get, runtime }: SessionAccess): P
     async setTypographyDensity(typographyDensity) {
       await saveTypographyDensity(typographyDensity)
       set({ typographyDensity })
+    },
+
+    async setChatAppearance(partial) {
+      const next = normalizeChatAppearance({ ...get().chatAppearance, ...partial })
+      await saveChatAppearance(next)
+      set({ chatAppearance: next })
+    },
+
+    async resetChatAppearance() {
+      const next = { ...DEFAULT_CHAT_APPEARANCE }
+      await saveChatAppearance(next)
+      set({ chatAppearance: next })
     },
 
     async setDefaultPermissionPreset(defaultPermissionPreset) {

@@ -44,13 +44,13 @@ In DeepSeek Harness Desktop, open **Extensions / Plugin management**, choose ins
 from **npm**, and enter:
 
 ```text
-ds-harness-remote@0.6.4
+ds-harness-remote@0.6.5
 ```
 
 Restart Desktop after installation. Its official `dsh` launcher can also install the package:
 
 ```sh
-dsh plugin --profile desktop add -w ds-harness-remote@0.6.4
+dsh plugin --profile desktop add -w ds-harness-remote@0.6.5
 ```
 
 Use Desktop's official launcher to manage its reserved `desktop` profile.
@@ -60,7 +60,7 @@ Use Desktop's official launcher to manage its reserved `desktop` profile.
 Add the current package version to the `web` profile, then restart Harness:
 
 ```sh
-dsh plugin --profile web add -w ds-harness-remote@0.6.4
+dsh plugin --profile web add -w ds-harness-remote@0.6.5
 ```
 
 ## Highlights
@@ -98,7 +98,7 @@ This repository includes a minimal, single-account self-hosted Relay Server in [
 
 - [Complete guide](https://github.com/liguobao/ds-harness-remote#readme)
 - [Codex Remote technical notes](https://github.com/liguobao/ds-harness-remote/blob/main/docs/codex-remote.md)
-- [Agent workspace integration guide](https://github.com/liguobao/ds-harness-remote/blob/main/docs/acp-integration.md)
+- [Agent workspace integration guide](https://github.com/liguobao/ds-harness-remote/blob/main/docs/acp-remote.md)
 - [End-to-end encryption](https://github.com/liguobao/ds-harness-remote/blob/main/docs/end-to-end-encryption.md)
 - [Network and transport](https://github.com/liguobao/ds-harness-remote/blob/main/docs/network.md)
 - [Protocol reference](https://github.com/liguobao/ds-harness-remote/blob/main/docs/protocol.md)

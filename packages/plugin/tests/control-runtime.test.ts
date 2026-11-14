@@ -10,6 +10,7 @@ import { resolveConfig, type Config } from '../src/config.js'
 import { CONTROL_RPC_PREFIX } from '../src/control-route.js'
 import { PluginControlRuntime, type PluginSettingsBinding } from '../src/control-runtime.js'
 import { IdentityInvalidError, IdentityStore, serverStorageDirectory } from '../src/identity-store.js'
+import { HostLogStore } from '../src/host-log-store.js'
 import { ServerCredentialStore } from '../src/server-credentials.js'
 
 const directories: string[] = []
@@ -616,6 +617,85 @@ describe('PluginControlRuntime settings setup', () => {
     expect(view).toMatchObject({ ok: true, value: { deviceName: expect.any(String) } })
     expect((view as any).value?.associations?.client).toBeUndefined()
     await expect(stat(join(hostDir, 'device.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
+
+describe('PluginControlRuntime local log endpoints', () => {
+  it('reads and clears Host logs locally even when startup failed and validates parameters', async () => {
+    const { HostLogStore } = await import('../src/host-log-store.js')
+    const directory = await temporaryDirectory()
+    const logFile = join(directory, 'logs', 'ds-harness-remote', 'web.log')
+    const logStore = new HostLogStore({ filePath: logFile })
+    logStore.record('info', '[ds-harness-remote] boot')
+    logStore.record('warn', '[ds-harness-remote] warning event')
+    logStore.record('error', '[ds-harness-remote] error event')
+
+    const settings = settingsBinding({ logLevel: 'info' })
+    const control = new PluginControlRuntime(
+      resolveConfig(settings.get()),
+      directory,
+      settings,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      logStore,
+    )
+    control.setStartupFailure(new Error('storage locked'))
+    const handler = register(control)
+
+    const all = await handler('settings.logs.get', {}, signal())
+    expect(all).toMatchObject({
+      ok: true,
+      value: {
+        logLevel: 'info',
+        totalBuffered: 3,
+        filePath: logFile,
+      },
+    })
+    expect((all as any).value.entries).toHaveLength(3)
+
+    const warnOnly = await handler('settings.logs.get', { filter: 'warn', limit: 1 }, signal())
+    expect(warnOnly).toMatchObject({ ok: true })
+    expect((warnOnly as any).value.entries).toHaveLength(1)
+    expect((warnOnly as any).value.entries[0].line).toContain('error event')
+
+    expect(await handler('settings.logs.get', { filter: 'debug' }, signal())).toMatchObject({ ok: false })
+    expect(await handler('settings.logs.get', { limit: 0 }, signal())).toMatchObject({ ok: false })
+
+    const cleared = await handler('settings.logs.clear', {}, signal())
+    expect(cleared).toMatchObject({
+      ok: true,
+      value: {
+        logLevel: 'info',
+        entries: [],
+        totalBuffered: 0,
+      },
+    })
+  })
+
+  it('rejects settings.logs.clear when settings are read-only', async () => {
+    const directory = await temporaryDirectory()
+    const logStore = new HostLogStore()
+    logStore.record('info', '[ds-harness-remote] keep-me')
+    const control = new PluginControlRuntime(
+      resolveConfig({ logLevel: 'info' }),
+      directory,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      logStore,
+    )
+    const handler = register(control)
+    await expect(handler('settings.logs.clear', {}, signal())).resolves.toMatchObject({
+      ok: false,
+      error: { details: { remoteCode: 'SETTINGS_UNAVAILABLE' } },
+    })
+    expect((await logStore.snapshot()).totalBuffered).toBe(1)
   })
 })
 function register(runtime: PluginControlRuntime) {

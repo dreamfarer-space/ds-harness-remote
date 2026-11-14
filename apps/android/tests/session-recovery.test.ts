@@ -310,6 +310,61 @@ describe('ordered history recovery', () => {
     }))), prepareScenario1)
   })
 
+  it('settles an acknowledged prompt that history and inbox never recorded, and releases the composer', async () => {
+    const local = (): ChatItem => ({ kind: 'message', id: 'local:rpc-lost', sessionId: 's1', role: 'user',
+      text: '@missing.png', createdAt: 2, requestRpcId: 'rpc-lost' })
+    const withInbox = (inbox: unknown, running = false) => ({ ...session, running,
+      projections: { values: { permissions: { currentValue: 'default' }, inbox } } })
+    await runScenarios([
+      { name: 'idle session with no record', inbox: { 'next-turn': [] }, running: false, settled: true },
+      { name: 'inbox still owns the request', inbox: { 'next-turn': [{ id: 'q1', source: { kind: 'user', rpcId: 'rpc-lost' }, content: [] }] }, running: false, settled: false },
+      { name: 'session is still running', inbox: { 'next-turn': [] }, running: true, settled: false },
+    ].map(({ name, inbox, running, settled }) => ({ name, run: async () => {
+      const target = withInbox(inbox, running)
+      useAppStore.setState({
+        ...useAppStore.getInitialState(),
+        selectedSession: target,
+        selectedDevice: { deviceId: 'host' } as never,
+        sessions: [target],
+        connection: { phase: 'connected', stats: { mode: 'Relay', connected: true } },
+        messages: { s1: [local()] },
+        busyAction: 'send-message',
+      })
+      proxy.sessionHistory.mockResolvedValueOnce(page([]))
+      proxy.sessionList.mockResolvedValueOnce([target])
+      expect(await useAppStore.getState().openSession(target)).toBe(true)
+      const row = useAppStore.getState().messages.s1?.[0]
+      if (settled) expect(row).toMatchObject({ sendState: 'unconfirmed' })
+      else expect(row).not.toHaveProperty('sendState')
+      expect(useAppStore.getState().busyAction).toBeUndefined()
+    } })), prepareScenario1)
+  })
+
+  it('rejects an offline prompt before creating an optimistic row for every backend', async () => {
+    // A tap that cannot reach the Host must not leave a `local:` row or a queued
+    // acknowledgement: the composer keeps the draft and the user sends manually
+    // after reconnection. Both send paths fail closed before the optimistic row.
+    await runScenarios((['harness', 'codex', 'claude'] as const).map(backend => ({ name: backend, run: async () => {
+      const target: RemoteSession = { ...session, sessionId: `offline-${backend}`, backend }
+      useAppStore.setState({
+        ...useAppStore.getInitialState(),
+        selectedSession: target,
+        selectedDevice: { deviceId: 'host' } as never,
+        sessions: [target],
+        connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false } },
+      })
+      proxy.sessionPrompt.mockClear()
+      acp.prompt.mockClear()
+      codex.request.mockClear()
+      expect(await useAppStore.getState().sendMessage('draft typed offline')).toBe('rejected')
+      expect(proxy.sessionPrompt).not.toHaveBeenCalled()
+      expect(acp.prompt).not.toHaveBeenCalled()
+      expect(codex.request).not.toHaveBeenCalled()
+      expect(useAppStore.getState().messages[target.sessionId] ?? []).toHaveLength(0)
+      expect(useAppStore.getState().busyAction).toBeUndefined()
+    } })), prepareScenario1)
+  })
+
   it('reconciles local delivery states by marking, never by deleting', async () => {
     const row = (id: string, requestRpcId: string, sendState: 'queued' | 'failed' | 'unconfirmed', createdAt = 1): ChatItem => ({
       kind: 'message', id, sessionId: 's1', role: 'user', text: 'hello', createdAt, requestRpcId, sendState,
@@ -989,6 +1044,37 @@ describe('session restore state machine', () => {
 })
 
 describe('session creation single flight', () => {
+  it('reuses the newest idle blank in the same workspace and backend on repeated new-chat requests', async () => {
+    const older = { ...session, sessionId: 'older', blank: true }
+    const newest = { ...older, sessionId: 'newest', updatedAt: 2 }
+    const foreign = { ...newest, sessionId: 'foreign', updatedAt: 3 }
+    const archived = { ...newest, sessionId: 'archived', updatedAt: 4 }
+    const running = { ...newest, sessionId: 'running', running: true, updatedAt: 5 }
+    const otherBackend = { ...newest, sessionId: 'codex:blank', backend: 'codex' as const, updatedAt: 6 }
+    useAppStore.setState({
+      sessions: [older, newest, foreign, archived, running, otherBackend],
+      archivedSessionIds: ['archived'],
+      workspaces: [{ workspaceId: 'workspace-a', title: 'A', path: '/a', createdAt: '', updatedAt: '',
+        sessionIds: ['older', 'newest', 'archived', 'running', 'codex:blank'] }],
+    })
+    expect(await useAppStore.getState().createSession('workspace-a')).toBe(true)
+    expect(await useAppStore.getState().createSession('workspace-a')).toBe(true)
+    expect(useAppStore.getState().selectedSession?.sessionId).toBe('newest')
+    expect(proxy.sessionCreate).not.toHaveBeenCalled()
+    expect(proxy.sessionSelectPermission).not.toHaveBeenCalled()
+    expect(useAppStore.getState().busyAction).toBeUndefined()
+  })
+
+  it('creates when the workspace only has nonempty conversations, even with a new-chat title', async () => {
+    useAppStore.setState({ sessions: [{ ...session, title: '新对话' }],
+      workspaces: [{ workspaceId: 'workspace-a', title: 'A', path: '/a', createdAt: '', updatedAt: '', sessionIds: ['s1'] }] })
+    const created = { ...session, sessionId: 'new', blank: true }
+    proxy.sessionCreate.mockResolvedValue({ sessionId: 'new' })
+    proxy.sessionList.mockResolvedValue([session, created])
+    expect(await useAppStore.getState().createSession('workspace-a')).toBe(true)
+    expect(proxy.sessionCreate).toHaveBeenCalledOnce()
+  })
+
   it('locks the real creation and opening lifecycle and releases after success or failure', async () => {
     await runScenarios(['success', 'create failure', 'history failure'].map(outcome => ({
       name: outcome,

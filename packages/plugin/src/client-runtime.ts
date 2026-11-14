@@ -1,3 +1,4 @@
+import { uploadLocalMentions } from './local-mention-upload.js'
 import type { ControlResult } from './control-result.js'
 import { AgentAcpClient, CodexRemoteClient } from '@dsh-remote/client-core'
 import type { PluginRouteCallResult } from '@dsh-remote/protocol'
@@ -884,6 +885,11 @@ export class ClientModeRuntime {
     if (!remote.features.pluginRoute) {
       throw new ClientModeError('FEATURE_NOT_SUPPORTED', 'The connected Host cannot forward plugin routes.')
     }
+    if (route === 'api/session/uploadFileBinary') {
+      const result = await this.remoteTypertGateway(remote).dispatch('remoteUploads/upload', { args: body }, signal)
+      if (!result.ok) throw new ClientModeError(result.error.code, result.error.message)
+      return result.value as PluginRouteCallResult
+    }
     return remote.client.rpc('plugin.route.call', { route, body }, signal)
   }
 
@@ -895,7 +901,18 @@ export class ClientModeRuntime {
     this.assertRemoteCompatible(remote)
     this.clientAuthRequired = false
     const target = { deviceId: remote.target.deviceId, name: remote.target.name }
-    this.gatewaySwitch.selectRemote(this.remoteTypertGateway(remote), undefined, target)
+    const gateway = this.remoteTypertGateway(remote)
+    const selected = {
+      invoke: async (request: Parameters<typeof gateway.invoke>[0]) => {
+        if (`${request.namespace}/${request.method}` !== 'session/prompt') return gateway.invoke(request)
+        const payload = await uploadLocalMentions({ args: request.args }, gateway, request.signal ?? new AbortController().signal)
+        return gateway.invoke({ ...request, args: (payload as { args: typeof request.args }).args })
+      },
+      dispatch: async (endpoint: string, payload: unknown, signal: AbortSignal) => gateway.dispatch(endpoint,
+        endpoint === 'session/prompt' ? await uploadLocalMentions(payload, gateway, signal) : payload, signal),
+      open: (endpoint: string, payload: unknown, signal: AbortSignal) => gateway.open(endpoint, payload, signal),
+    }
+    this.gatewaySwitch.selectRemote(selected, undefined, target)
     this.recoverable = remote
   }
 

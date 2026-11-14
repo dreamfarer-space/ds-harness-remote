@@ -33,7 +33,7 @@ Harness keeps running on your work computer, with the same workspaces, tools, an
 
 The DeepSeek Harness desktop edition is supported. Install the latest release:
 
-`ds-harness-remote@0.6.4`
+`ds-harness-remote@0.6.5`
 
 ## Features
 
@@ -52,13 +52,12 @@ The DeepSeek Harness desktop edition is supported. Install the latest release:
 
 | Client | Form | Status | Notes |
 | --- | --- | --- | --- |
-| DSH&nbsp;Desktop&nbsp;plugin | Remote sidebar | Supported | Install `ds-harness-remote@0.6.4`; this computer can also be the Host |
+| DSH plugin | Remote sidebar | Supported | Control other devices or act as a Host—the choice is yours! |
 | Web | Browser page | Supported | Open [https://dsh.r2049.cn](https://dsh.r2049.cn); reuses the native Harness interface |
 | Android | Native app | Supported | Download the APK from [Releases](https://github.com/liguobao/ds-harness-remote/releases/latest); see the [Android guide](apps/android/README.md) |
-| DSH Go | A standout app by ccch1mneyyy | Supported | See [ccch1mneyyy/dsh-go: an Android client for DeepSeek Harness. Run it directly on your phone or control DSH on your computer remotely.](https://github.com/ccch1mneyyy/dsh-go) |
+| DSH Go | A standout app by ccch1mneyyy | Supported | See [ccch1mneyyy/dsh-go: run DSH directly on your phone or control DSH on your computer remotely.](https://github.com/ccch1mneyyy/dsh-go) |
 | iOS | TestFlight beta | Beta | Not publicly released; see [issue #20](https://github.com/liguobao/ds-harness-remote/issues/20) |
-| Browser&nbsp;extension | Chrome | Entry point only | Exchanges an already signed-in Web authorization for a separate device credential, lists online Hosts and opens the same-origin Remote Web; it does not host a conversation UI |
-| dsh-TUI | Terminal-only CLI | Planned | Integration is not part of this release and returns in a later version; the installer never creates a Web service for it automatically |
+| dsh-TUI | Standalone Host bundle + CLI | Core device checks passed | Install matching `ds-harness-remote-tui`; see [tested versions and limits](docs/compatibility.md). The installer does not create a Web service for it |
 | Linux | Cloud server | Supported | Sign in on the [official website](https://dsh.r2049.cn/) to install with one command. |
 
 Several clients can connect to the same Host at once; RPC calls and streams are isolated per connection.
@@ -70,10 +69,10 @@ Several clients can connect to the same Host at once; RPC calls and streams are 
 Open **Extensions / Plugin management** in DeepSeek Harness Desktop, choose installation
 from npm, and enter this package:
 
-`ds-harness-remote@0.6.4`
+`ds-harness-remote@0.6.5`
 
 Restart Desktop afterward. Its official `dsh` launcher can also install the pinned package
-with `dsh plugin --profile desktop add -w ds-harness-remote@0.6.4`.
+with `dsh plugin --profile desktop add -w ds-harness-remote@0.6.5`.
 
 On DSH 0.2.2+, npm installations support version checks and updates in Plugin management, with an attempt to restore the previous version if hot updating fails. GitHub and local link installations must switch to npm first; see [online updates](docs/installation.md#online-updates-in-dsh-plugin-management).
 
@@ -167,7 +166,7 @@ Supported backends:
 
 Claude and Hermes also support direct file and terminal access, subject to the Host's workspace boundaries and terminal settings.
 
-Setup and adapter development: [Agent workspace integration guide](docs/acp-integration.md).
+Setup and adapter development: [Agent workspace integration guide](docs/acp-remote.md).
 
 Model selection for Cursor, Claude, Hermes, Pi, OpenCode, and AGY on Desktop/Android uses the Host's actual model catalog as determined by the Agent’s ACP interface.
 
@@ -283,7 +282,7 @@ DS Bot is a bot plugin for DeepSeek Harness (dsh) that turns dsh into a bot. You
 ## Links
 
 - Friendly link: [DSH Go](https://github.com/ccch1mneyyy/dsh-go) — DeepSeek Harness in your pocket: run it locally on your phone or control your computer remotely. Remote integration is available.
-- Friendly link: [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) — terminal-first Harness client; Remote integration is planned for a later release.
+- Friendly link: [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) — terminal-first Harness client; Remote Host integration uses the standalone `ds-harness-remote-tui` bundle.
 - Friendly link: [LINUX DO](https://linux.do/)
 - Friendly link: [Cyber Liu Kanshan](https://kanshan.r2049.cn/)
 
@@ -318,21 +317,17 @@ No matter your background, your involvement is deeply valued:
   <em>Thanks to all the wonderful contributors who make this project possible!</em>
 </p>
 
-## Project status and trademarks
-
-This is an independent community project and is not an official DeepSeek product.
-DeepSeek and related names and marks belong to their respective owners.
-
 ## Connection diagnostics
 
 On Android, reproduce the problem, then open **Settings → Diagnostics → Export connection log** and choose a folder to save the `.txt` file. It contains up to 500 recent diagnostic events from the current app process; restarting the app clears the buffer. Credentials and conversation content are excluded.
 
 On the Host, enable **Debug logging** in **Plugins → Remote settings**. The setting is saved and takes effect immediately; turn it off after troubleshooting (restores `info`). Look for `[ds-harness-remote]` in the Host log, or `desktop.log` on Desktop. Manual configuration also accepts `logLevel: debug`.
 
+## Project status and trademarks
+
+This is an independent community project and is not an official DeepSeek product.
+DeepSeek and related names and marks belong to their respective owners.
+
 ## License
 
 [MIT](packages/plugin/LICENSE)
-
-### Pair with DSH-Go
-
-Open Sign in → DSH-Go pairing in the local Remote settings and generate a QR code, scan and confirm on a compatible DSH-Go build, then enter the phone code on this computer. A wrong code invalidates the whole pairing. New Hosts accept incoming connections only; Device-only accounts have no Web/Admin access. Requires the full Server pairing v1 API and a DSH-Go build implementing [this integration](docs/dsh-go-pairing-integration.md). The bundled minimal Server does not support this workflow.

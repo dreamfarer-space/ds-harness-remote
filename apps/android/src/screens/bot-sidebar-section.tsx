@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -56,6 +55,7 @@ import { useTheme, type ThemeColors } from '../ui/theme-context'
 import { useResponsiveLayout } from '../ui/responsive'
 import { useThemedStyles } from '../ui/use-themed-styles'
 import { ModalSurface } from './chat/modal'
+import { ConfirmDialog } from './chat/confirm-dialog'
 import { resolveSessionDisplayTitle } from './session-title'
 import { BotAgentBadge, engineOfModel } from './bot/agent-badge'
 import { BotAvatar, BotAvatarWithBadge } from './bot/avatar'
@@ -148,7 +148,7 @@ function formatBotListTimestamp(updatedAt?: number): string {
     return `${hh}:${mm}`
   }
   if (date.getFullYear() === now.getFullYear()) {
-    return `${date.getMonth() + 1}月${date.getDate()}日`
+    return date.toLocaleDateString(s.time.locale, { month: 'short', day: 'numeric' })
   }
   return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`
 }
@@ -661,16 +661,8 @@ export function BotModalsHost() {
 
   const performAdapter: BotPerform = (operation, payload) => perform(operation, payload)
 
-  const confirmDelete = (kind: 'bot' | 'room', id: string) => {
-    Alert.alert(s.bots.delete, s.bots.deleteHint, [
-      { text: s.bots.cancel, style: 'cancel' },
-      {
-        text: s.bots.delete,
-        style: 'destructive',
-        onPress: () => void perform(kind === 'bot' ? 'delete-bot' : 'delete-room', { id }),
-      },
-    ])
-  }
+  const [deleteConfirm, setDeleteConfirm] = useState<{ kind: 'bot' | 'room'; id: string } | undefined>()
+  const confirmDelete = (kind: 'bot' | 'room', id: string) => setDeleteConfirm({ kind, id })
 
   const menuBot = contextMenu?.kind === 'bot' ? state?.bots.find(b => b.id === contextMenu.id) : undefined
   const menuRoom = contextMenu?.kind === 'room' ? state?.rooms.find(r => r.id === contextMenu.id) : undefined
@@ -773,6 +765,31 @@ export function BotModalsHost() {
 
   return (
     <>
+      <BotFloatingPopover
+        visible={contextMenu !== undefined && contextActions.length > 0}
+        actions={contextActions}
+        onClose={() => setContextMenu(undefined)}
+        anchor="top-right"
+        topOffset={120}
+      />
+
+      {state !== undefined && (
+        <BotProfilePage
+          visible={detailsOpen && Boolean(detailBot || detailRoom)}
+          covered={editor !== undefined}
+          bot={detailBot}
+          room={detailRoom}
+          state={state}
+          client={clientInstance}
+          busy={busy}
+          error={visibleError}
+          runStats={runStats}
+          onClose={() => setDetailsOpen(false)}
+          onEdit={() => setEditor({ kind: detailBot ? 'bot' : 'room', id: (detailBot ?? detailRoom)?.id ?? selectedId })}
+          perform={performAdapter}
+        />
+      )}
+
       {editor !== undefined && state !== undefined && clientInstance !== undefined && (
         <BotEditor
           key={`${editor.kind}:${editor.id ?? 'new'}`}
@@ -785,30 +802,6 @@ export function BotModalsHost() {
           error={visibleError}
           perform={performAdapter}
           onClose={() => setEditor(undefined)}
-        />
-      )}
-
-      <BotFloatingPopover
-        visible={contextMenu !== undefined && contextActions.length > 0}
-        actions={contextActions}
-        onClose={() => setContextMenu(undefined)}
-        anchor="top-right"
-        topOffset={120}
-      />
-
-      {state !== undefined && (
-        <BotProfilePage
-          visible={detailsOpen && Boolean(detailBot || detailRoom)}
-          bot={detailBot}
-          room={detailRoom}
-          state={state}
-          client={clientInstance}
-          busy={busy}
-          error={visibleError}
-          runStats={runStats}
-          onClose={() => setDetailsOpen(false)}
-          onEdit={() => setEditor({ kind: detailBot ? 'bot' : 'room', id: selectedId })}
-          perform={performAdapter}
         />
       )}
 
@@ -831,6 +824,24 @@ export function BotModalsHost() {
           </ModalSurface>
         </Modal>
       )}
+
+      <ConfirmDialog
+        visible={deleteConfirm !== undefined}
+        title={s.bots.delete}
+        message={s.bots.deleteHint}
+        onClose={() => setDeleteConfirm(undefined)}
+        buttons={[
+          { label: s.bots.cancel },
+          {
+            label: s.bots.delete,
+            danger: true,
+            onPress: () => {
+              if (!deleteConfirm) return
+              void perform(deleteConfirm.kind === 'bot' ? 'delete-bot' : 'delete-room', { id: deleteConfirm.id })
+            },
+          },
+        ]}
+      />
     </>
   )
 }
@@ -889,7 +900,7 @@ export function DsBotInstallCard({ error, loading = false, onRetry }: { error?: 
   const rows = [
     { label: s.plugins.installDesktop, value: 'ds-bot' },
     { label: s.plugins.installCli, value: 'dsh plugin --profile web add -w ds-bot' },
-    { label: 'GitHub 安装地址（无法连接 npm 时填入）', value: 'github:Fei2411/DS-Bot#main&path:/ds-bot' },
+    { label: s.plugins.installGithub, value: 'github:Fei2411/DS-Bot#main&path:/ds-bot' },
   ]
   return (
     <View style={styles.sectionBlock}>

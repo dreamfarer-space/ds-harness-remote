@@ -34,7 +34,7 @@ Harness 始终运行在工作电脑上，原有的工作区、工具和项目配
 
 已支持 DeepSeek Harness 桌面版，使用最新版本安装即可：
 
-`ds-harness-remote@0.6.4`
+`ds-harness-remote@0.6.5`
 
 ## 主要特性
 
@@ -53,13 +53,12 @@ Harness 始终运行在工作电脑上，原有的工作区、工具和项目配
 
 | 客户端 | 形态 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| DSH&nbsp;Desktop&nbsp;插件 | Remote 侧栏 | 已支持 | 装 `ds-harness-remote@0.6.4`；Host 也可以就是这台电脑 |
+| DSH 插件 | Remote 侧栏 | 已支持 | 主控、被控任君差遣~ |
 | Web | 浏览器页面 | 已支持 | 打开 [https://dsh.r2049.cn](https://dsh.r2049.cn)，复用 Harness 原生界面 |
 | Android | 原生 App | 已支持 | 从 [Releases](https://github.com/liguobao/ds-harness-remote/releases/latest) 下载 APK，见 [Android 说明](apps/android/README.md) |
-| DSH Go | C佬精品 | 已支持 | 详情见：[ccch1mneyyy/dsh-go: DeepSeek Harness 的 Android 客户端。手机上直接跑，也能遥控你电脑上的 DSH。](https://github.com/ccch1mneyyy/dsh-go)
+| DSH Go | C佬精品 | 已支持 | 详情见：[ccch1mneyyy/dsh-go: 手机上直接跑，也能遥控你电脑上的 DSH。](https://github.com/ccch1mneyyy/dsh-go)
 | iOS | TestFlight 内测 | 内测 | 未公开上架，入口见 [issue #20](https://github.com/liguobao/ds-harness-remote/issues/20) |
-| 浏览器扩展 | Chrome | 仅入口 | 读取已登录 Web 的授权换取独立设备凭据、列出在线 Host、打开同源 Remote Web，不承载会话界面 |
-| dsh-TUI | 纯终端 CLI | 计划中 | 本版本不包含该集成，将在后续版本单独提供；安装脚本不会为它自动创建 Web 服务 |
+| dsh-TUI | 独立 Host 组合包 + CLI | 核心真机验收通过 | 安装同版本 `ds-harness-remote-tui`，见[验证版本与边界](docs/compatibility.md)；安装脚本不会为它自动创建 Web 服务 |
 | Linux  | 云服务器  | 已支持 | [官网](https://dsh.r2049.cn/)登录后一键安装。
 
 多个客户端可以同时连接同一个 Host，RPC 与数据流按连接隔离。
@@ -70,10 +69,10 @@ Harness 始终运行在工作电脑上，原有的工作区、工具和项目配
 
 在 DeepSeek Harness Desktop 的 **扩展 / 插件管理** 中，选择从 **npm** 安装，输入包名和版本：
 
-`ds-harness-remote@0.6.4`
+`ds-harness-remote@0.6.5`
 
 安装后重启 Desktop。也可使用它的官方 `dsh` 启动器安装固定版本：
-`dsh plugin --profile desktop add -w ds-harness-remote@0.6.4`。
+`dsh plugin --profile desktop add -w ds-harness-remote@0.6.5`。
 
 DSH 0.2.2 起，npm 安装支持在插件页检查版本和一键更新；热更新失败时由 DSH 尝试恢复旧版。GitHub / 本地 link 安装需先切换到 npm，见[在线更新说明](docs/installation.zh.md#dsh-插件页在线更新)。
 
@@ -93,6 +92,7 @@ DSH 0.2.2 起，npm 安装支持在插件页检查版本和一键更新；热更
 
 在手机端DSH Go安装 ds-harness-remote 插件后，电脑端、Web端一样可以远程到手机上的DSH，丝滑使用Mobile Use.
 
+
 ### iOS 客户端
 
 - [内测招募](https://github.com/liguobao/ds-harness-remote/issues/20)
@@ -104,7 +104,7 @@ DSH 0.2.2 起，npm 安装支持在插件页检查版本和一键更新；热更
 3. 在另一台设备上使用 DeepSeek Harness安装同样插件，根据1、2完成同样方式的登录。也可以按需使用Remote Web、iOS、Android、DSH Go等客户端，即开即用，无需安装任何插件。
 4. 选择在线 Host，再选择已有 Workspace 或浏览远端目录后打开。
 
-默认使用本项目提供的[https://dsh.r2049.cn](https://dsh.r2049.cn)托管 Remote Server。
+默认使用本项目提供的 [https://dsh.r2049.cn](https://dsh.r2049.cn) 托管 Remote Server。
 
 自建托管Server可使用仓库内的[最小 Server](apps/server/README.zh.md)，当前版本已包含 WebRTC LAN/P2P/TURN 连接协调（TURN 需自行部署 coturn）与加密 Relay Server 等功能，暂不支持托管Remote Web的完整功能。
 
@@ -168,7 +168,7 @@ Host 启动本机支持ACP 的Agent，通过ds-harness-remote 通道传递 Promp
 
 Claude 和 Hermes 均支持直接 Files/Terminal 访问，复用 Host 的工作区路径隔离与终端权限设置。
 
-配置与后端适配开发见 [Agent 工作区接入指南](docs/acp-integration.md)。
+配置与后端适配开发见 [Agent 工作区接入指南](docs/acp-remote.md)。
 
 Desktop/Android 的 Cursor、Claude、Hermes、Pi、OpenCode、AGY 模型选择使用 Host 实际模型目录，由Agent ACP决定
 
@@ -287,7 +287,7 @@ DS Bot 是一个基于 DeepSeek Harness（简称 dsh）的 bot 插件，插件�
 ## 友情链接
 
 - 友情链接：[DSH Go](https://github.com/ccch1mneyyy/dsh-go) — 把 DeepSeek Harness 装进口袋：手机本机运行，也能遥控你的电脑。「已适配 Remote。」
-- 友情链接：[dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI)（终端优先的 Harness 客户端，Remote 集成计划在后续版本提供）
+- 友情链接：[dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI)（终端优先的 Harness 客户端，Remote Host 使用独立 `ds-harness-remote-tui` 组合包）
 - 友情链接：[LINUX DO 社区](https://linux.do/)
 - 友情链接：[赛博刘看山](https://kanshan.r2049.cn/)
 
@@ -322,20 +322,17 @@ DS Bot 是一个基于 DeepSeek Harness（简称 dsh）的 bot 插件，插件�
   <em>衷心感谢每一位让这个项目变得更好的贡献者！</em>
 </p>
 
-## 项目声明与商标
-
-本项目是独立的社区项目，不是 DeepSeek 官方产品。DeepSeek 及相关名称和商标归其各自权利人所有。
-
 ## 连接问题排查
 
 Android：复现问题后打开 **设置 → 诊断 → 导出连接日志**，选择文件夹保存 `.txt`。日志保留本次 App 进程启动以来最近 500 条连接诊断；重启 App 后清空，不包含凭据和会话内容。
 
 Host：在 **插件 → Remote 设置** 开启 **Debug 日志**，立即生效并持久保存；排查完成后关闭（恢复 `info` 级别）。日志带 `[ds-harness-remote]` 前缀，Desktop 可在 `desktop.log` 查找。手动配置可设置 `logLevel: debug`。
 
+## 项目声明与商标
+
+本项目是独立的社区项目，不是 DeepSeek 官方产品。DeepSeek 及相关名称和商标归其各自权利人所有。
+
+
 ## License
 
 [MIT](packages/plugin/LICENSE)
-
-### 与 DSH-Go 配对
-
-在电脑本机 Remote 设置的「登录账号 → DSH-Go 扫码」中生成二维码，使用支持此协议的 DSH-Go 扫码确认，再将手机验证码输入电脑。仅允许校验一次，错误后整个配对作废。新 Host 默认仅被控，新建 Device-only 账号无 Web/Admin 权限。需要完整 Server 配对 v1 API 及按[接入文档](docs/dsh-go-pairing-integration.md)改造的 DSH-Go；随仓库提供的最小 Server 暂不支持此流程。

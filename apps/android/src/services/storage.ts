@@ -6,8 +6,17 @@ import * as SecureStore from 'expo-secure-store'
 import { isLanguagePreference, messageCatalogs, strings, type LanguagePreference } from '../locales/i18n'
 import type { Messages } from '../locales/types'
 import zhCN from '../locales/zh-CN'
-import { isActivityDockMode, isThemePreference, isTypographyDensity, type ActivityDockMode, type ThemePreference, type TypographyDensity } from '../ui/theme'
+import { isActivityDockMode, isDrawerLayoutMode, isThemePreference, isTypographyDensity, normalizeChatAppearance, type ActivityDockMode, type ChatAppearance, type DrawerLayoutMode, type ThemePreference, type TypographyDensity } from '../ui/theme'
 import type { AgentBackend, CodexPermissionPreset, DefaultPermissionPreset, DeviceCredentials, DeviceIdentity, RemoteDevice, ServerConfig, WorkspaceShortcut } from '../types'
+
+/** Durable compaction attempt shape shared with `compaction-store`. */
+export interface StoredCompactionRecord {
+  sessionId: string
+  requestId: string
+  operationId?: string
+  state: string
+  updatedAt: number
+}
 
 const KEYS = {
   config: 'dshremote.server.v1',
@@ -20,7 +29,9 @@ const KEYS = {
   languagePreference: 'dshremote.language-preference.v1',
   themePreference: 'dshremote.theme-preference.v1',
   typographyDensity: 'dshremote.typography-density.v1',
+  chatAppearance: 'dshremote.chat-appearance.v1',
   activityDockMode: 'dshremote.activity-dock-mode.v1',
+  drawerLayoutMode: 'dshremote.drawer-layout-mode.v1',
   compactHistory: 'dshremote.compact-history.v1',
   statusBarVisible: 'dshremote.status-bar-visible.v1',
   defaultPermissionPreset: 'dshremote.default-permission-preset.v1',
@@ -31,6 +42,7 @@ const KEYS = {
   favoriteWorkspaces: 'dshremote.favorite-workspaces.v1',
   recentWorkspaces: 'dshremote.recent-workspaces.v1',
   customPrompts: 'dshremote.custom-prompts.v1',
+  compactions: 'dshremote.compactions.v1',
 } as const
 
 const secureOptions: SecureStore.SecureStoreOptions = {
@@ -390,6 +402,31 @@ export async function clearLocalData(): Promise<void> {
   await Promise.all(Object.values(KEYS).map(key => SecureStore.deleteItemAsync(key, secureOptions)))
 }
 
+/** Persisted compaction attempts keyed by Host scope and Session id. */
+export async function loadCompactionRecords(): Promise<Record<string, Record<string, StoredCompactionRecord>>> {
+  const stored = await readJson<Record<string, Record<string, StoredCompactionRecord>>>(KEYS.compactions)
+  if (stored === undefined || !isRecord(stored)) return {}
+  const scopes: Record<string, Record<string, StoredCompactionRecord>> = {}
+  for (const [scope, records] of Object.entries(stored)) {
+    if (!isRecord(records)) continue
+    const valid: Record<string, StoredCompactionRecord> = {}
+    for (const [sessionId, record] of Object.entries(records)) {
+      if (!isRecord(record)) continue
+      if (typeof record.sessionId !== 'string' || typeof record.requestId !== 'string'
+        || typeof record.state !== 'string' || typeof record.updatedAt !== 'number') continue
+      valid[sessionId] = record as unknown as StoredCompactionRecord
+    }
+    if (Object.keys(valid).length > 0) scopes[scope] = valid
+  }
+  return scopes
+}
+
+export async function saveCompactionRecords(
+  scopes: Record<string, Record<string, StoredCompactionRecord>>,
+): Promise<void> {
+  await writeJson(KEYS.compactions, scopes)
+}
+
 async function readJson<T>(key: string): Promise<T | undefined> {
   const value = await SecureStore.getItemAsync(key, secureOptions)
   if (value === null) return undefined
@@ -558,4 +595,22 @@ export async function loadActivityDockMode(): Promise<ActivityDockMode> {
 
 export async function saveActivityDockMode(value: ActivityDockMode): Promise<void> {
   await writeJson(KEYS.activityDockMode, { value })
+}
+
+export async function loadDrawerLayoutMode(): Promise<DrawerLayoutMode> {
+  const stored = await readJson<{ value: unknown }>(KEYS.drawerLayoutMode)
+  return isDrawerLayoutMode(stored?.value) ? stored.value : 'compact'
+}
+
+export async function saveDrawerLayoutMode(value: DrawerLayoutMode): Promise<void> {
+  await writeJson(KEYS.drawerLayoutMode, { value })
+}
+
+export async function loadChatAppearance(): Promise<ChatAppearance> {
+  const stored = await readJson<{ value?: unknown }>(KEYS.chatAppearance)
+  return normalizeChatAppearance(stored?.value ?? stored)
+}
+
+export async function saveChatAppearance(value: ChatAppearance): Promise<void> {
+  await writeJson(KEYS.chatAppearance, { value })
 }
