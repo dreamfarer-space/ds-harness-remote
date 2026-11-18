@@ -65186,6 +65186,8 @@ var connectIncomingPayloadSchema = external_exports.object({
   relayEpoch: external_exports.number().int().nonnegative().optional()
 });
 var connectAcceptedPayloadSchema = external_exports.object({
+  webrtcFallbackTimeoutMs: external_exports.number().int().positive().max(2147483647).optional(),
+  parallelConnections: external_exports.boolean().optional(),
   relayRecoveryTicket: external_exports.string().min(1).max(4096).optional(),
   recoveryTicket: external_exports.string().min(1).max(4096).optional(),
   connectionId: external_exports.string().min(1),
@@ -66259,7 +66261,25 @@ var AgentAcpClient = class {
   }
   async openStream(sessionId, onFrame, onClosed, signal, tool) {
     const streamId = createRemoteId();
-    const unsubscribe = this.core.onEvent((event) => {
+    let closed = false;
+    let opened = false;
+    let unsubscribe = () => void 0;
+    let unsubscribeCoreClose = () => void 0;
+    const onAbort = () => {
+      if (!markClosed())
+        return;
+      void this.core.rpc("agent.acp.stream.close", { streamId }).catch(() => void 0);
+    };
+    const markClosed = () => {
+      if (closed)
+        return false;
+      closed = true;
+      unsubscribe();
+      unsubscribeCoreClose();
+      signal?.removeEventListener("abort", onAbort);
+      return true;
+    };
+    unsubscribe = this.core.onEvent((event) => {
       if (event.event === "agent.acp.frame" && isRecord2(event.data)) {
         const data2 = event.data;
         if (tool ? data2.streamId !== streamId : !frameMatchesSubscription(data2, streamId, sessionId))
@@ -66267,24 +66287,40 @@ var AgentAcpClient = class {
         onFrame(data2);
       }
       if (event.event === "agent.acp.stream.closed" && isRecord2(event.data) && event.data.streamId === streamId) {
+        if (!markClosed())
+          return;
         onClosed?.(event.data);
       }
+    });
+    unsubscribeCoreClose = this.core.onClose(() => {
+      if (!opened) {
+        markClosed();
+        return;
+      }
+      if (!markClosed())
+        return;
+      onClosed?.({ streamId, reason: "peer-disconnected" });
     });
     try {
       await this.core.rpc("agent.acp.stream.open", { streamId, sessionId, ...tool ? { tool } : {} }, signal);
       if (signal?.aborted) {
-        unsubscribe();
+        markClosed();
         await this.core.rpc("agent.acp.stream.close", { streamId }).catch(() => void 0);
         throw signal.reason;
       }
+      opened = true;
+      if (!closed) {
+        signal?.addEventListener("abort", onAbort, { once: true });
+      }
     } catch (error62) {
-      unsubscribe();
+      markClosed();
       throw error62;
     }
     return {
       streamId,
       close: async () => {
-        unsubscribe();
+        if (!markClosed())
+          return;
         await this.core.rpc("agent.acp.stream.close", { streamId }).catch(() => void 0);
       }
     };
@@ -66377,6 +66413,112 @@ function canonicalBase64ToBytes(value) {
     bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
+
+// packages/webrtc/dist/direct-preferred-race.js
+var DirectPreferredRace = class {
+  signal;
+  windowMs;
+  result;
+  resolve;
+  reject;
+  settled = false;
+  windowExpired = false;
+  directFailed = false;
+  turnFailed = false;
+  standby;
+  windowTimer;
+  deadlineTimer;
+  deadlineAt;
+  started = /* @__PURE__ */ new Set();
+  abort = () => this.finish(void 0, new Error("RTC race aborted"));
+  constructor(signal, windowMs = 3e3, deadlineMs = 12e3, deferWindow = false) {
+    this.signal = signal;
+    this.windowMs = windowMs;
+    this.result = new Promise((resolve10, reject) => {
+      this.resolve = resolve10;
+      this.reject = reject;
+    });
+    this.deadlineAt = Date.now() + deadlineMs;
+    this.armDeadline(deadlineMs);
+    signal.addEventListener("abort", this.abort, { once: true });
+    if (signal.aborted)
+      this.abort();
+    else if (!deferWindow)
+      this.startWindow();
+  }
+  /** Preserve each configured RTC budget without allowing repeated events to prolong it. */
+  startAttempt(attempt, timeoutMs) {
+    if (this.settled || this.started.has(attempt))
+      return;
+    this.started.add(attempt);
+    if (attempt === "direct")
+      this.startWindow();
+    const deadline = Date.now() + timeoutMs;
+    if (deadline > this.deadlineAt) {
+      this.deadlineAt = deadline;
+      clearTimeout(this.deadlineTimer);
+      this.armDeadline(timeoutMs);
+    }
+  }
+  armDeadline(delayMs) {
+    this.deadlineTimer = setTimeout(() => {
+      this.windowExpired = true;
+      if (!this.chooseStandby())
+        this.finish(void 0, new Error("RTC race timed out"));
+    }, delayMs);
+  }
+  startWindow() {
+    if (this.settled || this.windowTimer !== void 0)
+      return;
+    this.windowTimer = setTimeout(() => {
+      this.windowExpired = true;
+      this.chooseStandby();
+    }, this.windowMs);
+  }
+  ready(attempt, value) {
+    if (this.settled || (attempt === "direct" ? this.directFailed : this.turnFailed))
+      return;
+    if (attempt === "direct")
+      this.finish({ attempt, value });
+    else {
+      this.standby = value;
+      this.chooseStandby();
+    }
+  }
+  failed(attempt) {
+    if (this.settled)
+      return;
+    if (attempt === "direct")
+      this.directFailed = true;
+    else {
+      this.turnFailed = true;
+      this.standby = void 0;
+    }
+    if (this.directFailed && this.turnFailed)
+      this.finish(void 0, new Error("Both RTC attempts failed"));
+    else
+      this.chooseStandby();
+  }
+  chooseStandby() {
+    if (this.standby === void 0 || !(this.windowExpired || this.directFailed))
+      return false;
+    this.finish({ attempt: "turn", value: this.standby });
+    return true;
+  }
+  finish(winner, error62) {
+    if (this.settled)
+      return;
+    this.settled = true;
+    clearTimeout(this.windowTimer);
+    clearTimeout(this.deadlineTimer);
+    this.signal.removeEventListener("abort", this.abort);
+    this.standby = void 0;
+    if (winner)
+      this.resolve(winner);
+    else
+      this.reject(error62 ?? new Error("RTC race failed"));
+  }
+};
 
 // packages/webrtc/dist/websocket-backpressure.js
 async function waitForRelayCapacity(socket) {
@@ -67638,7 +67780,7 @@ var AdaptiveTransport = class extends BaseTransport {
       const onAbort = () => this.failConnection(new Error("Adaptive connection was aborted"));
       this.options.signal?.addEventListener("abort", onAbort, { once: true });
       this.removeAbort = () => this.options.signal?.removeEventListener("abort", onAbort);
-      this.handshakeTimer = setTimeout(() => this.failConnection(new Error("Adaptive control handshake timed out")), this.options.handshakeTimeoutMs ?? 15e3);
+      this.handshakeTimer = setTimeout(() => this.failConnection(Object.assign(new Error("Adaptive control handshake timed out"), { code: "TRANSPORT_SETUP_FAILED" })), this.options.handshakeTimeoutMs ?? 15e3);
       const socket = this.socket;
       socket.onmessage = (event) => {
         if (this.socket === socket)
@@ -67657,7 +67799,7 @@ var AdaptiveTransport = class extends BaseTransport {
       };
       socket.onerror = () => {
         if (this.lifetime === lifetime && this.socket === socket)
-          this.controlLost(new Error("Control socket failed"), { reason: "control-error" });
+          this.controlLost(Object.assign(new Error("Control socket failed"), { code: "TRANSPORT_SETUP_FAILED" }), { reason: "control-error" });
       };
       socket.onclose = (event) => {
         if (this.lifetime === lifetime && this.socket === socket)
@@ -67806,6 +67948,11 @@ var AdaptiveTransport = class extends BaseTransport {
           throw new Error("connect.accepted did not include a connectionId");
         }
         this.connectionId = payload.connectionId;
+        if (this.options.useServerNegotiateTimeout && typeof payload.webrtcFallbackTimeoutMs === "number") {
+          this.serverNegotiateTimeoutMs = payload.webrtcFallbackTimeoutMs;
+        }
+        if (payload.parallelConnections === true)
+          this.options.onParallelConnections?.();
         if (this.negotiatedCapabilities.includes(WEBRTC_RESUME_CAPABILITY))
           this.recoveryTicket = payload.recoveryTicket;
         if (this.negotiatedCapabilities.includes(RELAY_RESUME_CAPABILITY))
@@ -67896,7 +68043,8 @@ var AdaptiveTransport = class extends BaseTransport {
     if (this.connectionId === void 0)
       return;
     const preferred = this.negotiatedTransports();
-    const wantWebRtc = !this.options.forceRelay && !this.options.relayFirst && this.webrtcEnabled && (preferred.includes("lan") || preferred.includes("p2p") || preferred.includes("turn"));
+    const lanRequested = (this.options.preferredTransports ?? DEFAULT_PREFERRED_TRANSPORTS).includes("lan");
+    const wantWebRtc = !this.options.forceRelay && (!this.options.relayFirst || lanRequested) && this.webrtcEnabled && (preferred.includes("lan") || preferred.includes("p2p") || preferred.includes("turn"));
     let selected = "relay";
     this.lastRtcDiagnostics = void 0;
     if (wantWebRtc) {
@@ -67927,6 +68075,8 @@ var AdaptiveTransport = class extends BaseTransport {
         await this.rtc?.close();
         throwIfAborted(signal);
         this.rtc = void 0;
+        if (this.options.failOnWebRtcFallback)
+          throw Object.assign(new Error("WebRTC attempt failed"), { code: "RTC_NEGOTIATION_FAILED", cause: reason });
         if (!preferred.includes("relay"))
           throw reason;
         this.dataMode = "relay";
@@ -67976,8 +68126,9 @@ var AdaptiveTransport = class extends BaseTransport {
       iceServers = [];
     }
     throwIfAborted(signal);
-    const negotiatedMs = negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs);
+    const negotiatedMs = this.options.useServerNegotiateTimeout ? Math.min(2147483647, this.serverNegotiateTimeoutMs ?? this.options.negotiateTimeoutMs ?? 8e3) : negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs);
     const effectiveNegotiateTimeoutMs = iceServers.length === 0 ? Math.min(negotiatedMs ?? DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS, DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS) : negotiatedMs;
+    this.options.onWebRtcStarted?.(effectiveNegotiateTimeoutMs ?? 8e3);
     const rtc = new RtcDataChannelTransport({
       role: "initiator",
       factory,
@@ -69561,105 +69712,149 @@ var AcpLiveProjection = class {
   constructor(context) {
     this.context = context;
   }
-  async sessionFollow(request, signal) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.context.ensureSessionRegistered(sessionId) ?? this.context.sessions.get(sessionId);
-    if (session2 === void 0) throw new Error("The Session was not found.");
-    await this.context.hydrateSession(session2);
-    this.context.rememberOpenedSession?.(session2.sessionId);
-    const history = this.context.historyPage(session2, {
-      limit: optionalPositiveInteger(request.maxMessages) ?? 50
-    });
-    const queue = new AsyncValueQueue(signal);
-    const follow = {
-      sessionId,
+  findFollow(sessionId) {
+    for (const follow of this.context.follows) {
+      if (follow.sessionId === sessionId) return follow;
+    }
+    return void 0;
+  }
+  createFollowState(session2, queue, hasConsumer, stepOpen) {
+    return {
+      sessionId: session2.sessionId,
       acpSessionId: session2.acpSessionId,
       queue,
-      nextSeq: session2.events.length,
+      hasConsumer,
+      nextSeq: session2.events.length === 0 ? 0 : Math.max(...session2.events.map((entry) => entry.event.seq)) + 1,
       turn: Math.max(0, ...session2.events.map((entry) => isRecord4(entry.event.data) && typeof entry.event.data.turn === "number" ? entry.event.data.turn : 0)),
-      stepOpen: session2.running,
+      stepOpen,
       streamActive: false,
       assistantStreamRevision: 0,
       accumulatedText: "",
+      accumulatedReasoning: "",
       activeToolCalls: /* @__PURE__ */ new Set(),
       piToolOutputs: /* @__PURE__ */ new Map(),
       piToolCalls: /* @__PURE__ */ new Map()
     };
-    this.context.follows.add(follow);
-    queue.push({
+  }
+  snapshotFrame(session2, history, follow) {
+    const step = this.context.backend === "pi" ? follow.piStep ?? 1 : 1;
+    const assistantStream = follow.assistantAttempt === void 0 ? { revision: follow.assistantStreamRevision } : {
+      revision: follow.assistantStreamRevision,
+      activeAttempt: {
+        attemptId: follow.assistantAttempt.attemptId,
+        startedAfterSeq: follow.assistantAttempt.startedAfterSeq,
+        turn: follow.turn,
+        step,
+        nextIndex: follow.assistantAttempt.nextIndex,
+        stream: [...follow.assistantAttempt.stream]
+      }
+    };
+    return {
       type: "snapshot",
       header: history.header,
       cursor: history.cursor,
       records: history.records,
       hasMore: history.hasMore,
       projections: {
-        asOfSeq: history.cursor,
+        asOfSeq: session2.projectionSeq ?? -1,
         values: {
           title: session2.title ?? acpBackendLabel(this.context.backend),
           sessionListMetadata: { blank: session2.blank && session2.events.length === 0, lastPromptAt: null },
-          modelSelection: this.context.modelSelectionProjection(sessionId),
-          permissions: this.context.permissionsProjection(sessionId),
+          modelSelection: this.context.modelSelectionProjection(session2.sessionId),
+          permissions: this.context.permissionsProjection(session2.sessionId),
           imageLimits: acpImageLimits(this.context.backend)
         }
       },
-      assistantStream: { revision: 0 }
+      assistantStream
+    };
+  }
+  handleRemoteStreamClosed(session2, follow, reason) {
+    if (follow.closed) return;
+    session2.running = false;
+    this.context.emitRemoteEvent("api-session/status", [session2.sessionId, false]);
+    this.closeFollowAfterRemoteStreamClosed(follow, piStreamOutcome(reason), true);
+  }
+  async sessionFollow(request, signal) {
+    const requestedId = extractSessionId(request);
+    const session2 = this.context.lookupSession(requestedId);
+    if (session2 === void 0) throw new Error("The Session was not found.");
+    const sessionId = session2.sessionId;
+    await this.context.hydrateSession(session2);
+    this.context.rememberOpenedSession?.(sessionId);
+    const history = this.context.historyPage(session2, {
+      limit: optionalPositiveInteger(request.maxMessages) ?? 50
     });
+    const queue = new AsyncValueQueue(signal);
+    const existing = this.findFollow(sessionId);
+    if (existing !== void 0) {
+      const priorQueue = existing.queue;
+      existing.queue = queue;
+      existing.hasConsumer = true;
+      priorQueue.close();
+      queue.push(this.snapshotFrame(session2, history, existing));
+      return queue.iterate(() => {
+        if (existing.queue === queue) {
+          existing.closed = true;
+          this.context.follows.delete(existing);
+          void existing.close?.().catch(() => void 0);
+        }
+      });
+    }
+    const follow = this.createFollowState(session2, queue, true, session2.running);
+    this.context.follows.add(follow);
+    queue.push(this.snapshotFrame(session2, history, follow));
     try {
       const stream = await this.context.client.openStream(
         session2.acpSessionId,
         (frame) => this.acceptAcpFrame(follow, frame),
-        (closed) => {
-          session2.running = false;
-          this.context.emitRemoteEvent("api-session/status", [sessionId, false]);
-          this.closeFollowAfterRemoteStreamClosed(follow, piStreamOutcome(closed.reason));
-        },
+        (closed) => this.handleRemoteStreamClosed(session2, follow, closed.reason),
         signal
       );
-      follow.close = () => stream.close();
+      if (follow.closed || !this.context.follows.has(follow)) {
+        await stream.close().catch(() => void 0);
+      } else {
+        follow.close = () => stream.close();
+      }
     } catch (error62) {
       this.context.follows.delete(follow);
-      queue.close();
+      follow.closed = true;
+      follow.queue.close();
       throw error62;
     }
     return queue.iterate(() => {
-      this.context.follows.delete(follow);
-      void follow.close?.().catch(() => void 0);
+      if (follow.queue === queue) {
+        follow.closed = true;
+        this.context.follows.delete(follow);
+        void follow.close?.().catch(() => void 0);
+      }
     });
   }
   async ensureFollow(session2) {
-    if ([...this.context.follows].some((follow2) => follow2.sessionId === session2.sessionId)) return;
+    if (this.findFollow(session2.sessionId) !== void 0) return;
     const controller = new AbortController();
     const queue = new AsyncValueQueue(controller.signal);
-    const follow = {
-      sessionId: session2.sessionId,
-      acpSessionId: session2.acpSessionId,
-      queue,
-      nextSeq: session2.events.length === 0 ? 0 : Math.max(...session2.events.map((entry) => entry.event.seq)) + 1,
-      turn: Math.max(0, ...session2.events.map((entry) => isRecord4(entry.event.data) && typeof entry.event.data.turn === "number" ? entry.event.data.turn : 0)),
-      stepOpen: false,
-      streamActive: false,
-      assistantStreamRevision: 0,
-      accumulatedText: "",
-      activeToolCalls: /* @__PURE__ */ new Set(),
-      piToolOutputs: /* @__PURE__ */ new Map(),
-      piToolCalls: /* @__PURE__ */ new Map()
-    };
+    const follow = this.createFollowState(session2, queue, false, false);
     this.context.follows.add(follow);
-    const stream = await this.context.client.openStream(
-      session2.acpSessionId,
-      (frame) => this.acceptAcpFrame(follow, frame),
-      (closed) => {
-        if (this.context.backend === "pi") {
-          session2.running = false;
-          this.context.emitRemoteEvent("api-session/status", [session2.sessionId, false]);
-        }
-        this.closeFollowAfterRemoteStreamClosed(follow, piStreamOutcome(closed.reason));
+    try {
+      const stream = await this.context.client.openStream(
+        session2.acpSessionId,
+        (frame) => this.acceptAcpFrame(follow, frame),
+        (closed) => this.handleRemoteStreamClosed(session2, follow, closed.reason)
+      );
+      if (follow.closed || !this.context.follows.has(follow)) {
+        await stream.close().catch(() => void 0);
+        return;
       }
-    );
-    follow.close = async () => {
-      controller.abort();
-      await stream.close();
-    };
+      follow.close = async () => {
+        controller.abort();
+        await stream.close();
+      };
+    } catch (error62) {
+      this.context.follows.delete(follow);
+      follow.closed = true;
+      follow.queue.close();
+      throw error62;
+    }
   }
   acceptAcpFrame(follow, frame) {
     const method = frame.frame.method;
@@ -69668,6 +69863,7 @@ var AcpLiveProjection = class {
       this.acceptSessionUpdate(follow, params);
       return;
     }
+    if (follow.closed) return;
     if (method === "session/request_permission" || method === "cursor/ask_question" || method === "cursor/create_plan") {
       this.acceptApproval(follow, params, method);
     }
@@ -69682,9 +69878,10 @@ var AcpLiveProjection = class {
       }
       return;
     }
+    if (follow.closed) return;
     if (kind === "model_selection" && isRecord4(update.selected) && update.selected.provider === this.context.backend && typeof update.selected.model === "string") {
       this.context.selectedModels.set(follow.sessionId, update.selected);
-      this.context.publishProjection(follow.sessionId, "modelSelection", this.context.modelSelectionProjection(follow.sessionId), this.context.nextProjectionSeq());
+      this.context.publishProjection(follow.sessionId, "modelSelection", this.context.modelSelectionProjection(follow.sessionId), this.context.nextProjectionSeq(follow.sessionId));
       return;
     }
     if (kind === "agent_message_chunk" || kind === "agent_message") {
@@ -69761,19 +69958,41 @@ var AcpLiveProjection = class {
         return;
       }
       if (kind === "tool_call_update" && !terminal) return;
-      if (kind === "tool_call" && follow.activeToolCalls.has(callId)) return;
-      this.pushEvent(follow, "tool/call", {
-        turn: follow.turn,
-        step: 1,
-        callId,
-        name: toolName,
-        arguments: typeof update.parameters === "object" && update.parameters !== null ? JSON.stringify(update.parameters) : typeof update.rawInput === "object" && update.rawInput !== null ? JSON.stringify(update.rawInput) : "{}",
-        toolCallId: callId,
-        toolName,
-        status: status2 === "completed" ? "finished" : status2 === "failed" ? "failed" : "running"
-      });
-      if (terminal) follow.activeToolCalls.delete(callId);
-      else follow.activeToolCalls.add(callId);
+      if (!terminal && follow.activeToolCalls.has(callId)) return;
+      if (!terminal || !follow.activeToolCalls.has(callId)) {
+        this.pushEvent(follow, "tool/call", {
+          turn: follow.turn,
+          step: 1,
+          callId,
+          name: toolName,
+          arguments: typeof update.parameters === "object" && update.parameters !== null ? JSON.stringify(update.parameters) : typeof update.rawInput === "object" && update.rawInput !== null ? JSON.stringify(update.rawInput) : "{}",
+          toolCallId: callId,
+          toolName,
+          status: status2 === "completed" ? "finished" : status2 === "failed" ? "failed" : "running"
+        });
+      }
+      if (terminal) {
+        const output2 = piToolResult(update);
+        const content = output2.content.length > 0 ? output2.content : typeof update.rawOutput === "string" && update.rawOutput.length > 0 ? [{ type: "text", text: update.rawOutput }] : [];
+        this.pushEvent(follow, "tool/result", {
+          turn: follow.turn,
+          step: 1,
+          message: {
+            id: `${callId}:result`,
+            role: "user",
+            content: [{
+              type: "tool-result",
+              toolCallId: callId,
+              content,
+              ...output2.isError ? { isError: true } : {}
+            }],
+            source: { kind: "tool", callId }
+          }
+        });
+        follow.activeToolCalls.delete(callId);
+      } else {
+        follow.activeToolCalls.add(callId);
+      }
       if (session2 !== void 0) session2.updatedAt = Date.now();
       return;
     }
@@ -69898,6 +70117,7 @@ var AcpLiveProjection = class {
       this.ensurePiStep(follow, true);
       follow.piReasoning = (follow.piReasoning ?? "") + delta;
     }
+    follow.accumulatedReasoning = (follow.accumulatedReasoning ?? "") + delta;
     if (!follow.stepOpen) {
       follow.turn += 1;
       follow.stepOpen = true;
@@ -69926,21 +70146,35 @@ var AcpLiveProjection = class {
     }
     if (advanceAfterTools) follow.piAfterTools = false;
   }
+  finishReason(outcome) {
+    if (outcome.kind === "error") return { kind: "error", failure: outcome.error };
+    if (outcome.kind === "aborted") {
+      return {
+        kind: "aborted",
+        failure: { code: "ABORTED", message: `${acpBackendLabel(this.context.backend)} reply interrupted.` }
+      };
+    }
+    return { kind: outcome.kind === "max-tokens" ? "max-tokens" : "stop" };
+  }
   finishPiAssistant(follow, outcome = { kind: "completed" }) {
     if (!follow.streamActive) return;
+    const isPi = this.context.backend === "pi";
+    const step = isPi ? follow.piStep ?? 1 : 1;
+    const reasoningText = follow.accumulatedReasoning ?? follow.piReasoning ?? "";
     const blocks = [
-      { index: follow.reasoningBlockIndex, type: "reasoning", text: follow.piReasoning ?? "" },
+      { index: follow.reasoningBlockIndex, type: "reasoning", text: reasoningText },
       { index: follow.blockIndex, type: "text", text: follow.accumulatedText }
     ].filter((block) => block.index !== void 0).sort((a, b) => a.index - b.index);
-    for (const { index, type, text } of blocks) this.pushAssistantChunk(follow, { type: "block-end", index, block: { type, text } });
-    const reason = outcome.kind === "error" ? { kind: "error", failure: outcome.error } : outcome.kind === "aborted" ? { kind: "aborted", failure: { code: "ABORTED", message: "Pi reply interrupted." } } : { kind: outcome.kind === "max-tokens" ? "max-tokens" : "stop" };
-    this.pushAssistantChunk(follow, { type: "finish", reason });
+    for (const { index, type, text } of blocks) {
+      this.pushAssistantChunk(follow, { type: "block-end", index, block: { type, text } });
+    }
+    this.pushAssistantChunk(follow, { type: "finish", reason: this.finishReason(outcome) });
     const selection = this.context.modelSelection(follow.sessionId);
     const seq = this.pushEvent(follow, "assistant/message", {
       turn: follow.turn,
-      step: follow.piStep ?? 1,
+      step,
       message: {
-        id: `${follow.sessionId}:${follow.turn}:${follow.piStep ?? 1}`,
+        id: isPi ? `${follow.sessionId}:${follow.turn}:${step}` : `${follow.sessionId}:${follow.turn}`,
         role: "assistant",
         content: blocks.map(({ type, text }) => ({ type, text })),
         source: { kind: "model", provider: selection.provider, model: selection.model }
@@ -69952,80 +70186,35 @@ var AcpLiveProjection = class {
     follow.blockIndex = void 0;
     follow.reasoningBlockIndex = void 0;
     follow.accumulatedText = "";
+    follow.accumulatedReasoning = "";
     follow.piReasoning = "";
   }
-  closeFollowAfterRemoteStreamClosed(follow, outcome = { kind: "completed" }) {
+  closeFollowAfterRemoteStreamClosed(follow, outcome = { kind: "completed" }, remoteClosed = false) {
+    if (follow.closed) return;
     const session2 = this.context.sessions.get(follow.sessionId);
     if (session2 !== void 0) session2.running = false;
-    if (this.context.backend === "pi") {
-      this.finishPiAssistant(follow, outcome);
-      if (follow.stepOpen) {
-        this.pushEvent(follow, "step/end", { turn: follow.turn, step: follow.piStep ?? 1 });
-        this.pushEvent(follow, "turn/end", { turn: follow.turn, reason: outcome });
-      }
-      follow.stepOpen = false;
+    const isPi = this.context.backend === "pi";
+    const step = isPi ? follow.piStep ?? 1 : 1;
+    this.finishPiAssistant(follow, outcome);
+    if (follow.stepOpen) {
+      this.pushEvent(follow, "step/end", { turn: follow.turn, step });
+      this.pushEvent(follow, "turn/end", { turn: follow.turn, reason: outcome });
+    }
+    follow.stepOpen = false;
+    if (isPi) {
       follow.piStep = 1;
       follow.piAfterTools = false;
-      follow.piToolOutputs.clear();
-      follow.piToolCalls.clear();
-      follow.activeToolCalls.clear();
-      if (session2 !== void 0) this.context.syncSessionCache?.(session2);
-      return;
     }
-    if (follow.streamActive) {
-      if (follow.reasoningBlockIndex !== void 0) {
-        this.pushAssistantChunk(follow, {
-          type: "block-end",
-          index: follow.reasoningBlockIndex,
-          block: { type: "reasoning", text: "" }
-        });
-        follow.reasoningBlockIndex = void 0;
-      }
-      if (follow.blockIndex !== void 0) {
-        const fullText2 = follow.accumulatedText;
-        this.pushAssistantChunk(follow, {
-          type: "block-end",
-          index: follow.blockIndex,
-          block: { type: "text", text: fullText2 }
-        });
-      }
-      this.pushAssistantChunk(follow, {
-        type: "finish",
-        reason: { kind: "stop" }
-      });
-      const fullText = follow.accumulatedText;
-      const selection = this.context.modelSelection(follow.sessionId);
-      const stream = follow.assistantAttempt?.stream ?? [];
-      const assistantMessageSeq = this.pushEvent(follow, "assistant/message", {
-        turn: follow.turn,
-        step: 1,
-        message: {
-          id: `${follow.sessionId}:${follow.turn}`,
-          role: "assistant",
-          content: [{ type: "text", text: fullText }],
-          source: { kind: "model", provider: selection.provider, model: selection.model }
-        },
-        stream
-      });
-      this.endAssistantAttempt(follow, {
-        kind: "committed",
-        eventType: "assistant/message",
-        seq: assistantMessageSeq
-      });
-      this.pushEvent(follow, "step/end", { turn: follow.turn, step: 1 });
-      this.pushEvent(follow, "turn/end", { turn: follow.turn, reason: { kind: "completed" } });
-    } else if (follow.stepOpen) {
-      this.pushEvent(follow, "step/end", { turn: follow.turn, step: 1 });
-      this.pushEvent(follow, "turn/end", { turn: follow.turn, reason: { kind: "completed" } });
-    }
-    follow.streamActive = false;
-    follow.stepOpen = false;
-    follow.blockIndex = void 0;
-    follow.reasoningBlockIndex = void 0;
-    follow.accumulatedText = "";
     follow.piToolOutputs.clear();
     follow.piToolCalls.clear();
+    follow.activeToolCalls.clear();
     if (session2 !== void 0) this.context.syncSessionCache?.(session2);
+    if (remoteClosed || !follow.hasConsumer) {
+      follow.closed = true;
+      this.context.follows.delete(follow);
+      follow.queue.close();
+      void follow.close?.().catch(() => void 0);
+    }
   }
   pushEvent(follow, type, data2) {
     const session2 = this.context.sessions.get(follow.sessionId);
@@ -70141,7 +70330,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     this.historyCache = historyCache;
     const owner = this;
     this.live = new AcpLiveProjection({
-      ensureSessionRegistered: (...args) => owner.ensureSessionRegistered(...args),
+      lookupSession: (...args) => owner.lookupSession(...args),
       get sessions() {
         return owner.sessions;
       },
@@ -70161,7 +70350,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
       get selectedModels() {
         return owner.selectedModels;
       },
-      publishProjection: (...args) => owner.events.publishProjection(...args),
+      publishProjection: (...args) => owner.publishProjection(...args),
       nextProjectionSeq: (...args) => owner.nextProjectionSeq(...args),
       refreshSessionTitle: (...args) => owner.titles.refresh(...args),
       applySessionTitle: (...args) => owner.titles.applyNative(...args),
@@ -70212,7 +70401,11 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
       backend,
       client,
       this.sessions,
-      (sessionId, title) => this.events.publishProjection(sessionId, "title", title)
+      (sessionId, title) => {
+        const session2 = this.sessions.get(sessionId);
+        if (session2 !== void 0) this.syncSessionCache(session2);
+        this.publishProjection(sessionId, "title", title);
+      }
     );
     this.unsubscribeArchived = client.onSessionArchived?.((data2) => {
       if (this.closed || data2.backend !== this.backend) return;
@@ -70423,15 +70616,15 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
         case "directoryPicker/list":
           return business(await this.listDirectory(requestArg(args), signal));
         case "skills/list":
-          return business(success2({ items: [] }));
+          return business(success2({ skills: [] }));
         case "job/kill":
-          return this.hostCarrier === void 0 ? business(success2({ outcome: "already-finished" })) : await this.hostCarrier.dispatch(endpoint, payload, signal);
+          return business(success2({ outcome: "already-finished" }));
         case "commands/list":
           return business(this.commandList(requestArg(args)));
         case "commands/execute":
           return business(await this.executeCommand(requestArg(args)));
         default:
-          return this.hostCarrier === void 0 ? fail("method-not-found", `${this.backendLabel()} virtual Harness does not implement ${endpoint}.`) : await this.hostCarrier.dispatch(endpoint, payload, signal);
+          return this.hostCarrier !== void 0 && isAllowedHostCarrierDispatch(endpoint) ? await this.hostCarrier.dispatch(endpoint, payload, signal) : fail("method-not-found", `${this.backendLabel()} virtual Harness does not implement ${endpoint}.`);
       }
     } catch (error62) {
       return failFrom(error62);
@@ -70454,7 +70647,9 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     if (endpoint === "session/follow") return this.live.sessionFollow(requestArg(args), signal);
     if (endpoint === "$events") return this.events.remoteEvents(signal);
     if (endpoint === "job/list" || endpoint === "job/follow") return this.events.emptyJobStream(endpoint, signal);
-    if (this.hostCarrier !== void 0) return this.hostCarrier.open(endpoint, payload, signal);
+    if (this.hostCarrier !== void 0 && isAllowedHostCarrierOpen(endpoint)) {
+      return this.hostCarrier.open(endpoint, payload, signal);
+    }
     throw Object.assign(new Error(`${this.backendLabel()} virtual Harness does not implement stream ${endpoint}.`), {
       isDSHRemoteError: true,
       code: "method-not-found",
@@ -70480,6 +70675,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     const follows = [...this.follows];
     this.follows.clear();
     for (const follow of follows) {
+      follow.closed = true;
       follow.queue.close();
       await follow.close?.().catch(() => void 0);
     }
@@ -70562,39 +70758,25 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     const session2 = this.registerSession(created.sessionId, cwd2, workspace2?.title);
     this.attachSessionToWorkspace(cwd2, session2.sessionId);
     this.publishWorkspaceBaseline();
-    const seq = this.nextProjectionSeq();
-    this.events.emitRemoteEvent("api-session/added", [this.sessionSummary(session2, seq)]);
-    this.events.publishProjection(session2.sessionId, "title", session2.title ?? this.backendLabel(), seq);
-    this.events.publishProjection(session2.sessionId, "modelSelection", this.modelSelectionProjection(session2.sessionId), seq);
+    const summarySeq = this.nextProjectionSeq(session2.sessionId);
+    this.events.emitRemoteEvent("api-session/added", [this.sessionSummary(session2, summarySeq)]);
+    this.events.publishProjection(session2.sessionId, "title", session2.title ?? this.backendLabel(), this.nextProjectionSeq(session2.sessionId));
+    this.events.publishProjection(session2.sessionId, "modelSelection", this.modelSelectionProjection(session2.sessionId), this.nextProjectionSeq(session2.sessionId));
     return success2({ sessionId: session2.sessionId });
   }
-  ensureSessionRegistered(sessionId) {
-    let session2 = this.sessions.get(sessionId);
-    if (session2 !== void 0) return session2;
-    const prefix = sessionPrefix(this.backend);
+  lookupSession(sessionId) {
+    const direct = this.sessions.get(sessionId);
+    if (direct !== void 0) return direct;
     if (this.backend !== "cursor") {
-      if (sessionId.startsWith(prefix)) {
-        const acpSessionId = sessionId.slice(prefix.length);
-        const workspace2 = this.selectedWorkspaceId !== void 0 ? this.workspaceById.get(this.selectedWorkspaceId) : void 0;
-        const cwd2 = workspace2?.path ?? "/";
-        session2 = this.registerSession(acpSessionId, cwd2, this.backendLabel(), Date.now(), Date.now(), false);
-        if (workspace2 && !workspace2.sessionIds.includes(sessionId)) {
-          workspace2.sessionIds.unshift(sessionId);
-          workspace2.sessionCount = workspace2.sessionIds.length;
-          this.publishWorkspaceBaseline();
-        }
-        return session2;
-      }
-      const prefixed = `${prefix}${sessionId}`;
-      const found = this.sessions.get(prefixed);
-      if (found !== void 0) return found;
+      return this.sessions.get(`${sessionPrefix(this.backend)}${sessionId}`);
     }
     return void 0;
   }
   async prompt(request, signal) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const requestedId = extractSessionId(request);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return failure2("session-not-found", "The Session was not found.");
+    const sessionId = session2.sessionId;
     await this.hydrateSession(session2);
     const text = extractPromptText(array2(request.content));
     let images;
@@ -70606,10 +70788,30 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     }
     if (text === void 0 && images.length === 0) return failure2("attachment-error", "A prompt or image is required.");
     const imageBlocks = images.map((image) => acpImageContent(image, `agy-image:${crypto.randomUUID()}.${image.mimeType === "image/jpeg" ? "jpg" : image.mimeType.slice(6)}`));
+    const hadFollow = [...this.follows].some((f) => f.sessionId === sessionId);
+    const prevEventsLen = session2.events.length;
+    const prevBlank = session2.blank;
+    const prevHydrated = session2.hydrated;
+    const prevRunning = session2.running;
+    const prevUpdatedAt = session2.updatedAt;
+    const prevTitle = session2.title;
+    const prevTitleFromPrompt = session2.titleFromPrompt;
+    const prevTitleOverridden = session2.titleOverridden;
+    const prevAttachmentIds = new Set(this.imageAttachments.keys());
     this.cacheImageAttachments(sessionId, imageBlocks);
     const requestId = typeof request.requestId === "string" && request.requestId.length > 0 ? request.requestId : void 0;
-    await this.live.ensureFollow(session2);
+    try {
+      await this.live.ensureFollow(session2);
+    } catch (error62) {
+      for (const id6 of [...this.imageAttachments.keys()]) {
+        if (!prevAttachmentIds.has(id6)) this.imageAttachments.delete(id6);
+      }
+      throw error62;
+    }
     const follow = [...this.follows].find((f) => f.sessionId === sessionId);
+    const prevTurn = follow?.turn;
+    const prevStepOpen = follow?.stepOpen;
+    const prevNextSeq = follow?.nextSeq;
     if (follow !== void 0) {
       follow.turn += 1;
       follow.stepOpen = true;
@@ -70630,13 +70832,56 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     this.syncSessionCache(session2);
     this.events.emitRemoteEvent("api-session/status", [sessionId, true]);
     this.publishWorkspaceBaseline();
-    await this.client.prompt(session2.acpSessionId, text ?? "", signal, images, this.backend);
+    try {
+      await this.client.prompt(session2.acpSessionId, text ?? "", signal, images, this.backend);
+    } catch (error62) {
+      if (!follow?.streamActive && session2.events.length === prevEventsLen + 3) {
+        session2.events.length = prevEventsLen;
+        session2.blank = prevBlank;
+        session2.hydrated = prevHydrated;
+        session2.running = prevRunning;
+        session2.updatedAt = prevUpdatedAt;
+        const titleChanged = session2.title !== prevTitle;
+        session2.title = prevTitle;
+        session2.titleFromPrompt = prevTitleFromPrompt;
+        session2.titleOverridden = prevTitleOverridden;
+        if (titleChanged) {
+          this.publishProjection(sessionId, "title", prevTitle ?? this.backendLabel());
+        }
+        for (const id6 of [...this.imageAttachments.keys()]) {
+          if (!prevAttachmentIds.has(id6)) this.imageAttachments.delete(id6);
+        }
+        if (follow !== void 0) {
+          follow.turn = prevTurn;
+          follow.stepOpen = prevStepOpen;
+          follow.nextSeq = prevNextSeq;
+          if (!hadFollow || follow.hasConsumer) {
+            follow.closed = true;
+            this.follows.delete(follow);
+            follow.queue.close();
+            void follow.close?.().catch(() => void 0);
+          }
+        }
+      } else {
+        session2.running = false;
+        if (follow !== void 0 && !follow.closed && (follow.stepOpen || follow.streamActive)) {
+          const code = error62 instanceof Error && "code" in error62 && typeof error62.code === "string" ? error62.code : "ACP_PROMPT_FAILED";
+          const message = error62 instanceof Error ? error62.message : String(error62);
+          this.live.closeFollowAfterRemoteStreamClosed(follow, { kind: "error", error: { code, message } });
+        }
+      }
+      this.events.emitRemoteEvent("api-session/status", [sessionId, false]);
+      this.syncSessionCache(session2);
+      this.publishWorkspaceBaseline();
+      throw error62;
+    }
     return success2({ accepted: true });
   }
   async cancel(request, signal) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const requestedId = extractSessionId(request);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return failure2("session-not-found", "The Session was not found.");
+    const sessionId = session2.sessionId;
     await this.client.cancel(session2.acpSessionId, signal);
     session2.running = false;
     for (const follow of this.follows) {
@@ -70649,17 +70894,18 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     return success2({ accepted: true });
   }
   async renameSession(request) {
-    const sessionId = extractSessionId(request);
+    const requestedId = extractSessionId(request);
     const title = string4(request.title)?.trim();
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return failure2("session-not-found", "The Session was not found.");
-    if (title === void 0) return failure2("bad-request", "A Session title is required.");
+    if (!title) return failure2("bad-request", "A Session title is required.");
     session2.title = title;
     session2.titleOverridden = true;
     session2.updatedAt = Date.now();
     this.syncSessionCache(session2);
-    this.events.publishProjection(sessionId, "title", title);
-    return success2({ sessionId });
+    const seq = this.nextProjectionSeq(session2.sessionId);
+    this.events.publishProjection(session2.sessionId, "title", title, seq);
+    return success2({ title, seq });
   }
   cacheImageAttachments(sessionId, content) {
     for (const value of content) {
@@ -70671,13 +70917,13 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     }
   }
   async attachment(request) {
-    const sessionId = extractSessionId(request);
+    const requestedId = extractSessionId(request);
     const attachmentId = string4(request.attachmentId) ?? string4(record2(request.attachment).attachmentId);
-    const session2 = this.ensureSessionRegistered(sessionId);
+    const session2 = this.lookupSession(requestedId);
     if (this.backend !== "antigravity" && this.backend !== "hermes" || session2 === void 0 || !attachmentId?.startsWith("agy-image:")) return failure2("attachment-error", "The image is not referenced by this Session.");
     await this.hydrateSession(session2);
     const cached2 = this.imageAttachments.get(attachmentId);
-    return cached2?.sessionId === sessionId ? success2({ attachment: cached2.attachment, data: cached2.data }) : failure2("attachment-error", "The image attachment is unavailable or expired.");
+    return cached2?.sessionId === session2.sessionId ? success2({ attachment: cached2.attachment, data: cached2.data }) : failure2("attachment-error", "The image attachment is unavailable or expired.");
   }
   async hydrateSession(session2) {
     if (this.backend === "cursor" || session2.blank || session2.events.length > 0 && !session2.staleHistory) return;
@@ -70762,13 +71008,14 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     });
   }
   async sessionHistory(request) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const requestedId = extractSessionId(request);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return failure2("session-not-found", "The Session was not found.");
+    const sessionId = session2.sessionId;
     await this.hydrateSession(session2);
     const beforeSeq = optionalInteger(request.beforeSeq);
     if (beforeSeq === void 0) {
-      this.rememberOpenedSession(session2.sessionId);
+      this.rememberOpenedSession(sessionId);
     }
     const page = this.historyPage(session2, {
       beforeSeq,
@@ -70778,7 +71025,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
       ...page,
       events: page.records.map((entry) => ({ event: entry.event })),
       projections: {
-        asOfSeq: page.cursor,
+        asOfSeq: session2.projectionSeq ?? -1,
         values: {
           title: session2.title ?? acpBackendLabel(this.backend),
           sessionListMetadata: { blank: session2.blank && session2.events.length === 0, lastPromptAt: null },
@@ -70790,15 +71037,15 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     });
   }
   async sessionProjections(request) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const requestedId = extractSessionId(request);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return success2(null);
     await this.hydrateSession(session2);
-    return success2(this.sessionSummary(session2, session2.events.at(-1)?.event.seq ?? -1).projections);
+    return success2(this.sessionSummary(session2, session2.projectionSeq ?? -1).projections);
   }
   async sessionPage(request) {
-    const sessionId = extractSessionId(request);
-    const session2 = this.ensureSessionRegistered(sessionId) ?? this.sessions.get(sessionId);
+    const requestedId = extractSessionId(request);
+    const session2 = this.lookupSession(requestedId);
     if (session2 === void 0) return failure2("session-not-found", "The Session was not found.");
     await this.hydrateSession(session2);
     const page = this.historyPage(session2, {
@@ -70921,10 +71168,10 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     const title = this.backend === "antigravity" ? "Antigravity" : this.backend === "opencode" ? "OpenCode" : workspace2.title;
     const session2 = this.registerSession(sessionId, cwd2, title);
     this.attachSessionToWorkspace(cwd2, session2.sessionId);
-    const seq = this.nextProjectionSeq();
-    this.events.emitRemoteEvent("api-session/added", [this.sessionSummary(session2, seq)]);
-    this.events.publishProjection(session2.sessionId, "title", session2.title ?? this.backendLabel(), seq);
-    this.events.publishProjection(session2.sessionId, "modelSelection", this.modelSelectionProjection(session2.sessionId), seq);
+    const summarySeq = this.nextProjectionSeq(session2.sessionId);
+    this.events.emitRemoteEvent("api-session/added", [this.sessionSummary(session2, summarySeq)]);
+    this.events.publishProjection(session2.sessionId, "title", session2.title ?? this.backendLabel(), this.nextProjectionSeq(session2.sessionId));
+    this.events.publishProjection(session2.sessionId, "modelSelection", this.modelSelectionProjection(session2.sessionId), this.nextProjectionSeq(session2.sessionId));
     this.publishWorkspaceBaseline();
     return session2;
   }
@@ -70940,7 +71187,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
   sessionSummaries() {
     const selected = this.selectedWorkspaceId === void 0 ? void 0 : this.workspaceById.get(this.selectedWorkspaceId);
     const allowed = new Set(selected?.sessionIds ?? [...this.sessions.keys()]);
-    return [...this.sessions.values()].filter((session2) => allowed.has(session2.sessionId) && !this.archivedSessionIds.has(session2.sessionId)).sort((a, b) => b.updatedAt - a.updatedAt || a.sessionId.localeCompare(b.sessionId)).map((session2) => this.sessionSummary(session2, 0));
+    return [...this.sessions.values()].filter((session2) => allowed.has(session2.sessionId) && !this.archivedSessionIds.has(session2.sessionId)).sort((a, b) => b.updatedAt - a.updatedAt || a.sessionId.localeCompare(b.sessionId)).map((session2) => this.sessionSummary(session2, session2.projectionSeq ?? -1));
   }
   sortWorkspaceSessions(workspace2) {
     workspace2.sessionIds.sort((a, b) => (this.sessions.get(b)?.updatedAt ?? 0) - (this.sessions.get(a)?.updatedAt ?? 0) || a.localeCompare(b));
@@ -71000,7 +71247,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
       this.selectedPermissions.set(resolved, preset);
       this.selectedPermissions.set(sessionId, preset);
     }
-    const seq = this.nextProjectionSeq();
+    const seq = this.nextProjectionSeq(resolved);
     this.events.publishProjection(resolved, "permissions", this.permissionsProjection(resolved), seq);
     if (resolved !== sessionId) {
       this.events.publishProjection(sessionId, "permissions", this.permissionsProjection(resolved), seq);
@@ -71089,7 +71336,7 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
     if (rawSessionId && rawSessionId !== sessionId) this.selectedModels.set(rawSessionId, confirmed);
     const session2 = this.sessions.get(sessionId);
     if (session2 !== void 0) this.syncSessionCache(session2);
-    const seq = this.nextProjectionSeq();
+    const seq = this.nextProjectionSeq(sessionId);
     this.events.publishProjection(sessionId, "modelSelection", this.modelSelectionProjection(sessionId), seq);
     if (rawSessionId && rawSessionId !== sessionId) {
       this.events.publishProjection(rawSessionId, "modelSelection", this.modelSelectionProjection(sessionId), seq);
@@ -71104,14 +71351,41 @@ var AcpVirtualHarness = class _AcpVirtualHarness {
       queue.push({ type: "archived", archivedSessionIds: [...this.archivedSessionIds] });
     }
   }
-  nextProjectionSeq() {
+  publishProjection(sessionId, key, value, seq = this.nextProjectionSeq(sessionId)) {
+    this.events.publishProjection(sessionId, key, value, seq);
+  }
+  nextProjectionSeq(sessionId) {
     this.lastProjectionSeq += 1;
+    if (sessionId !== void 0) {
+      const session2 = this.lookupSession(sessionId);
+      if (session2 !== void 0) session2.projectionSeq = this.lastProjectionSeq;
+    }
     return this.lastProjectionSeq;
   }
 };
+var ALLOWED_HOST_CARRIER_DISPATCH_PREFIXES = [
+  "settings/",
+  "pluginManager/",
+  "pluginMarket/",
+  "pluginRecommendations/",
+  "pluginRegistryProbe/",
+  "credentials/",
+  "llm/",
+  "speech/",
+  "account/"
+];
+var ALLOWED_HOST_CARRIER_DISPATCH_EXACT = /* @__PURE__ */ new Set([
+  "pluginInventory/list",
+  "permissionPresets/catalog"
+]);
+function isAllowedHostCarrierDispatch(endpoint) {
+  return ALLOWED_HOST_CARRIER_DISPATCH_EXACT.has(endpoint) || ALLOWED_HOST_CARRIER_DISPATCH_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
+}
+function isAllowedHostCarrierOpen(endpoint) {
+  return endpoint === "remoteAccess/follow" || endpoint.startsWith("account/") || endpoint.startsWith("settings/");
+}
 
 // packages/plugin/src/client-runtime-contract.ts
-var DIRECT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12e3;
 var DIRECT_LAN_PROGRESS_DISPLAY_MS = 1400;
 var HOST_AUTHORIZATION_ERRORS = /* @__PURE__ */ new Set([
   "ACCOUNT_AUTH_REQUIRED",
@@ -71288,6 +71562,7 @@ async function probeRemoteHostFeatures(client, clientVersion) {
     claude,
     ...hermes ? { hermes: true } : {},
     ...capabilities.has("agent.acp.antigravity.model-load.v1") ? { acpModelLoadsSession: true } : {},
+    ...capabilities.has("agent.acp.opencode.archive.v1") ? { acpOpencodeArchive: true } : {},
     ...workspaceTypes === void 0 ? {} : { workspaceTypes },
     pluginRoute: capabilities.has("plugin.route.v1")
   };
@@ -71428,6 +71703,91 @@ var ClientCodexStreams = class {
     }));
   }
 };
+
+// packages/plugin/src/preferred-connection.ts
+async function connectPreferredTransport(create, signal) {
+  const lifetime = new AbortController();
+  const cancel = () => lifetime.abort();
+  signal?.addEventListener("abort", cancel, { once: true });
+  if (signal?.aborted) cancel();
+  const race = new DirectPreferredRace(lifetime.signal, 3e3, 25e3, true);
+  const candidates = /* @__PURE__ */ new Map();
+  const unsubscribes = [];
+  let fatal;
+  let chosen;
+  let finished = false;
+  let succeeded = false;
+  const begin = (attempt) => {
+    if (finished || lifetime.signal.aborted || candidates.has(attempt)) return;
+    try {
+      const transport = create(attempt, {
+        signal: lifetime.signal,
+        failOnWebRtcFallback: true,
+        useServerNegotiateTimeout: true,
+        onParallelConnections: attempt === "direct" ? () => begin("turn") : void 0,
+        onWebRtcStarted: (timeoutMs) => race.startAttempt(attempt, timeoutMs)
+      });
+      candidates.set(attempt, transport);
+      let ready = false;
+      unsubscribes.push(transport.onClose(() => {
+        if (ready) race.failed(attempt);
+      }));
+      void transport.connect().then(() => {
+        if (finished || lifetime.signal.aborted) return;
+        const mode2 = transport.getStats().mode;
+        if (attempt === "direct" ? mode2 !== "LAN" && mode2 !== "P2P" : mode2 !== "TURN") {
+          race.failed(attempt);
+          void transport.close();
+          if (attempt === "direct") begin("turn");
+          return;
+        }
+        ready = true;
+        race.ready(attempt, transport);
+      }).catch((error62) => {
+        if (finished || lifetime.signal.aborted) return;
+        const candidateFailed = ["RTC_NEGOTIATION_FAILED", "TRANSPORT_SETUP_FAILED"].includes(error62?.code) || error62?.code === "TRANSPORT_CLOSED" && error62?.retryable === true;
+        if (!candidateFailed) {
+          fatal = error62;
+          lifetime.abort();
+          return;
+        }
+        race.failed(attempt);
+        void transport.close().then(() => {
+          if (attempt === "direct") begin("turn");
+        });
+      });
+    } catch (error62) {
+      fatal = error62;
+      lifetime.abort();
+    }
+  };
+  begin("direct");
+  try {
+    try {
+      chosen = (await race.result).value;
+      signal?.throwIfAborted();
+      if (!chosen.getStats().connected) throw new Error("Selected RTC closed");
+      succeeded = true;
+      return chosen;
+    } catch (error62) {
+      if (fatal) throw fatal;
+      signal?.throwIfAborted();
+      finished = true;
+      for (const candidate of candidates.values()) void candidate.close();
+      chosen = create("relay", { signal });
+      await chosen.connect();
+      signal?.throwIfAborted();
+      succeeded = true;
+      return chosen;
+    }
+  } finally {
+    finished = true;
+    signal?.removeEventListener("abort", cancel);
+    for (const unsubscribe of unsubscribes) unsubscribe();
+    for (const candidate of candidates.values()) if (candidate !== chosen || !succeeded) void candidate.close();
+    if (!succeeded) void chosen?.close();
+  }
+}
 
 // node_modules/@noble/ciphers/esm/cryptoNode.js
 import * as nc from "node:crypto";
@@ -78636,8 +78996,7 @@ var ClientConnection = class {
           targetDeviceId: shortId(target3.deviceId)
         });
       }
-      let webRtcFallback = false;
-      const createTransport = (attempt) => new AdaptiveTransport(
+      const createTransport = (attempt, hooks = {}) => new AdaptiveTransport(
         websocketUrl(this.context.server.baseUrl),
         {
           role: "client",
@@ -78647,11 +79006,10 @@ var ClientConnection = class {
           targetDeviceId,
           forceRelay: this.context.config.forceRelay || attempt === "relay",
           preferredTransports: preferredTransportsForAttempt(attempt),
-          negotiateTimeoutMs: attempt === "direct" ? DIRECT_WEBRTC_NEGOTIATE_TIMEOUT_MS : void 0,
           ...rtcFactory === void 0 || attempt === "relay" ? {} : { rtcFactory },
           fetchIceServers: async (connectionId) => iceServersForAttempt(attempt, await this.context.server.turnCredentials(connectionId)),
+          ...hooks,
           onWebRtcFallback: (error62, diagnostics) => {
-            webRtcFallback = true;
             this.context.logger.warn(attempt === "direct" ? "remote Harness direct WebRTC failed; trying TURN" : "remote Harness TURN WebRTC failed; using relay", {
               targetDeviceId: shortId(target3.deviceId),
               attempt,
@@ -78667,39 +79025,27 @@ var ClientConnection = class {
           }
         }
       );
-      const attempts = this.context.config.forceRelay || rtcFactory === void 0 ? ["relay"] : ["direct", "turn", "relay"];
+      const stopProgressTimer = options.background ? () => void 0 : this.beginAttemptProgress(progressRunId, "direct");
       let transport;
-      for (const attempt of attempts) {
-        webRtcFallback = false;
-        const stopProgressTimer = options.background ? () => void 0 : this.beginAttemptProgress(progressRunId, attempt);
-        try {
-          transport = createTransport(attempt);
-          client = new RemoteClientCore(new ClientSecureTransport(transport, identity3, target3), 6e4);
-          closed = false;
-          closeError = void 0;
-          client.onClose((error62) => {
-            closed = true;
-            closeError = error62;
-          });
-          const attemptClient = client;
-          signal?.throwIfAborted();
-          await attemptClient.connect();
-          signal?.throwIfAborted();
-        } finally {
-          stopProgressTimer();
+      try {
+        signal?.throwIfAborted();
+        if (this.context.config.forceRelay || rtcFactory === void 0) {
+          transport = createTransport("relay", { signal });
+          await transport.connect();
+        } else {
+          transport = await connectPreferredTransport(createTransport, signal);
         }
-        if (attempt === "relay" || !webRtcFallback) break;
-        await client.close();
-        client = void 0;
-        transport = void 0;
-        if (attempt === "turn") {
-          this.context.logger.info("remote Harness relay fallback re-established", {
-            targetDeviceId: shortId(target3.deviceId)
-          });
-        }
-      }
-      if (client === void 0 || transport === void 0) {
-        throw new ClientModeError("CONNECTION_FAILED", "Unable to establish a remote transport.", true);
+        client = new RemoteClientCore(new ClientSecureTransport(transport, identity3, target3), 6e4);
+        closed = false;
+        closeError = void 0;
+        client.onClose((error62) => {
+          closed = true;
+          closeError = error62;
+        });
+        await client.connect();
+        signal?.throwIfAborted();
+      } finally {
+        stopProgressTimer();
       }
       const connectedClient = client;
       const connectedTransport = transport;
@@ -79474,6 +79820,9 @@ var BOT_REMOTE_OPERATIONS = [
   "capability-approve",
   "capability-delete",
   "capability-save",
+  "changes-check",
+  "changes-diff",
+  "changes-summary",
   "chat",
   "computer-allow-foreground",
   "computer-app-answer",
@@ -79518,6 +79867,7 @@ var BOT_REMOTE_OPERATIONS = [
   "efforts",
   "exchange",
   "exchange-text",
+  "file-download",
   "file-text",
   "folder-list",
   "folder-pick",
@@ -79525,6 +79875,7 @@ var BOT_REMOTE_OPERATIONS = [
   "goal-control",
   "goal-draft",
   "group-rows",
+  "group-search",
   "hello",
   "im-add",
   "im-chat",
@@ -79548,6 +79899,7 @@ var BOT_REMOTE_OPERATIONS = [
   "mail-rule-set",
   "mail-send-answer",
   "mail-sign-in-code",
+  "markdown-image",
   "memory-add",
   "memory-ask",
   "memory-edit",
@@ -79569,6 +79921,7 @@ var BOT_REMOTE_OPERATIONS = [
   "provider-add",
   "provider-key",
   "provider-models",
+  "provider-models-save",
   "provider-remove",
   "providers",
   "remove-agent",
@@ -79576,14 +79929,19 @@ var BOT_REMOTE_OPERATIONS = [
   "resume",
   "room-chat",
   "room-progress",
+  "room-todo",
   "run-stats",
   "schedule-create",
   "schedule-delete",
   "schedules",
   "secret-allow",
   "secret-cancel",
+  "secret-decrypt",
   "secret-delete",
+  "secret-encrypt",
   "secret-set",
+  "secret-store",
+  "secret-unlock",
   "secret-update",
   "section-delete",
   "section-order",
@@ -79601,6 +79959,8 @@ var BOT_REMOTE_OPERATIONS = [
   "stop-chat",
   "stop-member-work",
   "stop-room-work",
+  "task-cancel",
+  "task-note",
   "team-workspace",
   "thinking",
   "update-bot",
@@ -85730,7 +86090,7 @@ function parseIpv6(value) {
 }
 
 // packages/plugin/src/version.ts
-var PLUGIN_VERSION = "0.6.5";
+var PLUGIN_VERSION = "0.6.6";
 
 // packages/plugin/src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
@@ -86960,7 +87320,7 @@ var ExternalNativePeerConnection = class {
     this.child.on("exit", () => this.handleExit());
     this.child.on("error", (error62) => this.handleExit(error62));
     this.child.stdin.on("error", (error62) => this.handleExit(error62));
-    this.ready = this.request("init", { iceServers: configuration.iceServers ?? [] }).then(() => void 0);
+    this.ready = this.request("init", { iceServers: configuration.iceServers ?? [], iceTransportPolicy: configuration.iceTransportPolicy }).then(() => void 0);
   }
   connectionState = "new";
   iceConnectionState = "new";
@@ -87268,7 +87628,7 @@ async function handle(command) {
   const { id, method, payload = {} } = command
   try {
     if (method === 'init') {
-      pc = new RTCPeerConnection({ iceServers: payload.iceServers ?? [] })
+      pc = new RTCPeerConnection({ iceServers: payload.iceServers ?? [], iceTransportPolicy: payload.iceTransportPolicy })
       pc.onconnectionstatechange = emitState
       pc.oniceconnectionstatechange = emitState
       pc.onicegatheringstatechange = emitState
@@ -87395,7 +87755,7 @@ function isElectronRuntime() {
 function buildNativeRtcFactory(RTCPeerConnection3) {
   return {
     create(configuration) {
-      const raw = new RTCPeerConnection3({ iceServers: configuration.iceServers });
+      const raw = new RTCPeerConnection3({ iceServers: configuration.iceServers, iceTransportPolicy: configuration.iceTransportPolicy });
       return {
         get connectionState() {
           return raw.connectionState;
@@ -87479,6 +87839,7 @@ function buildWeriftFactory(werift, options = {}) {
       const allowedHostIpv4 = new Set(hostIpv4Candidates);
       const raw = new werift.RTCPeerConnection({
         iceServers: orderIceServersForWerift(configuration.iceServers ?? []),
+        iceTransportPolicy: configuration.iceTransportPolicy,
         iceUseIpv4: true,
         iceUseIpv6: false,
         iceUseLinkLocalAddress: false,
@@ -87868,7 +88229,7 @@ function parseIceCandidate(candidate) {
 }
 function physicalInterfaceScore(name2) {
   const value = name2.toLowerCase();
-  if (/^(utun|tun|tap|ppp|bridge|awdl|llw|gif|stf|anpi|ap\d|vmnet|veth|docker|br-|vboxnet|lo)/.test(value)) {
+  if (/^(utun|tun|tap|ppp|bridge|awdl|llw|gif|stf|anpi|ap\d|vmnet|veth|docker|br-|vboxnet|lo|flclash|mihomo|clash|meta|sing-?box|tailscale|zerotier|zt[0-9a-f]|wg\d|wintun|proton|surge)/.test(value)) {
     return void 0;
   }
   if (/^(eth|eno|ens|enp)/.test(value)) return 500;
@@ -87883,6 +88244,7 @@ function isUsableIpv4(ip) {
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
   if (parts[0] === 0 || parts[0] === 127 || parts[0] >= 224) return false;
   if (parts[0] === 169 && parts[1] === 254) return false;
+  if (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19)) return false;
   return !isCgnat(ip);
 }
 function isCgnat(ip) {
@@ -88527,7 +88889,7 @@ var ClientModeRuntime = class {
         name: remote.target.name
       },
       backend,
-      remote.features.acpModelLoadsSession ? ["agent.acp.antigravity.model-load.v1"] : [],
+      remoteAcpCapabilities(remote.features),
       this.remoteTypertGateway(remote),
       this.acpHistoryCache(remote.target.deviceId, backend)
     );
@@ -88581,7 +88943,7 @@ var ClientModeRuntime = class {
         name: remote.target.name
       },
       backend,
-      remote.features.acpModelLoadsSession ? ["agent.acp.antigravity.model-load.v1"] : [],
+      remoteAcpCapabilities(remote.features),
       this.remoteTypertGateway(remote),
       this.acpHistoryCache(remote.target.deviceId, backend)
     );
@@ -88923,6 +89285,12 @@ var ClientModeRuntime = class {
     }, error62);
   }
 };
+function remoteAcpCapabilities(features) {
+  return [
+    ...features.acpModelLoadsSession ? ["agent.acp.antigravity.model-load.v1"] : [],
+    ...features.acpOpencodeArchive ? ["agent.acp.opencode.archive.v1"] : []
+  ];
+}
 
 // packages/plugin/src/control-runtime.ts
 import { hostname as hostname4 } from "node:os";
@@ -90043,7 +90411,7 @@ var CodexAppServerError = class extends Error {
   }
 };
 var CodexAppServerClient = class {
-  constructor(binary, logger2, spawnAppServer = (binary2) => spawn2(binary2, ["app-server"], {
+  constructor(binary, logger2, spawnAppServer = (binary2) => spawn2(binary2, ["app-server", "-c", "thread_unload_delay_secs=0"], {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true
   })) {
@@ -90169,7 +90537,7 @@ var CodexAppServerClient = class {
         reject(new CodexAppServerError("CODEX_REQUEST_TIMEOUT", "Codex App Server request timed out."));
       }, timeoutMs);
       timer2.unref?.();
-      this.pending.set(id6, { resolve: resolve10, reject, timer: timer2 });
+      this.pending.set(id6, { method, resolve: resolve10, reject, timer: timer2 });
     });
     try {
       this.write({ id: id6, method, params });
@@ -90220,7 +90588,7 @@ var CodexAppServerClient = class {
       const pending = this.takePending(value.id);
       if (pending === void 0) return;
       if ("error" in value && value.error !== void 0) {
-        pending.reject(safeUpstreamError(value.error));
+        pending.reject(safeUpstreamError(value.error, pending.method));
       } else {
         pending.resolve(value.result);
       }
@@ -90258,11 +90626,14 @@ var CodexAppServerClient = class {
 };
 var CODEX_THREAD_UNMATERIALIZED = "CODEX_THREAD_UNMATERIALIZED";
 var CODEX_UNMATERIALIZED_THREAD_MESSAGE = "Codex thread has no turns yet.";
-function safeUpstreamError(value) {
+function safeUpstreamError(value, method) {
   if (!isRecord12(value) || typeof value.message !== "string") {
     return new CodexAppServerError("CODEX_UPSTREAM_ERROR", "Codex App Server rejected the request.");
   }
   const message = value.message.toLowerCase();
+  if (method === "thread/goal/get" && (value.code === -32601 || message === "goals feature is disabled" || message.startsWith("unknown variant `thread/goal/get`") || message.startsWith("ephemeral thread does not support goals:"))) {
+    return new CodexAppServerError("CODEX_GOALS_UNAVAILABLE", "Codex Goals are not available for this thread.");
+  }
   if (message.includes("active writer")) {
     return new CodexAppServerError("CODEX_UPSTREAM_ERROR", "Codex thread already has an active writer.");
   }
@@ -90468,6 +90839,14 @@ function compactBotRound(text) {
 var LIMIT = 512;
 var MARKER = "\n[Compact history: output omitted]";
 var ROUND_BUDGET = 128 * 1024;
+var TOOL_EVENT_TYPES = /* @__PURE__ */ new Set([
+  "tool/call",
+  "tool/result",
+  "tool/ptc-dispatch",
+  "tool/ptc-dispatch-start",
+  "tool/code-dispatch",
+  "tool/code-dispatch-start"
+]);
 var object3 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 function preservedRound(text, budget) {
   if (budget.remaining < LIMIT) return void 0;
@@ -90486,7 +90865,7 @@ function toolValue(value, budget) {
   if (!object3(value)) return value;
   const result = { ...value };
   for (const [key, child] of Object.entries(value)) {
-    if (["input", "arguments", "output", "result", "rawInput", "rawOutput", "uiResultMeta", "meta", "argumentsDelta"].includes(key)) {
+    if (["input", "arguments", "output", "result", "rawInput", "rawOutput", "uiResultMeta", "meta", "argumentsDelta", "code"].includes(key)) {
       result[key] = typeof child === "string" ? summary2(child, budget) : { summary: summary2(child, budget) };
     } else if (key === "content" && Array.isArray(child)) {
       let previews = 0;
@@ -90505,24 +90884,81 @@ function toolValue(value, budget) {
   }
   return result;
 }
-function messageValue(value, budget) {
-  if (Array.isArray(value)) return value.map((item) => messageValue(item, budget));
+function compactMessageSource(value, isInjectedUser) {
+  if (!object3(value)) return value;
+  let next = value;
+  if ("replayState" in next) {
+    const { replayState: _replayState, ...rest } = next;
+    next = rest;
+  }
+  if (isInjectedUser) {
+    const { entries: _entries, sections: _sections, changes: _changes, baselineIdentity: _baselineIdentity, ...rest } = next;
+    next = rest;
+  }
+  return next;
+}
+function streamUsage(stream) {
+  if (!Array.isArray(stream)) return void 0;
+  for (let index = stream.length - 1; index >= 0; index--) {
+    const row = stream[index];
+    if (object3(row) && row.type === "chunk" && object3(row.chunk) && row.chunk.type === "usage") {
+      return object3(row.chunk.usage) ? row.chunk.usage : void 0;
+    }
+  }
+  return void 0;
+}
+function messageValue(value, budget, isInjectedUser = false) {
+  if (Array.isArray(value)) return value.map((item) => messageValue(item, budget, isInjectedUser));
   if (!object3(value)) return value;
   if (value.type === "tool-call" || value.type === "tool-result") return toolValue(value, budget);
-  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, messageValue(child, budget)]));
+  if (isInjectedUser && value.type === "text" && typeof value.text === "string" && value.text.length > LIMIT) {
+    return { ...value, text: summary2(value.text, budget) };
+  }
+  const out = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "stream") continue;
+    if (key === "source") out[key] = compactMessageSource(child, isInjectedUser);
+    else out[key] = messageValue(child, budget, isInjectedUser);
+  }
+  if (value.usage === void 0 || value.usage === null) {
+    const usage = streamUsage(value.stream);
+    if (usage !== void 0) out.usage = messageValue(usage, budget, isInjectedUser);
+  }
+  return out;
+}
+function isInjectedUserEvent(event) {
+  const data2 = object3(event.data) ? event.data : void 0;
+  const msg = data2 && object3(data2.message) ? data2.message : data2;
+  const src = msg && object3(msg.source) ? msg.source : void 0;
+  return Boolean(src && typeof src.kind === "string" && src.kind !== "user");
+}
+function requestHeaderEvent(event) {
+  if (!object3(event.data) || !object3(event.data.header)) return event;
+  const { tools: _tools, system: _system, ...restHeader } = event.data.header;
+  return { ...event, data: { ...event.data, header: restHeader } };
 }
 function project(value, budget) {
   if (Array.isArray(value)) return value.map((item) => project(item, budget));
   if (!object3(value)) return value;
-  if (object3(value.event) && ["tool/call", "tool/result"].includes(String(value.event.type))) {
-    const { view, ...rest } = value;
-    const event = toolValue(value.event, budget);
-    const data2 = object3(event.data) ? event.data : {};
-    const title = object3(view) && object3(view.view) ? view.view.title : void 0;
-    return { ...rest, event: { ...event, data: { ...data2, ...typeof title === "string" && !data2.name && !data2.toolName ? { toolName: title } : {} } } };
+  if (object3(value.event)) {
+    const eventType = String(value.event.type);
+    if (TOOL_EVENT_TYPES.has(eventType)) {
+      const { view, ...rest } = value;
+      const event = toolValue(value.event, budget);
+      const data2 = object3(event.data) ? event.data : {};
+      const title = object3(view) && object3(view.view) ? view.view.title : void 0;
+      return { ...rest, event: { ...event, data: { ...data2, ...typeof title === "string" && !data2.name && !data2.toolName ? { toolName: title } : {} } } };
+    }
+    if (eventType === "request/header") return { ...value, event: requestHeaderEvent(value.event) };
+    if (eventType === "assistant/message") return { ...value, event: messageValue(value.event, budget, false) };
+    if (eventType === "user/message") return { ...value, event: messageValue(value.event, budget, isInjectedUserEvent(value.event)) };
   }
-  if (typeof value.type === "string" && ["tool/call", "tool/result"].includes(value.type)) return toolValue(value, budget);
-  if (typeof value.type === "string" && ["user/message", "assistant/message"].includes(value.type)) return messageValue(value, budget);
+  if (typeof value.type === "string") {
+    if (TOOL_EVENT_TYPES.has(value.type)) return toolValue(value, budget);
+    if (value.type === "request/header") return requestHeaderEvent(value);
+    if (value.type === "assistant/message") return messageValue(value, budget, false);
+    if (value.type === "user/message") return messageValue(value, budget, isInjectedUserEvent(value));
+  }
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, project(child, budget)]));
 }
 function compactHistory(value) {
@@ -90655,17 +91091,21 @@ var CodexPeerBridge = class {
     if (this.streams.size >= MAX_ACTIVE_STREAMS) {
       throw new RpcError("RATE_LIMITED", "Too many Codex streams are active for this connection.", void 0, true);
     }
-    await this.domain.call(this.context.connectionId, {
-      method: "thread/read",
-      params: { threadId: params.threadId, includeTurns: false }
+    await this.domain.useThread(params.threadId, async () => {
+      await this.domain.call(this.context.connectionId, {
+        method: "thread/read",
+        params: { threadId: params.threadId, includeTurns: false }
+      });
+      this.requireOpen();
+      this.streams.set(params.streamId, params.threadId);
     });
-    this.requireOpen();
-    this.streams.set(params.streamId, params.threadId);
     return { opened: true, streamId: params.streamId, threadId: params.threadId };
   }
-  closeStream(input4) {
+  async closeStream(input4) {
     const params = streamCloseSchema.parse(input4);
+    const threadId = this.streams.get(params.streamId);
     this.streams.delete(params.streamId);
+    if (threadId !== void 0) await this.domain.releaseThread(threadId);
     return { closed: true, streamId: params.streamId };
   }
   openTransfer(input4) {
@@ -90798,6 +91238,7 @@ var CodexPeerBridge = class {
       const data2 = { streamId, frame };
       if (new TextEncoder().encode(JSON.stringify(data2)).byteLength > MAX_SECURE_MESSAGE_BYTES) {
         this.streams.delete(streamId);
+        void this.domain.releaseThread(threadId);
         await this.publish("codex.app.stream.closed", { streamId, reason: "failed" });
         this.logger?.warn("Codex stream closed after oversized frame", { streamId });
         continue;
@@ -90872,6 +91313,110 @@ function concatChunks(chunks, totalBytes) {
   return output2;
 }
 
+// packages/plugin/src/codex/thread-lifecycle.ts
+var CodexThreadLifecycle = class {
+  constructor(retained, unsubscribe, released, failed, closeTimeoutMs = 5e3) {
+    this.retained = retained;
+    this.unsubscribe = unsubscribe;
+    this.released = released;
+    this.failed = failed;
+    this.closeTimeoutMs = closeTimeoutMs;
+  }
+  threads = /* @__PURE__ */ new Map();
+  async use(threadId, action) {
+    const state2 = this.state(threadId);
+    state2.uses += 1;
+    try {
+      await state2.release;
+      if (this.threads.get(threadId) !== state2) throw new RpcError("CODEX_UNAVAILABLE", "The Codex App Server changed while handling the request.");
+      return await action();
+    } finally {
+      state2.uses -= 1;
+      await this.settle(threadId, state2);
+    }
+  }
+  active(threadId, active2) {
+    const state2 = this.state(threadId);
+    state2.active = active2;
+    state2.activityVersion += 1;
+    if (!active2) void this.settle(threadId, state2);
+  }
+  starting(threadId) {
+    const state2 = this.state(threadId);
+    const version2 = state2.activityVersion;
+    return (accepted) => {
+      if (accepted && this.threads.get(threadId) === state2 && state2.activityVersion === version2) {
+        state2.active = true;
+      }
+    };
+  }
+  async retry(threadId) {
+    const state2 = this.threads.get(threadId);
+    if (state2 !== void 0) await this.settle(threadId, state2);
+  }
+  async release(threadId) {
+    const state2 = this.state(threadId);
+    state2.pending = true;
+    await this.settle(threadId, state2);
+  }
+  closed(threadId) {
+    const state2 = this.threads.get(threadId);
+    state2?.closed?.();
+    if (state2 !== void 0) {
+      state2.active = false;
+      state2.activityVersion += 1;
+      state2.pending = false;
+      state2.release = void 0;
+      state2.closed = void 0;
+      if (state2.uses === 0) this.threads.delete(threadId);
+    }
+    this.released(threadId);
+  }
+  reset() {
+    const states = [...this.threads.values()];
+    this.threads.clear();
+    for (const state2 of states) state2.closed?.();
+  }
+  state(threadId) {
+    let state2 = this.threads.get(threadId);
+    if (state2 === void 0) {
+      state2 = { uses: 0, active: false, activityVersion: 0, pending: false };
+      this.threads.set(threadId, state2);
+    }
+    return state2;
+  }
+  async settle(threadId, state2) {
+    if (this.threads.get(threadId) !== state2 || state2.release !== void 0) return;
+    if (state2.uses > 0 || state2.active || this.retained(threadId)) return;
+    if (!state2.pending) {
+      this.threads.delete(threadId);
+      return;
+    }
+    const release = this.unload(threadId, state2);
+    state2.release = release;
+    await release.catch((error62) => this.failed(error62));
+  }
+  async unload(threadId, state2) {
+    let timer2;
+    const closed = new Promise((resolve10, reject) => {
+      state2.closed = resolve10;
+      timer2 = setTimeout(() => reject(new RpcError("CODEX_THREAD_CLOSING", "The CodeX thread is still closing. Please retry shortly.")), this.closeTimeoutMs);
+      timer2.unref?.();
+    });
+    void closed.catch(() => void 0);
+    try {
+      const result = await this.unsubscribe(threadId);
+      if (typeof result === "object" && result !== null && "status" in result && result.status === "notLoaded") {
+        this.closed(threadId);
+      } else {
+        await closed;
+      }
+    } finally {
+      clearTimeout(timer2);
+    }
+  }
+};
+
 // packages/plugin/src/codex/domain.ts
 var APPROVAL_TTL_MS = 5 * 6e4;
 var DEFAULT_RESTART_DELAYS_MS = [1e3, 2e3, 4e3, 8e3, 15e3];
@@ -90894,6 +91439,17 @@ var CodexRemoteDomain = class {
   unsubscribeInbound;
   unsubscribeUnavailable;
   peers = /* @__PURE__ */ new Map();
+  peerThreads = /* @__PURE__ */ new Map();
+  threadGoals = /* @__PURE__ */ new Map();
+  threadLifecycle = new CodexThreadLifecycle(
+    (threadId) => this.hasSubscriber(threadId) || this.threadGoals.get(threadId)?.active === true || [...this.approvals.values()].some((approval) => approval.threadId === threadId),
+    (threadId) => this.callUpstream("thread/unsubscribe", { threadId }),
+    (threadId) => {
+      this.threadGoals.delete(threadId);
+      for (const threads of this.peerThreads.values()) threads.delete(threadId);
+    },
+    (error62) => this.logger.warn("Codex thread release could not be confirmed", { code: errorCode2(error62) })
+  );
   peerDeviceIds = /* @__PURE__ */ new Map();
   turnOwners = /* @__PURE__ */ new Map();
   turnWatchdogs = /* @__PURE__ */ new Map();
@@ -90979,9 +91535,55 @@ var CodexRemoteDomain = class {
     const envelope = parseCallEnvelope(input4);
     const call = parseCodexCall(envelope.method, envelope.params);
     const assertCurrent = this.captureCallScope(connectionId);
-    const result = await this.callInternal(connectionId, call, assertCurrent);
-    assertCurrent();
-    return result;
+    const action = async () => {
+      const result = await this.callInternal(connectionId, call, assertCurrent);
+      assertCurrent();
+      return result;
+    };
+    const threadId = threadIdFromParams(call.params);
+    return threadId === void 0 ? action() : this.threadLifecycle.use(threadId, action);
+  }
+  useThread(threadId, action) {
+    return this.threadLifecycle.use(threadId, action);
+  }
+  releaseThread(threadId) {
+    if (!this.isAvailable() || this.closed) return Promise.resolve();
+    const tracked = this.threadGoals.has(threadId);
+    return this.threadLifecycle.use(threadId, async () => {
+      if (tracked && !this.threadGoals.has(threadId)) return;
+      if (await this.refreshThreadGoal(threadId)) await this.threadLifecycle.release(threadId);
+    });
+  }
+  async refreshThreadGoal(threadId) {
+    const appServer = this.requireAppServer();
+    const previous = this.threadGoals.get(threadId) ?? { active: true };
+    this.threadGoals.set(threadId, previous);
+    let active2 = true;
+    try {
+      const result = await this.callUpstream("thread/goal/get", { threadId }, 5e3);
+      if (!isRecord14(result) || !("goal" in result)) {
+        throw new RpcError("CODEX_INVALID_RESPONSE", "Codex App Server returned an invalid Goal.");
+      }
+      active2 = result.goal === null ? false : goalRetainsThread(result.goal, threadId);
+    } catch (error62) {
+      if (errorCode2(error62) === "CODEX_GOALS_UNAVAILABLE") active2 = false;
+      else this.logger.warn("Codex Goal state could not be confirmed", { code: errorCode2(error62) });
+    }
+    if (this.closed || this.appServer !== appServer || !this.isAvailable() || !this.threadGoals.has(threadId)) return false;
+    if (this.threadGoals.get(threadId) === previous) this.threadGoals.set(threadId, { active: active2 });
+    return true;
+  }
+  rememberThread(connectionId, threadId, releaseDetached = false) {
+    if (!this.peers.has(connectionId)) {
+      if (releaseDetached) void this.releaseThread(threadId);
+      return;
+    }
+    let threads = this.peerThreads.get(connectionId);
+    if (threads === void 0) {
+      threads = /* @__PURE__ */ new Set();
+      this.peerThreads.set(connectionId, threads);
+    }
+    threads.add(threadId);
   }
   captureCallScope(connectionId) {
     const appServer = this.requireAppServer();
@@ -90997,6 +91599,7 @@ var CodexRemoteDomain = class {
   }
   async callInternal(connectionId, call, assertCurrent) {
     assertCurrent();
+    const attached = this.peers.has(connectionId);
     if (call.method === "account/read") {
       return sanitizeAccount(await this.callUpstream(call.method, call.params));
     }
@@ -91030,6 +91633,8 @@ var CodexRemoteDomain = class {
         ...codexThreadPermissionParams(permission),
         serviceName: "deepseek_harness_remote"
       });
+      const createdId = extractThread(result)?.id;
+      if (typeof createdId === "string") this.rememberThread(connectionId, createdId, attached);
       assertCurrent();
       if (extractThread(result)?.id === void 0) {
         throw new RpcError("CODEX_INVALID_RESPONSE", "Codex App Server returned an invalid thread.");
@@ -91070,6 +91675,7 @@ var CodexRemoteDomain = class {
     }
     const allowedThread = threadId === void 0 ? void 0 : await this.readKnownThread(threadId);
     assertCurrent();
+    if (threadId !== void 0) this.rememberThread(connectionId, threadId);
     if (call.method === "thread/resume" && call.params.permissionPreset !== void 0) {
       const owner = this.turnOwners.get(threadId);
       if (owner !== void 0 && owner.connectionId !== connectionId) {
@@ -91083,8 +91689,8 @@ var CodexRemoteDomain = class {
     if (call.method === "thread/unsubscribe") {
       const bridge = this.peers.get(connectionId);
       bridge?.removeThreadSubscriptions(threadId);
-      if (this.hasSubscriber(threadId)) return { status: "unsubscribed" };
-      return this.callUpstream(call.method, call.params);
+      await this.releaseThread(threadId);
+      return { status: "unsubscribed" };
     }
     let claimed = false;
     let previousOwner;
@@ -91100,6 +91706,7 @@ var CodexRemoteDomain = class {
       previousOwner = claim2.previous;
       claimedOwner = this.turnOwners.get(threadId);
     }
+    const finishStart = call.method === "turn/start" && threadId !== void 0 ? this.threadLifecycle.starting(threadId) : void 0;
     try {
       const permission = codexPermission(call.params);
       const upstreamParams = call.method === "thread/resume" && allowedThread !== void 0 ? {
@@ -91126,6 +91733,11 @@ var CodexRemoteDomain = class {
         }
         throw error62;
       }
+      finishStart?.(true);
+      if (call.method === "thread/fork") {
+        const createdId = extractThread(result)?.id;
+        if (typeof createdId === "string") this.rememberThread(connectionId, createdId, attached);
+      }
       assertCurrent();
       if (call.method === "thread/resume" || call.method === "thread/fork" || call.method === "thread/unarchive") {
         await this.assertResultThreadAllowed(result);
@@ -91147,6 +91759,7 @@ var CodexRemoteDomain = class {
       }
       return result;
     } catch (error62) {
+      finishStart?.(errorCode2(error62) === "CODEX_REQUEST_TIMEOUT");
       if (claimed && threadId !== void 0 && this.turnOwners.get(threadId) === claimedOwner) {
         if (previousOwner === void 0) this.turnOwners.delete(threadId);
         else this.turnOwners.set(threadId, previousOwner);
@@ -91165,9 +91778,12 @@ var CodexRemoteDomain = class {
     this.approvals.delete(params.requestHandle);
     this.scheduleApprovalExpiry();
     await this.requireAppServer().respond(approval.upstreamId, { decision: params.decision });
+    await this.threadLifecycle.retry(approval.threadId);
     return { resolved: true };
   }
   async detachPeer(connectionId) {
+    const threadIds = this.peerThreads.get(connectionId) ?? /* @__PURE__ */ new Set();
+    this.peerThreads.delete(connectionId);
     const bridge = this.peers.get(connectionId);
     if (bridge !== void 0) this.peers.delete(connectionId);
     this.peerDeviceIds.delete(connectionId);
@@ -91183,12 +91799,16 @@ var CodexRemoteDomain = class {
       await appServer?.respond(approval.upstreamId, { decision: "decline" }).catch(() => void 0);
     }
     this.scheduleApprovalExpiry();
+    await Promise.all([...threadIds].map((threadId) => this.releaseThread(threadId)));
   }
   async reconfigure(config2) {
     if (this.closed) throw new RpcError("CODEX_CLOSED", "The Codex Remote domain is closed.");
     if (JSON.stringify(this.config) === JSON.stringify(config2)) return;
     this.config = config2;
     this.available = false;
+    this.threadLifecycle.reset();
+    this.peerThreads.clear();
+    this.threadGoals.clear();
     if (this.restartTimer !== void 0) clearTimeout(this.restartTimer);
     this.restartTimer = void 0;
     await this.startPromise?.catch(() => void 0);
@@ -91211,6 +91831,9 @@ var CodexRemoteDomain = class {
     if (this.closed) return;
     this.closed = true;
     this.available = false;
+    this.threadLifecycle.reset();
+    this.peerThreads.clear();
+    this.threadGoals.clear();
     this.state = this.config.enabled ? "unavailable" : "disabled";
     if (this.restartTimer !== void 0) clearTimeout(this.restartTimer);
     this.restartTimer = void 0;
@@ -91280,6 +91903,9 @@ var CodexRemoteDomain = class {
   async handleAppServerUnavailable(appServer, code) {
     if (this.closed || this.appServer !== appServer) return;
     this.available = false;
+    this.threadLifecycle.reset();
+    this.peerThreads.clear();
+    this.threadGoals.clear();
     this.state = "restarting";
     this.unavailableCode = code;
     this.clearAllTurnWatchdogs();
@@ -91340,13 +91966,24 @@ var CodexRemoteDomain = class {
       return;
     }
     const threadId = extractThreadId(message.params);
+    if (threadId !== void 0 && (message.method === "thread/goal/updated" || message.method === "thread/goal/cleared")) {
+      const active2 = message.method !== "thread/goal/cleared" && (!isRecord14(message.params) || goalRetainsThread(message.params.goal, threadId));
+      this.threadGoals.set(threadId, { active: active2 });
+      await this.threadLifecycle.retry(threadId);
+    }
     if (message.method === "thread/settings/updated" && threadId !== void 0) {
       this.rememberPermission(threadId, message.params);
     }
-    if (message.method === "thread/closed" && threadId !== void 0) this.permissionPresets.delete(threadId);
+    if (message.method === "thread/closed" && threadId !== void 0) {
+      this.permissionPresets.delete(threadId);
+      this.turnOwners.delete(threadId);
+      this.clearTurnWatchdog(threadId);
+      this.threadLifecycle.closed(threadId);
+    }
     if (message.method === "turn/completed" && threadId !== void 0) {
       this.turnOwners.delete(threadId);
       this.clearTurnWatchdog(threadId);
+      this.threadLifecycle.active(threadId, false);
     }
     if (message.method === "thread/status/changed" && threadId !== void 0 && isTerminalThreadStatus(message.params)) {
       this.turnOwners.delete(threadId);
@@ -91357,14 +91994,19 @@ var CodexRemoteDomain = class {
         void this.appServer?.respond(approval.upstreamId, { decision: "decline" }).catch(() => void 0);
       }
       this.scheduleApprovalExpiry();
+      this.threadLifecycle.active(threadId, false);
     }
     if (message.method === "turn/started" && threadId !== void 0) {
+      this.threadLifecycle.active(threadId, true);
       const owner = this.turnOwners.get(threadId);
       const turnId = extractTurnId(message.params);
       if (owner !== void 0) {
         this.turnOwners.set(threadId, { ...owner, ...turnId === void 0 ? {} : { turnId } });
       }
       this.armTurnWatchdog(threadId);
+    }
+    if (message.method === "thread/status/changed" && threadId !== void 0 && isRecord14(message.params) && isRecord14(message.params.status) && message.params.status.type === "active") {
+      this.threadLifecycle.active(threadId, true);
     }
     if (message.method === "serverRequest/resolved") this.resolveUpstreamApproval(message.params);
     if (threadId === void 0) return;
@@ -91651,7 +92293,10 @@ var CodexRemoteDomain = class {
   resolveUpstreamApproval(params) {
     if (!isRecord14(params) || typeof params.requestId !== "string" && typeof params.requestId !== "number") return;
     for (const [handle, approval] of this.approvals) {
-      if (approval.upstreamId === params.requestId) this.approvals.delete(handle);
+      if (approval.upstreamId === params.requestId) {
+        this.approvals.delete(handle);
+        void this.threadLifecycle.retry(approval.threadId);
+      }
     }
   }
   async expireApprovals() {
@@ -91661,6 +92306,7 @@ var CodexRemoteDomain = class {
       if (approval.expiresAt > now) continue;
       this.approvals.delete(handle);
       await appServer?.respond(approval.upstreamId, { decision: "decline" }).catch(() => void 0);
+      await this.threadLifecycle.retry(approval.threadId);
     }
     this.scheduleApprovalExpiry();
   }
@@ -91736,10 +92382,10 @@ var CodexRemoteDomain = class {
     }
     return this.appServer;
   }
-  async callUpstream(method, params) {
+  async callUpstream(method, params, timeoutMs) {
     const appServer = this.requireAppServer();
     try {
-      const result = await appServer.call(method, params);
+      const result = await appServer.call(method, params, timeoutMs);
       if (this.closed || this.appServer !== appServer || !this.isAvailable()) {
         throw new RpcError("CODEX_UNAVAILABLE", "The Codex App Server changed while handling the request.");
       }
@@ -92142,6 +92788,10 @@ function extractThreadId(params) {
   if (isRecord14(params.thread) && typeof params.thread.id === "string") return params.thread.id;
   if (isRecord14(params.turn) && typeof params.turn.threadId === "string") return params.turn.threadId;
   return void 0;
+}
+function goalRetainsThread(goal, threadId) {
+  if (!isRecord14(goal) || goal.threadId !== threadId || typeof goal.status !== "string") return true;
+  return !["complete", "paused", "blocked", "usageLimited", "budgetLimited"].includes(goal.status);
 }
 function isTerminalThreadStatus(params) {
   if (!isRecord14(params) || !isRecord14(params.status) || typeof params.status.type !== "string") return false;
@@ -94590,6 +95240,7 @@ var TranscriptWatcher = class extends EventEmitter2 {
 // packages/plugin/src/acp/adapters/antigravity-process.ts
 var ACP_PROMPT_TIMEOUT_MS2 = 10 * 6e4;
 var ACP_START_TIMEOUT_MS2 = 2e4;
+var MAX_ACP_LINE_BYTES2 = 288 * 1024 * 1024;
 var MAX_STDERR_CAPTURE_BYTES3 = 4 * 1024;
 var AntigravityAcpError = class extends Error {
   constructor(code, message, options) {
@@ -94923,6 +95574,7 @@ var AntigravityAcpClient = class _AntigravityAcpClient {
     this.process = child;
     this.stdoutBuffer = Buffer6.alloc(0);
     this.stderrBytes = 0;
+    let streamFailure;
     let initResolved = false;
     let rejectInit;
     const initPromise = new Promise((resolve10, reject) => {
@@ -94948,10 +95600,36 @@ var AntigravityAcpClient = class _AntigravityAcpClient {
         });
       };
       child.stdout.on("data", (chunk) => {
-        if (!initResolved) {
-          checkInit(Buffer6.from(chunk));
-        } else {
-          this.consumeStdout(Buffer6.from(chunk));
+        if (this.process !== child) return;
+        try {
+          const bytes = Buffer6.isBuffer(chunk) ? chunk : Buffer6.from(chunk);
+          if (!initResolved) checkInit(bytes);
+          else this.consumeStdout(bytes);
+        } catch (error62) {
+          if (!(error62 instanceof AntigravityAcpError) || error62.code !== "ANTIGRAVITY_RESPONSE_TOO_LARGE") throw error62;
+          streamFailure = error62;
+          clearTimeout(timer2);
+          rejectInit?.(error62);
+          this.ready = false;
+          this.process = void 0;
+          this.stdoutBuffer = Buffer6.alloc(0);
+          this.watcher?.stop();
+          this.watcher = void 0;
+          if (this.currentPromptPending) {
+            clearTimeout(this.currentPromptPending.timer);
+            this.currentPromptPending.reject(error62);
+            this.currentPromptPending = void 0;
+          }
+          child.stdout.removeAllListeners("data");
+          child.stdout.resume();
+          const killTimer = setTimeout(() => {
+            if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+          }, 1e3);
+          killTimer.unref?.();
+          child.once("exit", () => clearTimeout(killTimer));
+          child.kill("SIGTERM");
+          this.logger?.warn("Antigravity ACP communication failed", { code: error62.code });
+          if (!this.closed) this.notifyUnavailable(error62.code);
         }
       });
     });
@@ -94988,11 +95666,12 @@ var AntigravityAcpClient = class _AntigravityAcpClient {
     });
     try {
       await initPromise;
+      if (streamFailure) throw streamFailure;
       this.ready = true;
       this.warmNextSession();
       this.logger?.info("Antigravity ACP ready", { conversationId: this.activeConversationId });
     } catch (err5) {
-      child.kill("SIGTERM");
+      if (!child.killed) child.kill("SIGTERM");
       throw err5;
     }
   }
@@ -95047,7 +95726,10 @@ var AntigravityAcpClient = class _AntigravityAcpClient {
     watcher.start();
   }
   consumeStdout(chunk, onRawEvent) {
-    this.stdoutBuffer = Buffer6.concat([this.stdoutBuffer, chunk]);
+    if (this.stdoutBuffer.length + chunk.length > MAX_ACP_LINE_BYTES2) {
+      throw new AntigravityAcpError("ANTIGRAVITY_RESPONSE_TOO_LARGE", "Antigravity ACP emitted an oversized JSONL message.");
+    }
+    this.stdoutBuffer = this.stdoutBuffer.length === 0 ? chunk : Buffer6.concat([this.stdoutBuffer, chunk]);
     while (true) {
       const newlineIndex = this.stdoutBuffer.indexOf(10);
       if (newlineIndex === -1) break;
@@ -95299,7 +95981,7 @@ function unavailable() {
 var ACP_REQUEST_TIMEOUT_MS2 = 6e4;
 var ACP_PROMPT_TIMEOUT_MS3 = 10 * 6e4;
 var ACP_START_TIMEOUT_MS3 = 2e4;
-var MAX_ACP_LINE_BYTES2 = 288 * 1024 * 1024;
+var MAX_ACP_LINE_BYTES3 = 288 * 1024 * 1024;
 var MAX_STDERR_CAPTURE_BYTES4 = 4 * 1024;
 var OpencodeAcpError = class extends Error {
   constructor(code, message, options) {
@@ -95647,7 +96329,7 @@ var OpencodeAcpClient = class _OpencodeAcpClient {
   }
   consumeStdout(chunk) {
     this.stdoutBuffer = this.stdoutBuffer.length === 0 ? chunk : Buffer7.concat([this.stdoutBuffer, chunk]);
-    if (this.stdoutBuffer.length > MAX_ACP_LINE_BYTES2) {
+    if (this.stdoutBuffer.length > MAX_ACP_LINE_BYTES3) {
       this.handleProcessFailure(
         "OPENCODE_RESPONSE_TOO_LARGE",
         new Error("OpenCode ACP emitted an oversized JSONL message.")
@@ -99688,6 +100370,67 @@ import { randomUUID as randomUUID16 } from "node:crypto";
 import { constants as constants6 } from "node:fs";
 import { link as link2, lstat as lstat4, open as open6, realpath as realpath6, stat as stat7, unlink as unlink2 } from "node:fs/promises";
 import { extname, isAbsolute as isAbsolute8, join as join16 } from "node:path";
+
+// packages/plugin/src/workspace-upload-budget.ts
+import { statfs } from "node:fs/promises";
+var HOST_UPLOAD_ACTIVE_LIMIT = 4;
+var HOST_UPLOAD_RESERVED_BYTES = 4 * 1024 * 1024 * 1024;
+var SESSION_UPLOAD_RESERVED_BYTES = 2 * 1024 * 1024 * 1024;
+var UPLOAD_DISK_FREE_BYTES = 32 * 1024 * 1024;
+var WorkspaceUploadBudget = class {
+  constructor(limits = {
+    active: HOST_UPLOAD_ACTIVE_LIMIT,
+    reservedBytes: HOST_UPLOAD_RESERVED_BYTES,
+    sessionBytes: SESSION_UPLOAD_RESERVED_BYTES,
+    diskFreeBytes: UPLOAD_DISK_FREE_BYTES
+  }, freeBytes = async (root2) => {
+    const disk = await statfs(root2);
+    return disk.bavail * disk.bsize;
+  }) {
+    this.limits = limits;
+    this.freeBytes = freeBytes;
+  }
+  active = /* @__PURE__ */ new Set();
+  queue = Promise.resolve();
+  reserve(root2, dev, sessionId, bytes) {
+    const next = this.queue.then(async () => {
+      const free = await this.freeBytes(root2);
+      const active2 = [...this.active];
+      const reserved = active2.reduce((sum, entry2) => sum + entry2.total, 0);
+      const onDisk = active2.filter((entry2) => entry2.dev === dev).reduce((sum, entry2) => sum + entry2.remaining, 0);
+      const session2 = active2.filter((entry2) => entry2.sessionId === sessionId).reduce((sum, entry2) => sum + entry2.total, 0);
+      if (active2.length >= this.limits.active || reserved + bytes > this.limits.reservedBytes || session2 + bytes > this.limits.sessionBytes || !Number.isFinite(free) || free - onDisk - bytes < this.limits.diskFreeBytes) throw new RpcError("UPLOAD_LIMIT", "The workspace upload could not be completed.");
+      const entry = { sessionId, dev, remaining: bytes, total: bytes };
+      this.active.add(entry);
+      let done = false;
+      return {
+        checkDisk: async () => {
+          const current = await this.freeBytes(root2);
+          const other = [...this.active].filter((item) => item.dev === dev).reduce((sum, item) => sum + item.remaining, 0);
+          if (!Number.isFinite(current) || current - other < this.limits.diskFreeBytes)
+            throw new RpcError("UPLOAD_LIMIT", "The workspace upload could not be completed.");
+        },
+        consume: (amount) => {
+          entry.remaining -= amount;
+        },
+        commit: () => {
+          if (done) return;
+          done = true;
+          this.active.delete(entry);
+        },
+        release: () => {
+          if (done) return;
+          done = true;
+          this.active.delete(entry);
+        }
+      };
+    });
+    this.queue = next.catch(() => void 0);
+    return next;
+  }
+};
+
+// packages/plugin/src/workspace-upload.ts
 var WORKSPACE_UPLOAD_BYTES = 20 * 1024 * 1024;
 var WORKSPACE_UPLOAD_CHUNK = 64 * 1024;
 var WORKSPACE_UPLOAD_AUTHORITY_TTL_MS = 5e3;
@@ -99697,11 +100440,12 @@ var openParams = scope.extend({ name: external_exports.string().min(1), totalByt
 var chunkParams = scope.extend({ offset: external_exports.number().int().min(0), data: external_exports.string().min(1).max(Math.ceil(WORKSPACE_UPLOAD_CHUNK / 3) * 4) }).strict();
 var binaryChunkParams = scope.extend({ offset: external_exports.number().int().min(0), data: external_exports.instanceof(Uint8Array).refine((data2) => data2.byteLength > 0 && data2.byteLength <= BINARY_UPLOAD_CHUNK_BYTES) }).strict();
 var WorkspaceUploadHost = class {
-  constructor(resolveRoot, ttlMs = 12e4, transportMode = () => void 0, now = Date.now) {
+  constructor(resolveRoot, ttlMs = 12e4, transportMode = () => void 0, now = Date.now, budget = new WorkspaceUploadBudget()) {
     this.resolveRoot = resolveRoot;
     this.ttlMs = ttlMs;
     this.transportMode = transportMode;
     this.now = now;
+    this.budget = budget;
     this.timer = setInterval(() => {
       void this.serialize(() => this.expire()).catch(() => void 0);
     }, Math.min(ttlMs, 3e4));
@@ -99772,10 +100516,20 @@ var WorkspaceUploadHost = class {
     const root2 = await realpath6(sourceRoot);
     const directory = await stat7(root2);
     if (!directory.isDirectory()) throw failure4("UPLOAD_WORKSPACE_UNAVAILABLE");
+    const reservation = await this.budget.reserve(root2, directory.dev, p.sessionId, p.totalBytes);
     const temp = join16(root2, `.dsh-upload-${randomUUID16()}.part`);
-    const handle = await open6(temp, constants6.O_CREAT | constants6.O_EXCL | constants6.O_RDWR | (constants6.O_NOFOLLOW ?? 0), 384);
+    let handle;
+    try {
+      handle = await open6(temp, constants6.O_CREAT | constants6.O_EXCL | constants6.O_RDWR | (constants6.O_NOFOLLOW ?? 0), 384);
+    } catch (error62) {
+      reservation.release();
+      throw error62;
+    }
     const upload = {
-      ...p,
+      sessionId: p.sessionId,
+      name: p.name,
+      totalBytes: p.totalBytes,
+      encoding: p.encoding,
       received: 0,
       touched: this.now(),
       root: root2,
@@ -99785,7 +100539,8 @@ var WorkspaceUploadHost = class {
       temp,
       handle,
       authorityCheckedAt: 0,
-      authorityBytes: 0
+      authorityBytes: 0,
+      reservation
     };
     this.uploads.set(p.uploadId, upload);
     await this.validateRoot(upload);
@@ -99795,9 +100550,11 @@ var WorkspaceUploadHost = class {
     const p = binary ? binaryChunkParams.parse(input4) : chunkParams.parse(input4);
     const upload = this.requireUpload(p);
     if (binary !== (upload.encoding === "binary-v1")) throw failure4("UPLOAD_INVALID_CHUNK");
-    const data2 = typeof p.data === "string" ? Buffer.from(p.data, "base64") : Buffer.from(p.data.buffer, p.data.byteOffset, p.data.byteLength);
-    if (!data2.length || data2.length > (binary ? BINARY_UPLOAD_CHUNK_BYTES : WORKSPACE_UPLOAD_CHUNK) || !binary && data2.toString("base64") !== p.data || p.offset !== upload.received || upload.received + data2.length > upload.totalBytes) throw failure4("UPLOAD_INVALID_CHUNK");
+    const data2 = decodeChunk(p.data);
+    if (p.offset !== upload.received) throw failure4("UPLOAD_INVALID_CHUNK");
+    if (data2.length > upload.totalBytes - upload.received) throw failure4("UPLOAD_INVALID_CHUNK");
     await this.validateRoot(upload, this.authorityExpired(upload));
+    await upload.reservation.checkDisk();
     let written = 0;
     while (written < data2.length) {
       const result = await upload.handle.write(data2, written, data2.length - written, upload.received + written);
@@ -99806,6 +100563,7 @@ var WorkspaceUploadHost = class {
     }
     this.assertLive();
     upload.received += data2.length;
+    upload.reservation.consume(data2.length);
     upload.touched = this.now();
     return { uploadId: p.uploadId, receivedBytes: upload.received };
   }
@@ -99837,6 +100595,7 @@ var WorkspaceUploadHost = class {
       const result = { name: name2, path: `./${name2}`, bytes: upload.totalBytes };
       this.completed.set(p.uploadId, { sessionId: p.sessionId, result, touched: this.now() });
       if (this.completed.size > 64) this.completed.delete(this.completed.keys().next().value);
+      upload.reservation.commit();
       await this.discard(p.uploadId, upload);
       return result;
     }
@@ -99890,6 +100649,7 @@ var WorkspaceUploadHost = class {
   }
   async discard(id6, upload) {
     this.uploads.delete(id6);
+    upload.reservation.release();
     const original = await upload.handle.stat().catch(() => void 0);
     await upload.handle.close().catch(() => void 0);
     try {
@@ -99907,6 +100667,13 @@ var WorkspaceUploadHost = class {
 };
 function failure4(code) {
   return new RpcError(code, "The workspace upload could not be completed.");
+}
+function decodeChunk(value) {
+  const data2 = typeof value === "string" ? Buffer.from(value, "base64") : Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  const limit = typeof value === "string" ? WORKSPACE_UPLOAD_CHUNK : BINARY_UPLOAD_CHUNK_BYTES;
+  if (data2.length === 0 || data2.length > limit) throw failure4("UPLOAD_INVALID_CHUNK");
+  if (typeof value === "string" && data2.toString("base64") !== value) throw failure4("UPLOAD_INVALID_CHUNK");
+  return data2;
 }
 function validName(name2) {
   return Buffer.byteLength(name2, "utf8") <= 220 && name2 !== "." && name2 !== ".." && !/[/\\\x00-\x1f\x7f<>:"|?*]/u.test(name2) && !/[. ]$/u.test(name2) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu.test(name2) && !name2.startsWith(".dsh-upload-");
@@ -102400,6 +103167,8 @@ var HARNESS_REMOTE_ALLOWLIST = [
   "agentPresets/select",
   "commands/execute",
   "commands/list",
+  "cotTranslation/limits",
+  "cotTranslation/translate",
   "credentials/describe",
   "credentials/set",
   "credentials/unset",
@@ -102473,6 +103242,8 @@ var HARNESS_REMOTE_ALLOWLIST = [
   "userQuestions/attachWait",
   "claudeCodeMods/watchBand",
   "claudeCodeMods/pressBand",
+  "speech/catalog",
+  "speech/transcribe",
   "workspaceFiles/list",
   "workspaceFiles/stat",
   "workspaceFiles/read",
@@ -102794,6 +103565,7 @@ var HarnessRemoteBridge = class {
     const params = streamOpenSchema3.parse(input4);
     this.assertAllowed(params.endpoint);
     if (params.endpoint.startsWith("pluginManager/")) throw new RpcError("METHOD_NOT_ALLOWED", "Plugin management endpoints are not streams.");
+    if (params.endpoint.startsWith("cotTranslation/")) throw new RpcError("METHOD_NOT_ALLOWED", "Translation endpoints are not streams.");
     if (params.endpoint.startsWith("settings/")) throw new RpcError("METHOD_NOT_ALLOWED", "Settings endpoints are not streams.");
     if (TERMINAL_CALLS.has(params.endpoint)) throw new RpcError("METHOD_NOT_ALLOWED", "This terminal endpoint is not a stream.");
     if (TERMINAL_STREAMS.has(params.endpoint)) this.terminal.check(params.endpoint, params.payload);
@@ -103999,7 +104771,7 @@ var HostPluginRuntime = class {
         () => harnessSessionGeneration(this.harnessVersion) === "v3",
         (threadId) => this.codex.resolveThreadWorkspace(context.connectionId, threadId),
         (sessionId) => this.acp.resolveUploadWorkspace(context.connectionId, sessionId)
-      ), void 0, context.transportMode);
+      ), void 0, context.transportMode, Date.now, this.uploadBudget);
       const lanUpload = context.peerIdentityKey && context.transportMode ? new LanUploadHost(workspaceUpload, {
         connectionId: context.connectionId,
         peerIdentityKey: context.peerIdentityKey,
@@ -104033,6 +104805,7 @@ var HostPluginRuntime = class {
   }
   connections;
   terminalOwners = /* @__PURE__ */ new Map();
+  uploadBudget = new WorkspaceUploadBudget();
   loopbackHosts = /* @__PURE__ */ new Set();
   terminalEnabled;
   loopbackPorts;

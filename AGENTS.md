@@ -14,6 +14,7 @@
   - `packages/tui` 为同版本独立发布的 `ds-harness-remote-tui` Host 组合包（装配官方 API 并调 `applyTuiHost`）。
   - `packages/tui-plugin` 为未发布开发与契约校验包。
 - `apps/android`：Expo SDK 57 客户端（官方 Typert、`codex.app.*`、`agent.acp.*`、`plugin.route.call`、9 语言；见 [Android Guide](apps/android/AGENTS.md)）。
+- `apps/harmony`：HarmonyOS 原生 Client（ArkTS + ArkWeb WebRTC）；SDK 构建独立于 pnpm workspace，见 [客户端说明](docs/harmony-client.md)。
 - `apps/vscode`：VS Code 扩展 Client。
 - `apps/browser`：Chrome/Edge MV3 启动器（换独立凭据开同源 Remote Web，无登录/传输/会话 UI）。
 - `packages/{protocol,crypto,webrtc,client-core}` & `fixtures/`：共享协议/加密/传输/客户端库与一致性向量。
@@ -27,7 +28,7 @@
 ## Project Structure & Packaging Boundaries
 
 ```text
-apps/        android/  browser/  server/  vscode/
+apps/        android/  browser/  harmony/  server/  vscode/
 packages/    plugin/  tui/  tui-plugin/  protocol/  crypto/  webrtc/  client-core/
 examples/    mock-host/
 fixtures/    crypto/  pairing/  protocol/
@@ -116,7 +117,7 @@ git diff --exit-code -- packages/plugin/dist/index.js packages/plugin/dist/clien
   - **仅认 `gateway/arguments-invalid`**（零调用、5s 预算，禁换合法空请求扫库；余错或意外成功均 fail-closed）。
 - `session/list` 超 2,048 行时 Host 只留最新根会话并提升 `projections.values.title`，Client 先过滤再截断。
 - Harness v1 审批限 `allow_once | deny`（禁 `allow_session`）；问答限 `userQuestions/answer|attachWait`（断线释 claim）。
-- `packages/plugin/src/plugin-route-bridge.ts` 仅放行 `api/session/uploadFileBinary` 与 `packages/plugin/tests/fixtures/ds-bot-v0.3.6-endpoints.json` 161 端点 + `btw`/`btw-cancel`/`room-continue`：
+- `packages/plugin/src/plugin-route-bridge.ts` 仅放行 `api/session/uploadFileBinary` 与 `packages/plugin/tests/fixtures/ds-bot-v0.3.8-endpoints.json` 175 端点 + `btw`/`btw-cancel`/`room-continue`：
   - 保持 30s 预算与不重放 mutation。
   - 管理/凭据/电脑控制/审批 `choice` 交认证后 DS-Bot handler 校验。
 - 仅五类受限写入例外（禁通用 fs 写或远程桌面 RPC）：
