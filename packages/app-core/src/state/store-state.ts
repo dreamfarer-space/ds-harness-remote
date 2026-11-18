@@ -34,7 +34,7 @@ import type {
   WorkspaceView,
 } from '../types'
 import type { ActivityDockMode, ChatAppearance, DrawerLayoutMode, ThemePreference, TypographyDensity } from '../ui/theme'
-import type { QuickPromptActionMode } from '../services/storage'
+import type { BusySendMode, QuickPromptActionMode } from '../services/storage'
 
 type BootPhase = 'loading' | 'ready' | 'error'
 
@@ -73,6 +73,7 @@ export interface AppState {
   opencodeAvailable: boolean
   claudeAvailable: boolean
   hermesAvailable: boolean
+  customAcpBackends?: string[]
   workspaceCatalog?: { backend: AgentBackend; loading: boolean; error?: string }
   workspaces: WorkspaceView[]
   favoriteWorkspaces: WorkspaceShortcut[]
@@ -119,6 +120,7 @@ export interface AppState {
   activityDockMode: ActivityDockMode
   drawerLayoutMode: DrawerLayoutMode
   quickPromptActionMode: QuickPromptActionMode
+  busySendMode: BusySendMode
   defaultPermissionPreset: DefaultPermissionPreset
   pendingOAuthBaseUrl?: string
   pendingOAuthLoginMethod?: RedirectLoginMethod
@@ -196,7 +198,7 @@ export interface AppState {
   loadAgentPresets(): Promise<boolean>
   selectAgentPreset(preset: string): Promise<boolean>
   loadOlderHistory(): Promise<void>
-  workspaceCreate(path: string, backend?: 'harness' | 'codex' | 'cursor' | 'antigravity' | 'pi' | 'opencode' | 'claude' | 'hermes'): Promise<WorkspaceView | undefined>
+  workspaceCreate(path: string, backend?: AgentBackend): Promise<WorkspaceView | undefined>
   workspaceRename(workspaceId: string, title: string): Promise<boolean>
   workspaceDelete(workspaceId: string): Promise<boolean>
   workspaceMove(workspaceId: string, beforeWorkspaceId?: string): Promise<boolean>
@@ -216,6 +218,7 @@ export interface AppState {
   setActivityDockMode(mode: ActivityDockMode): Promise<void>
   setDrawerLayoutMode(mode: DrawerLayoutMode): Promise<void>
   setQuickPromptActionMode(mode: QuickPromptActionMode): Promise<void>
+  setBusySendMode(mode: BusySendMode): Promise<void>
   setDefaultPermissionPreset(preset: DefaultPermissionPreset): Promise<void>
   syncSystemLocales(localeTags: readonly string[]): void
   resetLocalData(): Promise<void>

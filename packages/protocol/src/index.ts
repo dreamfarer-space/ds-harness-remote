@@ -133,6 +133,40 @@ export interface AcpSessionModels {
   groups: Array<{ id: string; name: string; models: Array<{ id: string; name: string; reasoning?: { efforts: Array<{ id: string; name: string }>; defaultEffort?: string } }> }>;
   failures: Array<{ id: string; name: string; message: string }>;
 }
+export interface AcpModeOption { id: string; name: string; description?: string }
+export interface AcpSessionModes { currentModeId?: string; availableModes: AcpModeOption[] }
+export interface AcpAvailableCommand { name: string; description?: string; input?: { hint?: string } }
+export interface AcpAuthMethod {
+  id: string
+  name: string
+  description?: string
+  type?: 'terminal' | (string & {})
+  args?: string[]
+}
+export interface AcpAuthDiagnostic {
+  authStatus: 'authenticated' | 'auth_required' | 'unknown'
+  errorCode?: string
+  guidance?: string
+  loginCommand?: string
+  loginUrl?: string
+  authMethods?: AcpAuthMethod[]
+}
+export interface AcpUsageSummary {
+  inputTokens?: number
+  outputTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  reasoningTokens?: number
+  totalTokens?: number
+}
+export interface AcpContextUsage { used: number; size: number }
+export interface AcpWorkspaceRecord {
+  path: string
+  title?: string
+  sessionCount?: number
+  order?: number
+  updatedAt?: string
+}
 export const MAX_ACP_PROMPT_BYTES = 64 * 1024
 export const MAX_ACP_UPDATE_BYTES = 512 * 1024
 
@@ -169,7 +203,19 @@ export const controlFrameTypes = [
   'error',
 ] as const
 
+export const sessionTransferMethods = [
+  'session.transfer.export.open',
+  'session.transfer.export.read',
+  'session.transfer.export.close',
+  'session.transfer.import.open',
+  'session.transfer.import.chunk',
+  'session.transfer.import.commit',
+  'session.transfer.import.status',
+  'session.transfer.import.abort',
+] as const
+
 export const rpcMethods = [
+  ...sessionTransferMethods,
   'workspace.upload.lan.open',
   'workspace.upload.open',
   'workspace.upload.chunk',
@@ -523,6 +569,8 @@ export const transportCapabilities = [
  * harness.remote.v3); advertising both is a protocol violation.
  */
 export const harnessCapabilityValues = [
+  'session.transfer.export.v1',
+  'session.transfer.import.v1',
   'remote.history.compact.v1',
   'remote.compaction.async.v1',
   'remote.session.events.v1',
@@ -921,13 +969,13 @@ export interface AgentAcpRespondParams {
 export type AcpWorkspaceToolCallEndpoint = 'workspaceFiles/list' | 'workspaceFiles/stat' | 'workspaceFiles/read' | 'workspaceFiles/readBytes' | 'workspaceFiles/readAll'
   | 'terminal/environment' | 'terminal/shells' | 'terminal/list' | 'terminal/create' | 'terminal/write' | 'terminal/resize' | 'terminal/rename' | 'terminal/close'
 export type AcpWorkspaceToolStreamEndpoint = 'workspaceFiles/changes' | 'terminal/follow' | 'terminal/retain'
-export interface AcpWorkspaceToolParams { sessionId: string; backend: 'cursor' | 'antigravity' | 'pi' | 'opencode' | 'claude' | 'hermes'; endpoint: AcpWorkspaceToolCallEndpoint; args: Record<string, unknown> }
-export interface AcpModelParams { sessionId: string; backend: 'cursor' | 'claude' | 'antigravity' | 'pi' | 'opencode' }
+export interface AcpWorkspaceToolParams { sessionId: string; backend: AcpBackend; endpoint: AcpWorkspaceToolCallEndpoint; args: Record<string, unknown> }
+export interface AcpModelParams { sessionId: string; backend: AcpBackend }
 export interface AcpModelSelectionParams extends AcpModelParams { model: string; reasoningEffort?: string }
 export interface AgentAcpStreamOpenParams {
   streamId: string
   sessionId: string
-  tool?: { backend: 'cursor' | 'antigravity' | 'pi' | 'opencode' | 'claude' | 'hermes'; endpoint: AcpWorkspaceToolStreamEndpoint; args: Record<string, unknown> }
+  tool?: { backend: AcpBackend; endpoint: AcpWorkspaceToolStreamEndpoint; args: Record<string, unknown> }
 }
 
 export interface AgentAcpStreamCloseParams {

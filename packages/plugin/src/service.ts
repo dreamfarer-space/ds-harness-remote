@@ -1,3 +1,4 @@
+import { SessionTransferHost, type TransferServices } from './session-transfer.js'
 import { LanUploadHost } from './lan-upload.js'
 import { HostPairing } from './host-pairing.js'
 import type { HostPairingView } from './pairing-contract.js'
@@ -42,6 +43,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import type { CodexPeerBridge, PublishCodexFrame } from './codex/peer-bridge.js'
 import { AcpRemoteGateway } from './acp/gateway.js'
+import { AcpWorkspaceStore } from './acp/workspace-store.js'
 import type { AcpPeerBridge, PublishAcpFrame } from './acp/peer-bridge.js'
 import { RpcError } from './safe-error.js'
 import { CodexWorkspaceBridge, CodexWorkspaceState, type RemoteTerminalSpawner } from './codex-workspace-bridge.js'
@@ -106,11 +108,20 @@ export class HostPluginRuntime {
     private readonly pluginRoutes?: (peer?: unknown) => PluginRouteDispatcher | undefined,
     /** Host `schedule` service; absent on Hosts whose composition omits reminders. */
     private readonly schedule?: ScheduleCreateService,
+    transferServices?: () => TransferServices,
   ) {
     this.terminalEnabled = config.terminal.enabled
     this.loopbackPorts = [...config.loopback.ports]
     this.codex = new CodexRemoteDomain(config.codex, logger)
-    this.acp = new AcpRemoteGateway(config.acp ?? { enabled: false, backends: [] }, logger, undefined, undefined, () => this.terminalEnabled, this.terminalSpawner)
+    this.acp = new AcpRemoteGateway(
+      config.acp ?? { enabled: false, backends: [] },
+      logger,
+      undefined,
+      undefined,
+      () => this.terminalEnabled,
+      this.terminalSpawner,
+      AcpWorkspaceStore.inDirectory(identities?.directory),
+    )
     // Each operation runs on its own owner Peer minted from the Host gateway,
     // so its lifetime is independent of the client connection that submitted it.
     this.compactionOperations = new RemoteCompactionOperations(async (sessionId, signal) => {
@@ -145,6 +156,7 @@ export class HostPluginRuntime {
         }
       },
     })
+    const sessionTransfer = transferServices && new SessionTransferHost(transferServices)
     this.connections = new ConnectionController(this.identities, (context, send) => {
       const peerGateway = this.localGateway?.createPeer?.() ?? this.localGateway
       const uploadDispatcher = this.pluginRoutes?.(peerGateway?.peer)
@@ -218,6 +230,7 @@ export class HostPluginRuntime {
         },
         lanUpload,
         context.createTransportUpgradeHost?.(send),
+        sessionTransfer?.peer(context.peerDeviceId),
       )
     }, this.logger)
     if (config.serverUrl !== undefined) {
@@ -400,9 +413,12 @@ export class HostPluginRuntime {
     } catch (error) {
       revokeFailure = error
     }
-    this.identity = await this.identities.reset(this.config.deviceName)
+    this.identity = await this.identities.reset(this.config.deviceName, { clearPairingPolicy: true })
     this.serverApi?.bindIdentity(this.identity)
-    if (this.serverApi !== undefined) this.serverConnection = this.createServerConnection(this.identity)
+    if (this.serverApi !== undefined) {
+      await this.serverApi.loadStoredPolicy()
+      this.serverConnection = this.createServerConnection(this.identity)
+    }
     this.initializePairing()
     this.logger.info('Host authorization cleared')
     if (revokeFailure !== undefined) throw revokeFailure
@@ -497,6 +513,10 @@ export class HostPluginRuntime {
     return this.acp.status()
   }
 
+  acpDiagnostics(): ReturnType<AcpRemoteGateway['diagnostics']> {
+    return this.acp.diagnostics()
+  }
+
   acpCall(input: unknown): Promise<unknown> {
     return this.requireLocalAcpPeer().call(input)
   }
@@ -552,6 +572,7 @@ export class HostPluginRuntime {
       workspaceTypes: this.hostWorkspaceTypes(),
       codex: this.codex.status(),
       acp: this.acp.status(),
+      acpDiagnostics: this.acp.diagnostics(),
     }
   }
 
@@ -688,7 +709,7 @@ export class HostPluginRuntime {
         if (existsSync('/usr/local/bin/opencode') || existsSync('/var/lib/dsh/.opencode/bin/opencode')) return true
       } catch {}
     }
-    try { execFileSync(process.platform === 'win32' ? 'where' : 'which', [command], { stdio: 'ignore' }); return true } catch { return false }
+    try { execFileSync(process.platform === 'win32' ? 'where' : 'which', [command], { stdio: 'ignore', windowsHide: true }); return true } catch { return false }
   }
 
   private requireLocalCodexPeer(): CodexPeerBridge {
