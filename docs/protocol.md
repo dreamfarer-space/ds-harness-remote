@@ -1304,6 +1304,7 @@ realpath 后的规范根目录计算，避免符号链接父目录或大小写�
 Harness 从 `0.2.1-alpha.3` 起将原生输入改为 `terminal/attach` 双向流，RC.1 沿用此契约。
 本仓库不增加通用 uplink RPC：Desktop 在本地将原生 attach 转成既有 follow/write/resize，
 Host 在通过终端策略后将 Harness follow 转成官方 attach；CodeX/ACP 保留各自终端域。
+Desktop 原生 write 帧可附带布尔值 `typed`，转成加密 write RPC 时只转发输入数据。
 每个 attachment 的输入 sequence 从 1 递增，Host ack 后才完成 write/resize；拒绝、取消或
 断线不能确认或重放输入。Host 每 attachment 至多 32 个待确认输入，队列上限 64 项/256 KiB；
 原生客户端侧输出缓冲最多 256 项/4 MiB。状态快照按官方 writable 映射既有 controllerId。
@@ -2295,3 +2296,19 @@ When the Host advertises `remote.transport.upgrade.v1` in `harness.transport.des
 - **RPCs & events**: `remote.transport.upgrade.offer` (`{ attemptId, sdp } -> { attemptId, sdp }`), `remote.transport.upgrade.ice` (`{ attemptId, candidate } -> { ok: true }`, with responder trickle ICE emitted as `remote.transport.upgrade.ice` event), `remote.transport.upgrade.activate` (`{ attemptId, transport? } -> { activated, mode, previousLegEndCounter? }`), `remote.transport.upgrade.drain` (`{ attemptId, previousLegEndCounter } -> { ok: true }`), and `remote.transport.upgrade.abort` (`{ attemptId? } -> { ok: true }`).
 - **Authoritative Host path verification**: Tier promotion (`Relay < TURN < P2P < LAN`) strictly trusts the Host's own verified ICE candidate-pair telemetry (`connectionDetails().mode`); client hints never elevate a lower-tier path into `LAN` or `P2P`.
 - **Sequenced framing, watermark draining & bounded reorder**: Upgraded DataChannel frames prepend a 12-byte big-endian sequence header (`'DSHU' || uint64 noiseCounter`) before RTCH chunking. Both endpoints buffer out-of-order frames in `SequencedCiphertextReorderBuffer` (bounded by 256 frames, 4 MiB total bytes, and a 5 s gap timeout) and drain superseded WebRTC legs until `receivingCounter >= previousLegEndCounter` (bounded by a 3 s fallback deadline). Upgrade failure before activation keeps the current carrier intact; DataChannel loss after activation closes the tunnel so normal reconnect recovery runs.
+
+### DSH Web browser handoff
+
+A Host with a mounted DSH Web app and compatible browser authentication advertises
+`dsh.web.v1` in `harness.transport.describe`. On the authenticated Noise connection,
+`dsh.web.open({})` returns `{ url, browserGrant, expiresAt }`. The Host identifies the
+Client from the authenticated peer. The HTTPS URL is the tunnel origin root and
+`expiresAt` is the grant redemption deadline in Unix milliseconds.
+
+Android and iOS submit `browserGrant` as a URL-encoded form field in a top-level
+`POST /__remote/session` in their WebView. The Worker consumes the grant once,
+sets its host-only session cookie, and redirects with 303 to `/`.
+`dsh.web.close({})` closes the active lease for that Noise connection.
+The Host checks authorization at least every 15 seconds while connected and
+before reconnecting the allocated tunnel. The official DSH application cookie
+stays in Host memory and authenticates the local upstream.

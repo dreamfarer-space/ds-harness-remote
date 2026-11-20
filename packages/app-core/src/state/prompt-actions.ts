@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics'
-import { friendlyError, isRecoverableTransportError, isRpcTimeoutError } from '../lib/errors'
+import { friendlyError, isQueueItemNotFoundError, isRecoverableTransportError, isRpcTimeoutError } from '../lib/errors'
 import { strings as zhCN } from '../locales/i18n'
 import { createNativeRpcId } from '../services/rpc-id'
 import {
@@ -10,9 +10,9 @@ import {
 import { cursorNativeId } from '../services/cursor'
 import { isAcpManagedBackend } from '../lib/workspace-key'
 import { resolveHarnessSendMode } from '../screens/chat/composer-gate'
-import type { ChatItem } from '../types'
+import type { ChatItem, RemoteSession } from '../types'
 import { withCodexPermissionState } from './codex-session-state'
-import { findApproval, findQuestion, inboxRpcIds, mapApprovalOutcome, mapQuestionAnswered } from './message-helpers'
+import { findApproval, findQuestion, inboxQueuedItems, inboxRpcIds, mapApprovalOutcome, mapQuestionAnswered, removeInboxQueueItem } from './message-helpers'
 import type { SessionAccess } from './session-runtime'
 import { isRecord, record, stringValue, withActiveCodexTurn } from './session-state'
 import type { AppState } from './store-state'
@@ -123,6 +123,11 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
         if (session.backend === 'codex') {
           const client = runtime.connection.requireCodex()
           const threadId = codexThreadId(session)
+          const loadGeneration = runtime.sessionLoadGeneration
+          const connGeneration = runtime.connectionGeneration
+          const isCurrentTarget = () => loadGeneration === runtime.sessionLoadGeneration
+            && connGeneration === runtime.connectionGeneration
+            && get().selectedSession?.sessionId === session.sessionId
           const promptInput = [
             ...(text.length === 0 ? [] : [{ type: 'text', text }]),
             ...images.map(image => ({ type: 'image', mediaType: image.mediaType, data: image.data })),
@@ -140,6 +145,19 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
               threadId,
               ...(selection?.provider === 'codex' ? { model: selection.model } : {}),
             })
+            if (!isCurrentTarget()) {
+              set(state => ({
+                messages: {
+                  ...state.messages,
+                  [session.sessionId]: (state.messages[session.sessionId] ?? []).map(item =>
+                    item.id === optimistic.id && item.kind === 'message'
+                      ? { ...item, sendState: 'failed' as const }
+                      : item),
+                },
+                ...(state.busyAction === 'send-message' ? { busyAction: undefined } : {}),
+              }))
+              return 'rejected'
+            }
             const serverPreset = codexPermissionPresetFromResponse(resumeResult)
             if (serverPreset !== undefined) {
               set(state => withCodexPermissionState(state, session.sessionId, serverPreset))
@@ -152,20 +170,28 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
                 ...(selection.reasoningEffort === undefined ? {} : { effort: selection.reasoningEffort }),
               } : {}),
             }))
-            const turnId = stringValue(record(result.turn).id)
-            if (runtime.activeCodexTimeline?.session.nativeId === threadId) {
-              runtime.activeCodexTimeline = {
-                ...runtime.activeCodexTimeline,
-                ...(turnId === undefined ? {} : { activeTurnId: turnId }),
-                session: { ...runtime.activeCodexTimeline.session, status: 'running' },
-              }
+            runtime.flushPendingCodexFrames()
+            if (!isCurrentTarget()) {
+              set(state => state.busyAction === 'send-message' ? { busyAction: undefined } : {})
+              return 'sent'
             }
-            set(state => ({
-              sessions: state.sessions.map(item => item.sessionId === session.sessionId ? { ...item, running: true } : item),
-              selectedSession: state.selectedSession?.sessionId === session.sessionId
-                ? { ...state.selectedSession, running: true }
-                : state.selectedSession,
-            }))
+            const turnId = stringValue(record(result.turn).id)
+            const alreadyCompleted = turnId !== undefined && runtime.isCodexTurnCompleted(threadId, turnId)
+            if (!alreadyCompleted) {
+              if (runtime.activeCodexTimeline?.session.nativeId === threadId) {
+                runtime.activeCodexTimeline = {
+                  ...runtime.activeCodexTimeline,
+                  ...(turnId === undefined ? {} : { activeTurnId: turnId }),
+                  session: { ...runtime.activeCodexTimeline.session, status: 'running' },
+                }
+              }
+              set(state => ({
+                sessions: state.sessions.map(item => item.sessionId === session.sessionId ? { ...item, running: true } : item),
+                selectedSession: state.selectedSession?.sessionId === session.sessionId
+                  ? { ...state.selectedSession, running: true }
+                  : state.selectedSession,
+              }))
+            }
           }
         } else if (isAcpManagedBackend(session.backend)) {
           if (session.backend === 'cursor' && images.length > 0) throw new Error(zhCN.runtime.cursorTextOnly)
@@ -226,6 +252,7 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
               latest?.running === true
               || inInbox
               || echoed
+              || (expectQueued && latest?.running === false)
               || state.selectedSession?.sessionId !== session.sessionId
             )
             return {
@@ -239,7 +266,8 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
                       // A projection may already have queued or released this
                       // row while the acknowledgement was still in flight.
                       sendState: item.queuedAdopted === true ? item.sendState
-                        : inInbox ? 'queued' : item.sendState ?? (expectQueued ? 'queued' : undefined),
+                        : inInbox ? 'queued'
+                          : item.sendState ?? (expectQueued ? (latest?.running === false ? 'unconfirmed' : 'queued') : undefined),
                       ...(inInbox ? { queuedAdopted: true as const } : {}),
                     }
                     : item),
@@ -293,29 +321,70 @@ export function createPromptActions({ get, set, runtime }: SessionAccess): Pick<
       // nothing with no error.
       if (session === undefined || (session.backend !== undefined && session.backend !== 'harness')
         || get().connection.phase !== 'connected') return false
+      const generation = runtime.connectionGeneration
+      let notFound = false
       try {
         await runtime.connection.requireProxy().sessionUpdateQueue(session.sessionId, itemId, { kind: action })
       } catch (error) {
-        set({ error: friendlyError(error) })
-        return false
+        if (generation !== runtime.connectionGeneration) return false
+        if (!isQueueItemNotFoundError(error)) {
+          set({ error: friendlyError(error) })
+          return false
+        }
+        notFound = true
       }
+      if (generation !== runtime.connectionGeneration) return false
       // Settle the matching local optimistic row together with the Host queue:
       // the dock lists local `queued` rows the inbox has not adopted, so without
       // this the steered/removed item is immediately re-listed from local state
-      // and the buttons look like no-ops. Steer hands the row back to the
-      // timeline (its echo replaces it); remove retires it quietly.
-      if (rpcId !== undefined) {
-        set(state => ({
-          messages: {
-            ...state.messages,
-            [session.sessionId]: (state.messages[session.sessionId] ?? []).map(item =>
-              item.kind === 'message' && item.requestRpcId === rpcId && item.id.startsWith('local:')
-                && item.nativeSeq === undefined && (item.sendState === 'queued' || item.sendState === 'unconfirmed')
-                ? { ...item, queuedAdopted: true, sendState: action === 'steer' ? 'unconfirmed' as const : 'canceled' as const, sendError: undefined }
-                : item),
+      // and the buttons look like no-ops. A confirmed steer hands the row back
+      // to the timeline awaiting its echo (only a missing queue entry is
+      // unconfirmed); remove retires it quietly and prunes the stale inbox entry.
+      set(state => {
+        const currentSession = state.selectedSession?.sessionId === session.sessionId
+          ? state.selectedSession
+          : state.sessions.find(item => item.sessionId === session.sessionId)
+        const currentInbox = currentSession?.projections?.values?.inbox
+        const effectiveRpcId = rpcId ?? inboxQueuedItems(currentInbox).find(item => item.id === itemId)?.rpcId
+        const prunedInbox = removeInboxQueueItem(currentInbox, itemId, effectiveRpcId)
+        const inboxChanged = prunedInbox !== currentInbox
+        const updateSession = (item: RemoteSession): RemoteSession => item.sessionId !== session.sessionId ? item : {
+          ...item,
+          projections: {
+            ...item.projections,
+            values: {
+              ...item.projections?.values,
+              inbox: prunedInbox,
+            },
           },
-        }))
-      }
+        }
+        const nextSendState = action === 'remove'
+          ? 'canceled' as const
+          : notFound ? 'unconfirmed' as const : undefined
+        const existingMessages = state.messages[session.sessionId] ?? []
+        let messagesChanged = false
+        const nextMessages = effectiveRpcId === undefined ? existingMessages : existingMessages.map(item => {
+          if (item.kind === 'message' && item.requestRpcId === effectiveRpcId && item.id.startsWith('local:')
+            && item.nativeSeq === undefined && item.sendState !== 'failed' && item.sendState !== 'canceled') {
+            messagesChanged = true
+            return { ...item, queuedAdopted: true, sendState: nextSendState, sendError: undefined }
+          }
+          return item
+        })
+        if (!inboxChanged && !messagesChanged) return {}
+        return {
+          ...(inboxChanged ? {
+            sessions: state.sessions.map(updateSession),
+            selectedSession: state.selectedSession === undefined ? undefined : updateSession(state.selectedSession),
+          } : {}),
+          ...(messagesChanged ? {
+            messages: {
+              ...state.messages,
+              [session.sessionId]: nextMessages,
+            },
+          } : {}),
+        }
+      })
       return true
     },
 

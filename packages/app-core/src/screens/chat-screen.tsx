@@ -388,7 +388,7 @@ export function ChatScreen({
   const [newSessionPending, setNewSessionPending] = useState(false)
   const creatingSessionRef = useRef(false)
   const lastNewSessionTimeRef = useRef(0)
-  const { visibleMessages, visibleSections, uiBySection, visibleUiIds, queueItems, childSessions, teamState } = useChatTranscript({ session, sessions, messages, hostId })
+  const { visibleMessages, visibleSections, turnUsageByTurn, uiBySection, visibleUiIds, queueItems, childSessions, teamState } = useChatTranscript({ session, sessions, messages, hostId })
   const panelOpen = composerExpanded || plusMenuOpen || modelPickerOpen || modePickerOpen || permissionPickerOpen
     || workspacePickerOpen || toolPickerOpen || toolsMode !== undefined || trajectory || mentionType !== null
     || promptsPickerOpen || promptsManagerOpen || promptEditing !== null || sessionInfoOpen
@@ -403,16 +403,15 @@ export function ChatScreen({
   const styles = useThemedStyles(createStyles)
   // Landscape phones are short: keep the composer compact when the IME is up
   // and let the list use a readable centred column on wide windows.
-  const { landscape, compactHeight, height, width, contentMaxWidth } = useResponsiveLayout()
+  const { landscape, compactHeight, height, width, contentMaxWidth, splitNav } = useResponsiveLayout()
   const compactComposer = landscape || compactHeight
   const composerInputMaxHeight = compactComposer ? Math.max(48, Math.min(96, Math.round(height * 0.22))) : 126
-  // Tablets keep the session list visible beside the conversation. Short
-  // landscape phone windows stay single-pane; a wide tablet keeps the split
-  // even while the IME reduces the window height.
-  const tabletSplit = width >= 760 && (height >= 520 || width >= 1000)
+  // splitNav (from useResponsiveLayout) keeps the session list visible beside
+  // the conversation. Short landscape phone windows stay single-pane; a wide
+  // tablet keeps the split even while the IME reduces the window height.
   useEffect(() => {
-    if (tabletSplit) setSessionsOpen(false)
-  }, [tabletSplit])
+    if (splitNav) setSessionsOpen(false)
+  }, [splitNav])
   const readableColumn = { width: '100%' as const, maxWidth: contentMaxWidth, alignSelf: 'center' as const }
 
   const openSessionsDrawer = useCallback(() => {
@@ -432,22 +431,22 @@ export function ChatScreen({
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_evt, g) => {
-          if (tabletSplit || sessionsOpen) return false
+          if (splitNav || sessionsOpen) return false
           return shouldStartSwipeRightToOpen({ dx: g.dx, dy: g.dy, x0: g.x0 }, trajectory)
         },
         onMoveShouldSetPanResponderCapture: (_evt, g) => {
-          if (tabletSplit || sessionsOpen) return false
+          if (splitNav || sessionsOpen) return false
           return shouldStartSwipeRightToOpen({ dx: g.dx, dy: g.dy, x0: g.x0 }, trajectory)
         },
         onPanResponderTerminationRequest: () => false,
         onPanResponderRelease: (_evt, g) => {
-          if (tabletSplit || sessionsOpen) return
+          if (splitNav || sessionsOpen) return
           if (shouldConfirmSwipeRightOpen({ dx: g.dx, dy: g.dy, x0: g.x0, vx: g.vx })) {
             openSessionsDrawer()
           }
         },
       }),
-    [sessionsOpen, tabletSplit, trajectory, openSessionsDrawer]
+    [sessionsOpen, splitNav, trajectory, openSessionsDrawer]
   )
   const swipeStartRef = useRef<{ x0: number; y0: number; t0: number } | undefined>(undefined)
   const swipeRightTouchProps = useMemo(
@@ -459,7 +458,7 @@ export function ChatScreen({
       onTouchEnd: (e: { nativeEvent: { pageX: number; pageY: number } }) => {
         const start = swipeStartRef.current
         swipeStartRef.current = undefined
-        if (start === undefined || tabletSplit || sessionsOpen) return
+        if (start === undefined || splitNav || sessionsOpen) return
         const dx = e.nativeEvent.pageX - start.x0
         const dy = e.nativeEvent.pageY - start.y0
         const dt = Math.max(16, Date.now() - start.t0)
@@ -472,15 +471,25 @@ export function ChatScreen({
         }
       },
     }),
-    [edgeSwipeResponder, tabletSplit, sessionsOpen, trajectory, openSessionsDrawer],
+    [edgeSwipeResponder, splitNav, sessionsOpen, trajectory, openSessionsDrawer],
   )
 
   // Artifact changes must invalidate FlatList cells even when their section is
   // reused (a later turn can patch a card owned by an earlier turn).
-  const renderChatItem = useCallback(({ item }: { item: ChatSection }) => item.kind === 'process'
-    ? <ChatProcessGroup items={item.items} artifacts={uiBySection.get(item.key)?.cards ?? EMPTY_UI_ARTIFACTS} updatedArtifacts={uiBySection.get(item.key)?.pointers ?? EMPTY_UI_ARTIFACTS} availableUiIds={visibleUiIds} busyAction={busy} onApproval={respondApproval} onQuestion={respondQuestion} />
+  const renderChatItem = useCallback(({ item, index }: { item: ChatSection; index: number }) => item.kind === 'process'
+    ? <ChatProcessGroup
+        items={item.items}
+        artifacts={uiBySection.get(item.key)?.cards ?? EMPTY_UI_ARTIFACTS}
+        updatedArtifacts={uiBySection.get(item.key)?.pointers ?? EMPTY_UI_ARTIFACTS}
+        availableUiIds={visibleUiIds}
+        busyAction={busy}
+        isTurnRunning={index === visibleSections.length - 1 && (session?.running === true || busy === 'stop-session')}
+        turnUsage={turnUsageByTurn.get(item.turn)}
+        onApproval={respondApproval}
+        onQuestion={respondQuestion}
+      />
     : <ChatItemView item={item.item} busyAction={busy} compact={false} onApproval={respondApproval} onQuestion={respondQuestion} />,
-  [busy, respondApproval, respondQuestion, uiBySection, visibleUiIds])
+  [busy, respondApproval, respondQuestion, session?.running, turnUsageByTurn, uiBySection, visibleSections.length, visibleUiIds])
 
   // Keep chat's back action at the top of the Android responder stack. The
   // navigator also handles back globally, but a freshly mounted FlatList can
@@ -488,7 +497,7 @@ export function ChatScreen({
   // Back inside a subagent child returns to its parent conversation (the
   // official subagent UI's navigation), instead of leaving the chat entirely.
   const backFromChat = () => {
-    if (!tabletSplit && sessionsOpen) {
+    if (!splitNav && sessionsOpen) {
       return drawerBackRef.current?.() ?? false
     }
     const parent = session !== undefined && isSubagentSession(session)
@@ -499,7 +508,7 @@ export function ChatScreen({
       void openSession(parent)
       return true
     }
-    if (!tabletSplit && !sessionsOpen) {
+    if (!splitNav && !sessionsOpen) {
       openSessionsDrawer()
       return true
     }
@@ -673,22 +682,22 @@ export function ChatScreen({
     <ChatImageProvider value={imageLoader}>
       <MarkdownLinkProvider onLinkPress={openLink}>
         <View style={styles.flex}>
-          <NavigationFocusProvider value={active && (!sessionsOpen || tabletSplit) && !composerExpanded}>
+          <NavigationFocusProvider value={active && (!sessionsOpen || splitNav) && !composerExpanded}>
             <KeyboardInset>
               <View
                 key="chat-layout"
-                style={[styles.splitRoot, tabletSplit && styles.splitRootWide]}
-                pointerEvents={sessionsOpen && !tabletSplit ? 'none' : 'auto'}
-                accessibilityElementsHidden={sessionsOpen && !tabletSplit}
-                importantForAccessibility={sessionsOpen && !tabletSplit ? 'no-hide-descendants' : 'auto'}
+                style={[styles.splitRoot, splitNav && styles.splitRootWide]}
+                pointerEvents={sessionsOpen && !splitNav ? 'none' : 'auto'}
+                accessibilityElementsHidden={sessionsOpen && !splitNav}
+                importantForAccessibility={sessionsOpen && !splitNav ? 'no-hide-descendants' : 'auto'}
               >
-                {tabletSplit && <View style={styles.splitSidebar}>{drawerElement(true)}</View>}
+                {splitNav && <View style={styles.splitSidebar}>{drawerElement(true)}</View>}
                 {mainPane}
               </View>
               {extraOverlays}
             </KeyboardInset>
           </NavigationFocusProvider>
-          {sessionsOpen && !tabletSplit && drawerElement(false)}
+          {sessionsOpen && !splitNav && drawerElement(false)}
           <PluginsModal visible={pluginsOpen} onClose={() => setPluginsOpen(false)} />
           <AutomationTasksModal
             visible={automationTasksOpen}
@@ -697,14 +706,14 @@ export function ChatScreen({
               markConversationChosen()
               const opened = await openSession(targetSession)
               onBotModeChange?.(false)
-              if (opened && !tabletSplit) setSessionsOpen(false)
+              if (opened && !splitNav) setSessionsOpen(false)
               setAutomationTasksOpen(false)
             }}
             onNewTask={async () => {
               markConversationChosen()
               const created = await createSession(defaultTaskWorkspaceId)
               onBotModeChange?.(false)
-              if (created && !tabletSplit) setSessionsOpen(false)
+              if (created && !splitNav) setSessionsOpen(false)
               setAutomationTasksOpen(false)
             }}
           />
@@ -723,9 +732,9 @@ export function ChatScreen({
           onOpenDrawer={openSessionsDrawer}
           onDeviceInfo={() => onOpenDeviceInfo?.()}
           onMore={() => onOpenSettings?.()}
-          splitView={tabletSplit}
-          drawerOpen={sessionsOpen || tabletSplit}
-          screenActive={active && (!sessionsOpen || tabletSplit)}
+          splitView={splitNav}
+          drawerOpen={sessionsOpen || splitNav}
+          screenActive={active && (!sessionsOpen || splitNav)}
         />
       </View>,
     )
@@ -738,7 +747,7 @@ export function ChatScreen({
         title={strings.chat.newChat}
         titleLines={1}
         titleAlign="between"
-        onBack={tabletSplit ? undefined : openSessionsDrawer}
+        onBack={splitNav ? undefined : openSessionsDrawer}
         backIcon={Menu}
         backLabel={strings.chat.openHostSessions}
         action={
@@ -1193,7 +1202,7 @@ export function ChatScreen({
         onTitlePress={() => { Keyboard.dismiss(); setMentionType(null); setSessionInfoOpen(true) }}
         titleLines={1}
         titleAlign="between"
-        onBack={tabletSplit ? undefined : trajectory ? handleBack : openSessionsDrawer}
+        onBack={splitNav ? undefined : trajectory ? handleBack : openSessionsDrawer}
         backIcon={trajectory ? ArrowLeft : Menu}
         backLabel={trajectory ? strings.common.back : strings.chat.openHostSessions}
         action={<>
@@ -1440,7 +1449,6 @@ export function ChatScreen({
         permissionDisabled={permissionSelecting || (replyActive && !hasComposerContent)}
         permissionLabel={permissions === undefined ? undefined : permissionDisplayName(permissions.currentValue, currentPermission?.name)}
         onReferenceChat={(session.backend ?? 'harness') === 'harness' ? () => setReferenceChatOpen(true) : undefined}
-        onOpenPrompts={openPromptsPicker}
         onOpenWorkspace={() => setWorkspacePickerOpen(true)} onOpenMode={() => setModePickerOpen(true)}
         onOpenTools={() => setToolPickerOpen(true)} onOpenPermissions={() => setPermissionPickerOpen(true)}
       />

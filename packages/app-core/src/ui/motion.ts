@@ -18,17 +18,21 @@ export interface Rect {
 }
 
 /**
- * `opening`/`closing` are in flight, `open`/`unmounted` are settled. A visible
- * change retargets from the current phase instead of restarting from zero.
+ * `opening`/`closing` are in flight, `dismissing` waits for the native iOS
+ * Modal view controller to finish dismissing before unmounting, and
+ * `open`/`unmounted` are settled. A visible change retargets from the current
+ * phase instead of restarting from zero.
  */
-export type SheetPhase = 'unmounted' | 'opening' | 'open' | 'closing'
+export type SheetPhase = 'unmounted' | 'opening' | 'open' | 'closing' | 'dismissing'
 
 /** Phone defaults from the design brief; desktop uses two thirds of these. */
 export const motionTokens = {
   duration: {
     micro: 160,
     sheet: 380,
-    sheetExit: 260,
+    // Exits read best fast: the scrim and card leave well before the eye has
+    // settled on where they were (Material: exits are quicker than entrances).
+    sheetExit: 120,
     fullscreen: 480,
     indicator: 420,
     stagger: 25,
@@ -37,7 +41,9 @@ export const motionTokens = {
   /** Cubic-bezier control points: fast start, long tail. */
   easing: {
     expand: [0.32, 0.72, 0, 1],
-    retreat: [0.4, 0, 0.6, 1],
+    // Accelerated ease-in: the card drops away immediately instead of
+    // hovering through a symmetric middle.
+    retreat: [0.3, 0, 0.8, 0.15],
   },
   spring: { bounciness: 0, speed: 14 },
 } as const
@@ -80,21 +86,39 @@ export function resolveMotion(kind: MotionKind, reduceMotion: boolean): {
 
 /** Enter is slower than exit so dismissal feels immediate. */
 export function sheetPhaseDuration(phase: SheetPhase, reduceMotion: boolean): number {
-  if (reduceMotion) return motionTokens.duration.reduced
-  return phase === 'opening' ? motionTokens.duration.sheet : motionTokens.duration.sheetExit
+  const normal = phase === 'opening' ? motionTokens.duration.sheet : motionTokens.duration.sheetExit
+  return reduceMotion ? Math.min(normal, motionTokens.duration.reduced) : normal
 }
 
 /**
  * Pure phase transition. Closing is never skipped unless another sheet
  * supersedes it during a direct handoff; showing again while closing
  * re-enters `opening` so the animation continues from its current frame.
+ * When `waitForNativeDismiss` is true (iOS), a visible transition during
+ * `dismissing` stays in `dismissing` until the native Modal finishes closing.
  */
-export function nextSheetPhase(phase: SheetPhase, visible: boolean, superseded = false): SheetPhase {
+export function nextSheetPhase(
+  phase: SheetPhase,
+  visible: boolean,
+  superseded = false,
+  waitForNativeDismiss = false,
+): SheetPhase {
   if (visible) {
     return phase === 'unmounted' || phase === 'closing' ? 'opening' : phase
   }
-  if (superseded) return 'unmounted'
-  return phase === 'unmounted' ? 'unmounted' : 'closing'
+  if (phase === 'unmounted') return 'unmounted'
+  if (phase === 'dismissing') return 'dismissing'
+  if (superseded) return waitForNativeDismiss ? 'dismissing' : 'unmounted'
+  return 'closing'
+}
+
+/**
+ * Settle the end of the JS closing animation into either `dismissing` (to flip
+ * `Modal.visible` to `false` on iOS so `onDismiss` fires) or `unmounted`.
+ */
+export function finishSheetExit(phase: SheetPhase, waitForNativeDismiss = false): SheetPhase {
+  if (phase !== 'closing') return phase
+  return waitForNativeDismiss ? 'dismissing' : 'unmounted'
 }
 
 /**

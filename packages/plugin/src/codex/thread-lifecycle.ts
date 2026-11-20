@@ -5,6 +5,7 @@ interface ThreadState {
   active: boolean
   activityVersion: number
   pending: boolean
+  releasing: boolean
   release?: Promise<void>
   closed?: () => void
 }
@@ -61,6 +62,10 @@ export class CodexThreadLifecycle {
     await this.settle(threadId, state)
   }
 
+  isReleasing(threadId: string): boolean {
+    return this.threads.get(threadId)?.releasing === true
+  }
+
   closed(threadId: string): void {
     const state = this.threads.get(threadId)
     state?.closed?.()
@@ -68,6 +73,7 @@ export class CodexThreadLifecycle {
       state.active = false
       state.activityVersion += 1
       state.pending = false
+      state.releasing = false
       state.release = undefined
       state.closed = undefined
       if (state.uses === 0) this.threads.delete(threadId)
@@ -84,7 +90,7 @@ export class CodexThreadLifecycle {
   private state(threadId: string): ThreadState {
     let state = this.threads.get(threadId)
     if (state === undefined) {
-      state = { uses: 0, active: false, activityVersion: 0, pending: false }
+      state = { uses: 0, active: false, activityVersion: 0, pending: false, releasing: false }
       this.threads.set(threadId, state)
     }
     return state
@@ -97,14 +103,19 @@ export class CodexThreadLifecycle {
       this.threads.delete(threadId)
       return
     }
-    const release = this.unload(threadId, state)
+    state.releasing = true
+    const release = this.unload(threadId, state).finally(() => {
+      if (state.release === release) state.releasing = false
+    })
     state.release = release
     await release.catch(error => this.failed(error))
   }
 
   private async unload(threadId: string, state: ThreadState): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined
+    let onClosed!: () => void
     const closed = new Promise<void>((resolve, reject) => {
+      onClosed = resolve
       state.closed = resolve
       timer = setTimeout(() => reject(new RpcError('CODEX_THREAD_CLOSING', 'The CodeX thread is still closing. Please retry shortly.')), this.closeTimeoutMs)
       timer.unref?.()
@@ -113,8 +124,8 @@ export class CodexThreadLifecycle {
     try {
       const result = await this.unsubscribe(threadId)
       if (typeof result === 'object' && result !== null && 'status' in result && result.status === 'notLoaded') {
-        this.closed(threadId)
-      } else {
+        if (this.threads.get(threadId) === state && state.closed === onClosed) this.closed(threadId)
+      } else if (this.threads.get(threadId) === state && state.closed === onClosed) {
         await closed
       }
     } finally {

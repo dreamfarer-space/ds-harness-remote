@@ -1,6 +1,7 @@
 import { browseScope, useBrowseMemory } from '../services/browse-memory'
 import { friendlyError, isSessionAuthError } from '../lib/errors'
 import { initialProbeTransports, type PreferredTransport } from '../lib/network-route'
+import { isAcpManagedBackend } from '../lib/workspace-key'
 import { strings as zhCN } from '../locales/i18n'
 import { resolveAutomaticPreferredTransports } from '../services/network-route'
 import { serverSession } from '../services/server-session'
@@ -38,6 +39,8 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         sessionProjectionSeqs: {},
         permissionSelecting: false,
         modelSelecting: false,
+        agentPresetSelecting: false,
+        agentPresetLoading: false,
         busyAction: undefined,
         codexReadySessionId: undefined,
         selectedDevice: device,
@@ -150,6 +153,10 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
                   opencodeAvailable: false,
                   claudeAvailable: false,
                   hermesAvailable: false,
+                  permissionSelecting: false,
+                  modelSelecting: false,
+                  agentPresetSelecting: false,
+                  agentPresetLoading: false,
                   busyAction: undefined,
                 })
               }
@@ -268,6 +275,23 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         }
         return generation === runtime.connectionGeneration && current.connection.phase === 'connected'
       }
+      const restoreHealthySessionState = async () => {
+        await get().refreshConnectionNetworkDetails()
+        if (generation !== runtime.connectionGeneration || get().connection.phase !== 'connected') return
+        const selected = get().selectedSession
+        if (
+          selected?.backend === 'codex'
+          && !get().busyAction?.startsWith('session:')
+          && (runtime.activeCodexStream === undefined || get().codexReadySessionId !== selected.sessionId)
+        ) {
+          void get().openSession(selected)
+        }
+        if (get().transportPreference === 'auto') {
+          const nextPreferred: readonly string[] = await resolveAutomaticPreferredTransports().catch(() => [])
+          if (generation !== runtime.connectionGeneration || get().connection.phase !== 'connected') return
+          void runtime.connection.promoteTransport({ preferLan: nextPreferred.includes('lan') })
+        }
+      }
       const healthy = await runtime.connection.checkHealth().catch(() => false)
       if (!await canContinueAfterProbe()) return
       if (!healthy) {
@@ -278,15 +302,11 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
           await get().reconnect()
         } else {
           console.info('[dsh-remote] Resume health restored after retry')
-          await get().refreshConnectionNetworkDetails()
+          await restoreHealthySessionState()
         }
       }
       else {
-        await get().refreshConnectionNetworkDetails()
-        if (get().transportPreference === 'auto') {
-          const nextPreferred: readonly string[] = await resolveAutomaticPreferredTransports().catch(() => [])
-          void runtime.connection.promoteTransport({ preferLan: nextPreferred.includes('lan') })
-        }
+        await restoreHealthySessionState()
       }
     },
 
@@ -340,6 +360,11 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         sessionLifecycles: {},
         sessionProjectionSeqs: {},
         sessionModels: undefined,
+        permissionSelecting: false,
+        modelSelecting: false,
+        agentPresetOptions: undefined,
+        agentPresetLoading: false,
+        agentPresetSelecting: false,
         historyHasMore: false,
         historyLoadingOlder: false,
         oldestLoadedSeq: undefined,
@@ -349,22 +374,37 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
     setOffline() {
       if (get().connection.phase !== 'disconnected') {
         runtime.flushPendingMuxFrames()
+        ++runtime.connectionGeneration
         ++runtime.sessionLoadGeneration
         runtime.clearPendingMuxFrames()
         runtime.clearHarnessCatalogSync()
-        set({
+        void runtime.closeActiveCodexStream(false)
+        void runtime.closeActiveCursorStream(false)
+        set(state => ({
           connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false }, error: zhCN.runtime.networkUnavailable,
-            ...(get().connection.retryable === false ? { retryable: false } : {}) },
+            ...(state.connection.retryable === false ? { retryable: false } : {}) },
           hostSessionEvents: false,
           codexAvailable: false,
           busyAction: undefined,
+          permissionSelecting: false,
+          modelSelecting: false,
+          agentPresetSelecting: false,
+          agentPresetLoading: false,
           cursorAvailable: false,
           antigravityAvailable: false,
           piAvailable: false,
           opencodeAvailable: false,
           claudeAvailable: false,
           hermesAvailable: false,
-        })
+          sessions: state.sessions.map(item =>
+            (isAcpManagedBackend(item.backend) || item.backend === 'codex') && item.running ? { ...item, running: false } : item,
+          ),
+          selectedSession: state.selectedSession !== undefined
+            && (isAcpManagedBackend(state.selectedSession.backend) || state.selectedSession.backend === 'codex')
+            && state.selectedSession.running
+            ? { ...state.selectedSession, running: false }
+            : state.selectedSession,
+        }))
       }
     },
   }

@@ -3,9 +3,16 @@ import { AnimatedEllipsis } from '../ui/animated-ellipsis'
 import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native'
 import { Alert } from '../ui/alert'
 import { ArrowLeft, Check, ChevronRight, Laptop, MessageSquareText, Monitor, Pencil, Server, ShieldCheck, Trash2, type LucideIcon } from 'lucide-react-native'
-import { useAppStore } from '../state/store'
+import { requireConnectionRpc, useAppStore } from '../state/store'
+import { DshWebScreen } from './dsh-web-screen'
 import { shouldPollSessionStatus } from '../state/session-catalog-commands'
-import type { ConnectionProbeTransport, ConnectionStage, RemoteDevice } from '../types'
+import type {
+  ConnectionNetworkDetails,
+  ConnectionProbeTransport,
+  ConnectionSnapshot,
+  ConnectionStage,
+  RemoteDevice,
+} from '../types'
 import {
   BlurHeaderFrame,
   Button,
@@ -273,8 +280,15 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
   const forgetBusy = useAppStore(state => state.busyAction === `forget:${device.deviceId}`)
   const reconnect = useAppStore(state => state.reconnect)
   const [renaming, setRenaming] = useState(false)
+  const language = useAppStore(state => state.language)
+  const dshWebLabel = language?.startsWith('zh') ? '打开 DSH Web' : 'Open DSH Web'
+  const [webRpc, setWebRpc] = useState<ReturnType<typeof requireConnectionRpc>>()
   const isSelected = selected?.deviceId === device.deviceId
   const isConnected = isSelected && connection.phase === 'connected'
+  const webAvailable = isConnected && requireConnectionRpc().supportsDshWeb
+  useEffect(() => {
+    if (!isConnected) setWebRpc(undefined)
+  }, [isConnected])
 
   const trustAndContinue = async () => {
     if (await trust(device) && device.online) onConnect()
@@ -290,6 +304,7 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
 
   return (
     <View style={styles.flex}>
+      {webRpc && isConnected && <DshWebScreen rpc={webRpc} hostName={device.name} onClose={() => setWebRpc(undefined)} />}
       <BlurHeaderFrame header={<TopBar title={zhCN.devices.title} onBack={onBack} />}>
         <Screen>
           <View style={[styles.contentColumn, landscape && { maxWidth: contentMaxWidth }]}>
@@ -299,7 +314,6 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
                 <Text style={styles.deviceName}>{device.name}</Text>
                 <IconButton label={`${zhCN.devices.rename} ${device.name}`} icon={Pencil} tint={colors.primary} dense onPress={() => setRenaming(true)} />
               </View>
-              <Text style={styles.devicePlatform}>{platformName(device.platform)}</Text>
             </View>
 
             {connection.error !== undefined && isSelected && (
@@ -329,6 +343,7 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
                 : <>
                     <SectionTitle>{zhCN.devices.info}</SectionTitle>
                     <View style={styles.group}>
+                      <KeyValue label={zhCN.devices.operatingSystem} value={platformName(device.platform)} />
                       <KeyValue label={zhCN.devices.harnessShort} value={descriptor?.version ?? device.harnessVersion ?? zhCN.devices.unknownVersion} />
                       <KeyValue label={zhCN.devices.plugin} value={device.clientVersion ?? zhCN.devices.unknownVersion} />
                       <KeyValue label={zhCN.devices.directory} value={descriptor?.cwd ?? zhCN.common.unavailable} mono />
@@ -341,6 +356,7 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
                       </View>
                     </View>
 
+                    {webAvailable && <Button label={dshWebLabel} onPress={() => setWebRpc((current: ReturnType<typeof requireConnectionRpc> | undefined) => current ?? requireConnectionRpc())} />}
                     <DeviceConnectionInfo deviceId={device.deviceId} />
 
                     {onWorkspaces !== undefined && <View style={styles.primaryArea}><Button label={zhCN.devices.viewWorkspaces} icon={MessageSquareText} onPress={onWorkspaces} /></View>}
@@ -367,6 +383,16 @@ export function DeviceDetailScreen({ device, onBack, onConnect, onWorkspaces }: 
   )
 }
 
+export function hasConnectionNetworkDetails(
+  stats: Pick<ConnectionSnapshot['stats'], 'mode' | 'bytesSent' | 'bytesReceived'>,
+  networkDetails: ConnectionNetworkDetails | undefined,
+): boolean {
+  if (stats.mode !== 'Relay') return true
+  return networkDetails !== undefined
+    || stats.bytesSent !== undefined
+    || stats.bytesReceived !== undefined
+}
+
 /** Read-only diagnostics shared by Host details and conversation information. */
 export function DeviceConnectionInfo({ deviceId }: { deviceId?: string }) {
   const selectedId = useAppStore(state => state.selectedDevice?.deviceId)
@@ -375,6 +401,7 @@ export function DeviceConnectionInfo({ deviceId }: { deviceId?: string }) {
   const networkDetails = useAppStore(state => state.connectionNetworkDetails)
   const refreshNetworkDetails = useAppStore(state => state.refreshConnectionNetworkDetails)
   const styles = useThemedStyles(createStyles)
+  const relay = networkDetails?.relay
   const isConnected = deviceId !== undefined && selectedId === deviceId && connection.phase === 'connected'
 
   useEffect(() => {
@@ -385,6 +412,8 @@ export function DeviceConnectionInfo({ deviceId }: { deviceId?: string }) {
     <SectionTitle>{zhCN.devices.secureConnection}</SectionTitle>
     <KeyValue label={zhCN.devices.path} value={zhCN.status.disconnected} />
   </>
+
+  const showNetworkDetails = hasConnectionNetworkDetails(connection.stats, networkDetails)
 
   return <>
     <SectionTitle>{zhCN.devices.secureConnection}</SectionTitle>
@@ -397,20 +426,28 @@ export function DeviceConnectionInfo({ deviceId }: { deviceId?: string }) {
       <KeyValue label={zhCN.devices.encryption} value="Noise IK · ChaCha20-Poly1305" />
     </View>
 
-    <View style={styles.networkDetails}>
-      <SectionTitle>{zhCN.devices.networkDetails}</SectionTitle>
-      <View style={styles.group}>
-        <KeyValue label={zhCN.devices.phoneEndpoint} value={networkDetails?.webRtc?.localAddress ?? zhCN.devices.relayEndpointUnavailable} mono={networkDetails?.webRtc?.localAddress !== undefined} />
-        <KeyValue label={zhCN.devices.computerEndpoint} value={networkDetails?.webRtc?.remoteAddress ?? zhCN.devices.relayEndpointUnavailable} mono={networkDetails?.webRtc?.remoteAddress !== undefined} />
-        {networkDetails !== undefined && <KeyValue label={zhCN.devices.connectionServer} value={controlServerName(networkDetails.controlChannelUrl)} mono />}
-        {networkDetails?.webRtc?.protocol !== undefined && <KeyValue label={zhCN.devices.networkProtocol} value={protocolText(networkDetails.webRtc.protocol, networkDetails.webRtc.relayProtocol)} />}
-        {networkDetails?.webRtc !== undefined && <KeyValue label={zhCN.devices.candidatePath} value={candidatePathText(networkDetails.webRtc.localCandidateType, networkDetails.webRtc.localAddressScope, networkDetails.webRtc.remoteCandidateType, networkDetails.webRtc.remoteAddressScope)} />}
-        {networkDetails?.webRtc?.currentRoundTripTimeMs !== undefined && <KeyValue label={zhCN.devices.roundTripTime} value={`${networkDetails.webRtc.currentRoundTripTimeMs.toLocaleString()} ms`} />}
-        {networkDetails?.webRtc?.availableOutgoingBitrate !== undefined && <KeyValue label={zhCN.devices.availableBitrate} value={formatBitrate(networkDetails.webRtc.availableOutgoingBitrate)} />}
-        {networkDetails !== undefined && <KeyValue label={zhCN.devices.connectedAt} value={networkDetails.connectedAt === undefined ? zhCN.common.unavailable : new Date(networkDetails.connectedAt).toLocaleString()} />}
-        {(connection.stats.bytesSent !== undefined || connection.stats.bytesReceived !== undefined) && <KeyValue label={zhCN.devices.traffic} value={`${formatBytes(connection.stats.bytesSent ?? 0)} ${zhCN.devices.sent} · ${formatBytes(connection.stats.bytesReceived ?? 0)} ${zhCN.devices.received}`} />}
+    {showNetworkDetails && (
+      <View style={styles.networkDetails}>
+        <SectionTitle>{zhCN.devices.networkDetails}</SectionTitle>
+        <View style={styles.group}>
+          {connection.stats.mode === 'Relay' ? (relay !== undefined && <>
+            <KeyValue label={zhCN.devices.relayPath} value={relay.path === 'control' ? zhCN.devices.relayControl : zhCN.devices.relayAttached} />
+            {relay.path === 'node' && relay.host !== undefined && <KeyValue label={zhCN.devices.relayNodeAddress} value={relay.host} mono />}
+            {relay.path === 'node' && relay.id !== undefined && <KeyValue label={zhCN.devices.relayNodeId} value={relay.id} mono />}
+          </>) : <>
+            <KeyValue label={zhCN.devices.phoneEndpoint} value={networkDetails?.webRtc?.localAddress ?? zhCN.common.unavailable} mono={networkDetails?.webRtc?.localAddress !== undefined} />
+            <KeyValue label={zhCN.devices.computerEndpoint} value={networkDetails?.webRtc?.remoteAddress ?? zhCN.common.unavailable} mono={networkDetails?.webRtc?.remoteAddress !== undefined} />
+          </>}
+          {networkDetails !== undefined && <KeyValue label={zhCN.devices.connectionServer} value={controlServerName(networkDetails.controlChannelUrl)} mono />}
+          {networkDetails?.webRtc?.protocol !== undefined && <KeyValue label={zhCN.devices.networkProtocol} value={protocolText(networkDetails.webRtc.protocol, networkDetails.webRtc.relayProtocol)} />}
+          {networkDetails?.webRtc !== undefined && <KeyValue label={zhCN.devices.candidatePath} value={candidatePathText(networkDetails.webRtc.localCandidateType, networkDetails.webRtc.localAddressScope, networkDetails.webRtc.remoteCandidateType, networkDetails.webRtc.remoteAddressScope)} />}
+          {networkDetails?.webRtc?.currentRoundTripTimeMs !== undefined && <KeyValue label={zhCN.devices.roundTripTime} value={`${networkDetails.webRtc.currentRoundTripTimeMs.toLocaleString()} ms`} />}
+          {networkDetails?.webRtc?.availableOutgoingBitrate !== undefined && <KeyValue label={zhCN.devices.availableBitrate} value={formatBitrate(networkDetails.webRtc.availableOutgoingBitrate)} />}
+          {networkDetails !== undefined && <KeyValue label={zhCN.devices.connectedAt} value={networkDetails.connectedAt === undefined ? zhCN.common.unavailable : new Date(networkDetails.connectedAt).toLocaleString()} />}
+          {(connection.stats.bytesSent !== undefined || connection.stats.bytesReceived !== undefined) && <KeyValue label={zhCN.devices.traffic} value={`${formatBytes(connection.stats.bytesSent ?? 0)} ${zhCN.devices.sent} · ${formatBytes(connection.stats.bytesReceived ?? 0)} ${zhCN.devices.received}`} />}
+        </View>
       </View>
-    </View>
+    )}
   </>
 }
 
@@ -592,7 +629,6 @@ function createStyles(colors: ThemeColors) {
   deviceIcon: { width: 56, height: 56, borderRadius: radius.xl, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   deviceHeroCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   deviceName: { ...type.title, color: colors.ink, flexShrink: 1 },
-  devicePlatform: { ...type.small, color: colors.muted, maxWidth: '30%', flexShrink: 1, textAlign: 'right' },
   connectArea: { marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.card, gap: spacing.lg },
   connectCopy: { ...type.body, color: colors.muted },
   trustHeader: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },

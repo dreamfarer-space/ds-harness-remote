@@ -41,6 +41,7 @@ import { strings } from '../locales/i18n'
 
 const DIRECTORY_SHEET_COMPACT_RATIO = 0.92
 const DIRECTORY_SHEET_RATIO = 0.75
+const EMPTY_STRINGS: readonly string[] = []
 
 export function WorkspaceActionsModal({
   target,
@@ -70,12 +71,17 @@ export function WorkspaceActionsModal({
   onDelete: () => void
 }) {
   const styles = useThemedStyles(createStyles)
-  const { sheetMaxHeight } = useResponsiveLayout()
+  const { sheetMaxHeight, sheetAsDialog } = useResponsiveLayout()
   const canManage = canManageWorkspace(target)
 
   return (
-    <SheetModal visible={target !== undefined} onClose={onClose} backdropStyle={styles.backdrop} sheetStyle={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
-        <View style={styles.grabber} />
+    <SheetModal
+      visible={target !== undefined}
+      onClose={onClose}
+      backdropStyle={styles.backdrop}
+      sheetStyle={[styles.sheet, sheetAsDialog ? { paddingTop: spacing.lg } : { maxHeight: sheetMaxHeight }]}
+    >
+        {!sheetAsDialog && <View style={styles.grabber} />}
         <View style={styles.sheetHeader}>
           <View style={styles.workspaceActionHeading}>
             <Text style={styles.sheetTitle}>{strings.workspaces.options}</Text>
@@ -168,7 +174,7 @@ export function CreateWorkspaceModal({
   opencodeAvailable,
   claudeAvailable,
   hermesAvailable,
-  customAcpBackends = [],
+  customAcpBackends = EMPTY_STRINGS,
   initialBackend,
   busy,
   onClose,
@@ -424,7 +430,7 @@ export function RenameWorkspaceModal({
   const [title, setTitle] = useState('')
   const { colors } = useTheme()
   const styles = useThemedStyles(createStyles)
-  const { sheetMaxHeight } = useResponsiveLayout()
+  const { sheetMaxHeight, sheetAsDialog } = useResponsiveLayout()
 
   useEffect(() => {
     if (target !== undefined) setTitle(target.title)
@@ -437,8 +443,13 @@ export function RenameWorkspaceModal({
   }
 
   return (
-    <SheetModal visible={target !== undefined} onClose={onClose} backdropStyle={styles.backdrop} sheetStyle={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
-        <View style={styles.grabber} />
+    <SheetModal
+      visible={target !== undefined}
+      onClose={onClose}
+      backdropStyle={styles.backdrop}
+      sheetStyle={[styles.sheet, sheetAsDialog ? { paddingTop: spacing.lg } : { maxHeight: sheetMaxHeight }]}
+    >
+        {!sheetAsDialog && <View style={styles.grabber} />}
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>{strings.workspaces.renameTitle}</Text>
           <IconButton label={strings.common.close} icon={X} onPress={onClose} />
@@ -483,7 +494,7 @@ export function DirectoryBrowserModal({
   const requestRef = useRef(0)
   const { colors } = useTheme()
   const styles = useThemedStyles(createStyles)
-  const { height: windowHeight, landscape, compactHeight } = useResponsiveLayout()
+  const { height: windowHeight, landscape, compactHeight, sheetAsDialog } = useResponsiveLayout()
   const browserSheetHeight = Math.round(windowHeight * (landscape || compactHeight ? DIRECTORY_SHEET_COMPACT_RATIO : DIRECTORY_SHEET_RATIO))
 
   const open = useCallback(async (path?: string) => {
@@ -522,8 +533,14 @@ export function DirectoryBrowserModal({
   const entries = listing === undefined ? [] : listing.entries.filter(entry => showHidden || !entry.hidden)
 
   return (
-    <SheetModal visible={visible} onClose={onClose} avoidKeyboard backdropStyle={styles.backdrop} sheetStyle={[styles.browserSheet, { height: browserSheetHeight }]}>
-        <View style={styles.grabber} />
+    <SheetModal
+      visible={visible}
+      onClose={onClose}
+      avoidKeyboard
+      backdropStyle={styles.backdrop}
+      sheetStyle={[styles.browserSheet, { height: browserSheetHeight }, sheetAsDialog && { paddingTop: spacing.lg }]}
+    >
+        {!sheetAsDialog && <View style={styles.grabber} />}
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>{strings.workspaces.chooseFolder}</Text>
           <IconButton label={strings.common.close} icon={X} onPress={onClose} />

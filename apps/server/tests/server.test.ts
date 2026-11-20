@@ -323,6 +323,44 @@ describe('account and device authorization', () => {
   })
 })
 describe('control authorization and encrypted relay', () => {
+  it('closes an established connection on restart without a spurious connection failure', async () => {
+    const ctx = await connection()
+    await handshake(ctx)
+    const info = vi.spyOn(app.gateway.logger, 'info')
+    const hostClose = once(ctx.host.ws, 'close')
+    const clientClose = once(ctx.client.ws, 'close')
+    await app.close()
+    await Promise.all([hostClose, clientClose])
+    await vi.waitFor(() => expect(info.mock.calls.filter(([event]) => event === 'ws_connection_closed')).toHaveLength(2))
+    expect(info.mock.calls.filter(([event]) => event === 'ws_peer_disconnected')).toEqual([])
+    expect(ctx.host.messages.filter(frame => frame.type === 'error')).toEqual([])
+    expect(ctx.client.messages.filter(frame => frame.type === 'error')).toEqual([])
+    await start()
+    const host = await socket(ctx.h)
+    const client = await socket(ctx.c)
+    expect((await host.next('hello.ack')).capabilities).not.toContain('transport.webrtc.resume.v1')
+    await client.next('hello.ack')
+    client.send('relay', { connectionId: ctx.connectionId, targetDeviceId: ctx.h.deviceId, counter: 0, ciphertext: 'AQIDBA' })
+    expect((await client.next('error')).code).toBe('CONNECTION_NOT_FOUND')
+    client.send('connect.request', { hostDeviceId: ctx.h.deviceId, preferredTransports: ['relay'] })
+    const incoming = await host.next('connect.incoming')
+    expect(incoming.connectionId).not.toBe(ctx.connectionId)
+  })
+  it('drops an established link when the Host control TCP socket fails', async () => {
+    const ctx = await connection()
+    await handshake(ctx)
+    ctx.host.ws.terminate()
+    expect((await ctx.client.next('error'))).toMatchObject({
+      code: 'CONNECTION_FAILED', connectionId: ctx.connectionId, retryable: true,
+    })
+    ctx.client.send('relay', {
+      connectionId: ctx.connectionId, targetDeviceId: ctx.h.deviceId, counter: 0, ciphertext: 'AQIDBA',
+    })
+    ctx.client.send('ping', { nonce: 'stale-link-barrier' })
+    expect(await ctx.client.next('pong')).toEqual({ nonce: 'stale-link-barrier' })
+    expect(ctx.client.messages.filter(frame => frame.type === 'error')).toEqual([])
+    expect(ctx.host.messages.filter(frame => frame.type === 'relay')).toEqual([])
+  })
   it('requires the complete native origin when NetStack omits the WebSocket port', async () => {
     const hint = 'X-DSH-Native-Origin: http://localhost:8080'
     await runScenarios([
@@ -527,11 +565,13 @@ describe('webrtc signaling and TURN credentials', () => {
     expect(await partial.next('hello.ack')).toMatchObject({
       capabilities: ['transport.p2p', 'transport.relay'],
       webrtcEnabled: true,
-      webrtcFallbackTimeoutMs: 12_000,
+      webrtcFallbackTimeoutMs: 3_000,
     })
     const withoutTurn = await socket(await device(), { capabilities: fullCapabilities })
     expect(await withoutTurn.next('hello.ack')).toMatchObject({
       capabilities: ['transport.lan', 'transport.p2p', 'transport.relay'],
+      webrtcEnabled: true,
+      webrtcFallbackTimeoutMs: 3_000,
     })
     await app.close()
     await start(password, [], {
@@ -544,7 +584,11 @@ describe('webrtc signaling and TURN credentials', () => {
     })
     accountToken = (await request('/auth/login', 'POST', { email: account, password })).data.token
     const withTurn = await socket(await device(), { capabilities: fullCapabilities })
-    expect(await withTurn.next('hello.ack')).toMatchObject({ capabilities: fullCapabilities })
+    expect(await withTurn.next('hello.ack')).toMatchObject({
+      capabilities: fullCapabilities,
+      webrtcEnabled: true,
+      webrtcFallbackTimeoutMs: 12_000,
+    })
   })
 
   it('disables WebRTC when negotiation leaves only relay (#449)', async () => {
@@ -555,7 +599,10 @@ describe('webrtc signaling and TURN credentials', () => {
       })
     }
     const lan = await socket(await device(), { capabilities: ['transport.lan', 'transport.relay'] })
-    expect(await lan.next('hello.ack')).toMatchObject({ webrtcEnabled: true })
+    expect(await lan.next('hello.ack')).toMatchObject({
+      webrtcEnabled: true,
+      webrtcFallbackTimeoutMs: 3_000,
+    })
   })
 
   it('forwards ordered WebRTC signaling and transport selection', async () => {
@@ -1507,6 +1554,61 @@ describe('stale link frame dropping and configurable rate limit', () => {
       await adaptive.close()
     } finally {
       ;(globalThis as Record<string, unknown>).WebSocket = prevWs
+    }
+  })
+
+  it('accepts a delayed pong for the previous ping nonce while rejecting stale or replayed nonces', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      await app.close()
+      await start(password, [], { heartbeatIntervalMs: 25_000, heartbeatDisconnectMs: 75_000 })
+      accountToken = (await request('/auth/login', 'POST', { email: account, password })).data.token
+      const d = await device()
+      const wire = await socket(d)
+      await wire.next('hello.ack')
+      const peer = app.gateway.peers.get(d.deviceId)!
+
+      // Two consecutive pings arrive across a jitter boundary before the client answers the first.
+      vi.advanceTimersByTime(25_000)
+      const ping1 = await wire.next('ping')
+      vi.advanceTimersByTime(25_000)
+      const ping2 = await wire.next('ping')
+
+      const baseline = Date.now() - 30_000
+      peer.lastPong = baseline
+      wire.send('pong', { nonce: ping1.nonce })
+      wire.send('ping', { nonce: 'sync-1' })
+      await wire.next('pong')
+      expect(peer.lastPong).toBeGreaterThan(baseline)
+
+      // Replaying the already-consumed previous nonce must not refresh lastPong again.
+      peer.lastPong = baseline
+      wire.send('pong', { nonce: ping1.nonce })
+      wire.send('ping', { nonce: 'sync-2' })
+      await wire.next('pong')
+      expect(peer.lastPong).toBe(baseline)
+
+      // The second ping nonce remains valid and refreshes lastPong.
+      wire.send('pong', { nonce: ping2.nonce })
+      wire.send('ping', { nonce: 'sync-3' })
+      await wire.next('pong')
+      expect(peer.lastPong).toBeGreaterThan(baseline)
+
+      // After three new pings, the oldest nonce has been evicted from the 2-nonce window.
+      vi.advanceTimersByTime(25_000)
+      const ping3 = await wire.next('ping')
+      vi.advanceTimersByTime(25_000)
+      await wire.next('ping')
+      vi.advanceTimersByTime(25_000)
+      await wire.next('ping')
+
+      peer.lastPong = baseline
+      wire.send('pong', { nonce: ping3.nonce })
+      wire.send('ping', { nonce: 'sync-4' })
+      await wire.next('pong')
+      expect(peer.lastPong).toBe(baseline)
+    } finally {
+      vi.useRealTimers()
     }
   })
 })

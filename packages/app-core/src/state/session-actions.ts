@@ -56,7 +56,17 @@ function acpPermissionsValue(currentValue: string) {
   }
 }
 
-function acpClientForBackend(connection: SessionAccess['runtime']['connection'], backend: string) {
+export function hasAcpBackendFor(connection: SessionAccess['runtime']['connection'], backend: string): boolean {
+  if (backend === 'claude') return connection.hasClaude()
+  if (backend === 'hermes') return connection.hasHermes()
+  if (backend === 'opencode') return connection.hasOpencode()
+  if (backend === 'pi') return connection.hasPi()
+  if (backend === 'antigravity') return connection.hasAntigravity()
+  if (backend === 'cursor') return connection.hasCursor()
+  return connection.hasAcpBackend(backend)
+}
+
+export function acpClientForBackend(connection: SessionAccess['runtime']['connection'], backend: string) {
   if (backend === 'claude') return connection.requireClaude()
   if (backend === 'hermes') return connection.requireHermes()
   if (backend === 'opencode') return connection.requireOpencode()
@@ -69,6 +79,11 @@ function acpClientForBackend(connection: SessionAccess['runtime']['connection'],
 /** Session actions use the store's single connection/session runtime. */
 export function createSessionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
   'refreshSessionStatus' | 'syncHarnessCatalog' | 'openSession' | 'forkChatMessage' | 'quoteChatMessage' | 'rateMessage' | 'createSession' | 'forkSession' | 'archiveSession' | 'unarchiveSession' | 'pinSession' | 'unpinSession' | 'renameSession' | 'selectModel' | 'selectPermission' | 'loadAgentPresets' | 'selectAgentPreset' | 'loadOlderHistory'> {
+  let modelSelectToken = 0
+  let permissionSelectToken = 0
+  let agentPresetLoadToken = 0
+  let agentPresetSelectToken = 0
+
   const isHarnessBackend = (backend?: RemoteSession['backend']) =>
     (backend ?? 'harness') === 'harness'
 
@@ -230,6 +245,10 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           historyLoadingOlder: false,
           sessionModels: undefined,
           modelSelecting: false,
+          permissionSelecting: false,
+          agentPresetOptions: undefined,
+          agentPresetLoading: false,
+          agentPresetSelecting: false,
           historyHasMore: false,
           oldestLoadedSeq: undefined,
         }))
@@ -254,6 +273,7 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         // Retain live/optimistic rows and pending approvals/questions, not a misleading gap in cached history.
         return contiguousCache ? existing : existing.filter(item => !cachedIds.has(item.id) || item.id.startsWith('local:') || item.kind === 'approval' || item.kind === 'question')
       }
+      runtime.clearCodexRecoveryTimer()
       runtime.sessionReadAbort?.abort()
       const readAbort = new AbortController()
       runtime.sessionReadAbort = readAbort
@@ -293,8 +313,10 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         historyLoadingOlder: false,
         sessionModels: undefined,
         modelSelecting: false,
+        permissionSelecting: false,
         agentPresetOptions: undefined,
         agentPresetLoading: false,
+        agentPresetSelecting: false,
         sessionLifecycles: state.sessionLifecycles[session.sessionId] === undefined
           ? state.sessionLifecycles
           : {
@@ -310,65 +332,185 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           void runtime.closeActiveCursorStream()
           const client = runtime.connection.requireCodex()
           const threadId = codexThreadId(session)
-          const savedPermissions = await loadSavedCodexPermissions(get().selectedDevice?.deviceId)
-          if (!current()) return
-          const sessionWithPermission = withBestCodexPermission(session, undefined, savedPermissions)
-          const permission = codexPermissionPreset(sessionWithPermission)
-          const [read, history] = await Promise.all([
-            readCodexSession(client, threadId, permission, readAbort.signal),
-            readCodexHistoryPage(client, threadId, undefined, 16, readAbort.signal),
+          const recoveryDelaysMs = [1_500, 3_000, 6_000, 12_000] as const
+          const nonRetryableRecoveryCodes = new Set([
+            'FEATURE_NOT_SUPPORTED',
+            'CODEX_AUTH_REQUIRED',
+            'CODEX_THREAD_NOT_ALLOWED',
+            'CODEX_BINARY_UNAVAILABLE',
+            'CODEX_CLOSED',
+            'THREAD_NOT_FOUND',
           ])
-          if (!current()) return
-          const timeline = createCodexTimelineState({ ...read.thread, turns: [] })
-          if (timeline === undefined) throw new Error(zhCN.runtime.codexInvalidResponse)
-          runtime.activeCodexTimeline = withActiveCodexTurn(timeline, history.activeTurnId)
-          const items = foldHistory(history.events, session.sessionId, true)
-          const nextSession = {
-            ...sessionWithPermission,
-            ...read.session,
-            ...(history.activeTurnId === undefined ? {} : { running: true }),
+          const isCurrentCodexSession = () => current()
+            && get().connection.phase === 'connected'
+            && get().selectedSession?.sessionId === session.sessionId
+          const applyCodexSnapshot = (
+            read: Awaited<ReturnType<typeof readCodexSession>>,
+            history: Awaited<ReturnType<typeof readCodexHistoryPage>>,
+            savedPermissions: Awaited<ReturnType<typeof loadSavedCodexPermissions>>,
+            recovering = false,
+          ) => {
+            const timeline = createCodexTimelineState({ ...read.thread, turns: [] })
+            if (timeline === undefined) throw new Error(zhCN.runtime.codexInvalidResponse)
+            runtime.activeCodexTimeline = withActiveCodexTurn(timeline, history.activeTurnId)
+            const items = foldHistory(history.events, session.sessionId, true)
+            set(state => {
+              const latestSession = state.sessions.find(item => item.sessionId === session.sessionId) ?? session
+              const baseSession = recovering ? latestSession : withBestCodexPermission(latestSession, undefined, savedPermissions)
+              const nextSession = {
+                ...baseSession,
+                ...read.session,
+                ...(history.activeTurnId !== undefined ? { running: true } : recovering ? { running: false } : {}),
+              }
+              const codexMerged = mergeHistoryAndLive(items, browseLive(items, state.messages[session.sessionId] ?? []))
+              if (canPersistSnapshot()) saveSessionMessagesSnapshot(memoryScope, session.sessionId, codexMerged)
+              return {
+                selectedSession: state.selectedSession?.sessionId === session.sessionId ? nextSession : state.selectedSession,
+                sessions: state.sessions.map(item => item.sessionId === session.sessionId ? nextSession : item),
+                messages: {
+                  ...state.messages,
+                  [session.sessionId]: codexMerged,
+                },
+                ...pageState(history.hasMore, oldestSeq(history.events)),
+              }
+            })
           }
-          set(state => {
-            const codexMerged = mergeHistoryAndLive(items, browseLive(items, state.messages[session.sessionId] ?? []))
-            if (canPersistSnapshot()) saveSessionMessagesSnapshot(memoryScope, session.sessionId, codexMerged)
-            return {
-              selectedSession: nextSession,
-              sessions: state.sessions.map(item => item.sessionId === session.sessionId ? nextSession : item),
-              messages: {
-                ...state.messages,
-                [session.sessionId]: codexMerged,
-              },
-              ...pageState(history.hasMore, oldestSeq(history.events)),
+          const applyCodexRefreshedHistory = (history: Awaited<ReturnType<typeof readCodexHistoryPage>>) => {
+            const items = foldHistory(history.events, session.sessionId, true)
+            const activeTurnId = history.activeTurnId !== undefined
+              && !runtime.isCodexTurnCompleted(threadId, history.activeTurnId)
+              ? history.activeTurnId
+              : undefined
+            if (runtime.activeCodexTimeline?.session.nativeId === threadId && activeTurnId !== undefined
+              && runtime.activeCodexTimeline.activeTurnId === undefined) {
+              runtime.activeCodexTimeline = withActiveCodexTurn(runtime.activeCodexTimeline, activeTurnId)
             }
-          })
-          let streamClosed = false
-          const stream = await client.subscribe(
-            threadId,
-            frame => { if (current()) runtime.enqueueCodexFrame(loadGeneration, frame) },
-            // History reads can abort locally. An open must retain its ACK so
-            // a superseded load can close the subscription created on the Host.
-            undefined,
-            reason => {
-              streamClosed = true
-              if (!current()) return
-              if (runtime.activeCodexTimeline?.session.nativeId !== threadId) return
-              runtime.activeCodexStream = undefined
-              runtime.activeCodexTimeline = undefined
-              set(state => ({
-                codexReadySessionId: undefined,
-                sessions: state.sessions.map(item => item.sessionId === session.sessionId ? {...item, running: false} : item),
-                selectedSession: state.selectedSession?.sessionId === session.sessionId
-                  ? state.selectedSession
-                  : state.selectedSession,
-                ...(reason === 'failed' ? { error: zhCN.runtime.codexUnavailable } : {}),
-              }))
-            },
-          )
-          if (!current()) { await stream.close().catch(() => undefined); return }
-          if (streamClosed) throw new Error(zhCN.runtime.codexUnavailable)
-          runtime.activeCodexStream = stream
-          set({ busyAction: undefined, codexReadySessionId: session.sessionId })
-          void runtime.refreshCodexModels(session.sessionId)
+            set(state => {
+              const codexMerged = mergeHistoryAndLive(items, browseLive(items, state.messages[session.sessionId] ?? []))
+              if (canPersistSnapshot()) saveSessionMessagesSnapshot(memoryScope, session.sessionId, codexMerged)
+              const activeTurnKnown = activeTurnId !== undefined || runtime.activeCodexTimeline?.activeTurnId !== undefined
+              const syncRunning = (item: RemoteSession): RemoteSession => item.sessionId === session.sessionId
+                ? { ...item, running: activeTurnKnown }
+                : item
+              return {
+                selectedSession: state.selectedSession === undefined ? undefined : syncRunning(state.selectedSession),
+                sessions: state.sessions.map(syncRunning),
+                messages: {
+                  ...state.messages,
+                  [session.sessionId]: codexMerged,
+                },
+                ...pageState(history.hasMore, oldestSeq(history.events)),
+              }
+            })
+          }
+          const openCodexSubscription = async (recovering: boolean) => {
+            let subscribedStream: import('@dsh-remote/client-core').CodexStream | undefined
+            let streamClosed = false
+            let ready = false
+            const stream = await client.subscribe(
+              threadId,
+              frame => { if (current()) runtime.enqueueCodexFrame(loadGeneration, frame) },
+              // History reads can abort locally. An open must retain its ACK so
+              // a superseded load can close the subscription created on the Host.
+              undefined,
+              reason => {
+                streamClosed = true
+                if (!current()) return
+                if (subscribedStream !== undefined && runtime.activeCodexStream !== subscribedStream) return
+                if (subscribedStream === undefined && runtime.activeCodexTimeline?.session.nativeId !== threadId) return
+                runtime.activeCodexStream = undefined
+                runtime.activeCodexTimeline = undefined
+                set(state => ({
+                  codexReadySessionId: undefined,
+                  sessions: state.sessions.map(item => item.sessionId === session.sessionId ? { ...item, running: false } : item),
+                  selectedSession: state.selectedSession?.sessionId === session.sessionId
+                    ? { ...state.selectedSession, running: false }
+                    : state.selectedSession,
+                  ...(reason === 'failed' ? { error: zhCN.runtime.codexUnavailable } : {}),
+                }))
+                if (ready && reason === 'failed' && get().connection.phase === 'connected'
+                  && get().selectedSession?.sessionId === session.sessionId) {
+                  scheduleCodexRecovery(0)
+                }
+              },
+            )
+            if (!current()) { await stream.close().catch(() => undefined); return }
+            if (streamClosed) {
+              await stream.close().catch(() => undefined)
+              throw new Error(zhCN.runtime.codexUnavailable)
+            }
+            subscribedStream = stream
+            runtime.activeCodexStream = stream
+            if (stream.replayTruncated === true) {
+              let refreshed: Awaited<ReturnType<typeof readCodexHistoryPage>>
+              try {
+                refreshed = await readCodexHistoryPage(client, threadId, undefined, 16, readAbort.signal)
+              } catch (error) {
+                if (runtime.activeCodexStream === stream) {
+                  runtime.activeCodexStream = undefined
+                  runtime.activeCodexTimeline = undefined
+                }
+                await stream.close().catch(() => undefined)
+                throw error
+              }
+              if (!current()) {
+                if (runtime.activeCodexStream === stream) runtime.activeCodexStream = undefined
+                await stream.close().catch(() => undefined)
+                return
+              }
+              if (streamClosed || runtime.activeCodexStream !== stream) {
+                if (runtime.activeCodexStream === stream) runtime.activeCodexStream = undefined
+                await stream.close().catch(() => undefined)
+                throw new Error(zhCN.runtime.codexUnavailable)
+              }
+              applyCodexRefreshedHistory(refreshed)
+            }
+            ready = true
+            set(state => ({
+              ...(recovering ? {} : { busyAction: undefined }),
+              codexReadySessionId: session.sessionId,
+              ...(recovering && state.error === zhCN.runtime.codexUnavailable ? { error: undefined } : {}),
+            }))
+            void runtime.refreshCodexModels(session.sessionId)
+          }
+          const loadAndApplyCodexSnapshot = async (recovering: boolean, activeCheck: () => boolean) => {
+            const savedPermissions = await loadSavedCodexPermissions(get().selectedDevice?.deviceId)
+            if (!activeCheck()) return false
+            const sessionWithPermission = withBestCodexPermission(session, undefined, savedPermissions)
+            const permission = codexPermissionPreset(sessionWithPermission)
+            const [read, history] = await Promise.all([
+              readCodexSession(client, threadId, permission, readAbort.signal),
+              readCodexHistoryPage(client, threadId, undefined, 16, readAbort.signal),
+            ])
+            if (!activeCheck()) return false
+            applyCodexSnapshot(read, history, savedPermissions, recovering)
+            return true
+          }
+          const scheduleCodexRecovery = (attempt: number) => {
+            const delayMs = recoveryDelaysMs[attempt]
+            if (delayMs === undefined) return
+            runtime.scheduleCodexRecovery(delayMs, () => {
+              void (async () => {
+                const canRecover = () => isCurrentCodexSession()
+                  && runtime.activeCodexStream === undefined
+                  && !get().busyAction?.startsWith('session:')
+                if (!canRecover()) return
+                try {
+                  if (!await loadAndApplyCodexSnapshot(true, canRecover)) return
+                  await openCodexSubscription(true)
+                } catch (error) {
+                  if (!canRecover()) return
+                  const code = typeof (error as { code?: unknown })?.code === 'string'
+                    ? (error as { code: string }).code
+                    : undefined
+                  if (code !== undefined && nonRetryableRecoveryCodes.has(code)) return
+                  if (attempt + 1 < recoveryDelaysMs.length) scheduleCodexRecovery(attempt + 1)
+                }
+              })()
+            })
+          }
+          if (!await loadAndApplyCodexSnapshot(false, current)) return
+          await openCodexSubscription(false)
           return
         }
         if (isAcpManagedBackend(session.backend)) {
@@ -383,7 +525,12 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           // History replaces the previous connection's projection. Retain existing displayed
           // messages so opening or reconnecting does not flash white, then in-place merge.
           set(state => ({
-            selectedSession: session, sessionModels: undefined, historyHasMore: false,
+            selectedSession: {
+              ...session,
+              running: session.running || (state.selectedSession?.sessionId === session.sessionId && state.selectedSession.running),
+            },
+            sessionModels: undefined,
+            historyHasMore: false,
             ...(cleanExisting.length !== existingMessages.length
               ? { messages: { ...state.messages, [session.sessionId]: cleanExisting } }
               : {}),
@@ -437,7 +584,17 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
             if (older.length > 0) acpOlderHistory.set(session.sessionId, older)
             else acpOlderHistory.delete(session.sessionId)
             if (canPersistSnapshot()) saveSessionMessagesSnapshot(memoryScope, session.sessionId, tail)
-            const active = state.selectedSession?.sessionId === session.sessionId ? { ...state.selectedSession, ...enrichedSession } : enrichedSession
+            const currentSession = state.selectedSession?.sessionId === session.sessionId
+              ? state.selectedSession
+              : state.sessions.find(item => item.sessionId === session.sessionId)
+            const hasLiveTurnInFlight = merged.some(item =>
+              (item.kind === 'message' && item.streaming === true)
+              || ((item.kind === 'message' || item.kind === 'tool') && item.turn?.startsWith('acp-live:') && item.turnEnd === undefined),
+            )
+            const resolvedRunning = hasLiveTurnInFlight ? true : (currentSession?.running ?? session.running)
+            const active = state.selectedSession?.sessionId === session.sessionId
+              ? { ...state.selectedSession, ...enrichedSession, running: resolvedRunning }
+              : { ...enrichedSession, running: resolvedRunning }
             enrichedSession = active
             return {
               selectedSession: active,
@@ -502,11 +659,13 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           // replaces the row by requestRpcId, so a misjudgment self-heals.
           const inboxSnapshot = latest.projections?.values?.inbox
           const userQuestionsSnapshot = latest.projections?.values?.userQuestions
-          const merged = applyFeedback(mergeHistoryAndLive(items, browseLive(items, state.messages[session.sessionId] ?? []), history.throughSeq), ratings)
-          const reconciled = inboxSnapshot === undefined ? merged : reconcileDeliveryStates(
-            merged,
-            inboxRpcIds(inboxSnapshot),
-            new Set(items.flatMap(item => item.kind === 'message' && item.requestRpcId !== undefined ? [item.requestRpcId] : [])),
+          const liveItems = browseLive(items, state.messages[session.sessionId] ?? [])
+          const historyRpcIds = new Set(items.flatMap(item => item.kind === 'message' && item.requestRpcId !== undefined ? [item.requestRpcId] : []))
+          const queuedRpcIds = inboxSnapshot === undefined ? undefined : inboxRpcIds(inboxSnapshot)
+          const reconciledLive = queuedRpcIds === undefined ? liveItems : reconcileDeliveryStates(
+            liveItems,
+            queuedRpcIds,
+            historyRpcIds,
             runtime.connectionStartedAt,
           )
           // A prompt acknowledged on this connection can still be missing from
@@ -514,19 +673,18 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           // proves the session is idle and neither source knows the requestId,
           // settle the optimistic row as unconfirmed instead of leaving the
           // composer stuck on "sending" forever. Late echoes still replace it.
-          const historyRpcIds = new Set(items.flatMap(item => item.kind === 'message' && item.requestRpcId !== undefined ? [item.requestRpcId] : []))
           const runningNow = nextSession.running === true || authoritativeLifecycle?.running === true
-          const unsettled = inboxSnapshot === undefined || runningNow ? reconciled : (() => {
-            const queuedRpcIds = inboxRpcIds(inboxSnapshot)
-            return reconciled.map(item => item.kind === 'message' && item.id.startsWith('local:')
-              && item.sendState === undefined && item.requestRpcId !== undefined
-              && !queuedRpcIds.has(item.requestRpcId) && !historyRpcIds.has(item.requestRpcId)
+          const settledLive = queuedRpcIds === undefined || runningNow ? reconciledLive : reconciledLive.map(item =>
+            item.kind === 'message' && item.id.startsWith('local:')
+            && (item.sendState === undefined || item.sendState === 'queued') && item.requestRpcId !== undefined
+            && !queuedRpcIds.has(item.requestRpcId) && !historyRpcIds.has(item.requestRpcId)
               ? { ...item, sendState: 'unconfirmed' as const }
-              : item)
-          })()
+              : item,
+          )
+          const merged = applyFeedback(mergeHistoryAndLive(items, settledLive, history.throughSeq), ratings)
           const withQuestions = userQuestionsSnapshot === undefined
-            ? unsettled
-            : reconcileUserQuestionsProjection(unsettled, session.sessionId, userQuestionsSnapshot, inboxSnapshot)
+            ? merged
+            : reconcileUserQuestionsProjection(merged, session.sessionId, userQuestionsSnapshot, inboxSnapshot)
           const hasRunningAskUserTool = items.some(item => item.kind === 'tool' && item.state === 'running' && (item.toolKey ?? item.toolName) === 'ask_user_question')
           const effectivelyRunning = nextSession.running || (authoritativeLifecycle === undefined && hasRunningAskUserTool)
           const activeTurn = authoritativeLifecycle?.turn
@@ -690,7 +848,6 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
             const session = createCursorSession({
               acpSessionId: created.sessionId,
               cwd,
-              title: workspace?.title ?? 'Cursor',
             })
             set(state => ({
               sessions: [session, ...state.sessions.filter(item => item.sessionId !== session.sessionId)],
@@ -939,8 +1096,15 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
               sessionIds: workspace.sessionIds.filter(id => id !== sessionId),
             })),
             busyAction: undefined,
-            selectedSession: state.selectedSession?.sessionId === sessionId ? undefined : state.selectedSession,
-            sessionModels: state.selectedSession?.sessionId === sessionId ? undefined : state.sessionModels,
+            ...(state.selectedSession?.sessionId === sessionId ? {
+              selectedSession: undefined,
+              sessionModels: undefined,
+              permissionSelecting: false,
+              modelSelecting: false,
+              agentPresetOptions: undefined,
+              agentPresetLoading: false,
+              agentPresetSelecting: false,
+            } : {}),
           }))
           return true
         }
@@ -957,8 +1121,15 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
               sessionIds: workspace.sessionIds.filter(id => id !== sessionId),
             })),
             busyAction: undefined,
-            selectedSession: state.selectedSession?.sessionId === sessionId ? undefined : state.selectedSession,
-            sessionModels: state.selectedSession?.sessionId === sessionId ? undefined : state.sessionModels,
+            ...(state.selectedSession?.sessionId === sessionId ? {
+              selectedSession: undefined,
+              sessionModels: undefined,
+              permissionSelecting: false,
+              modelSelecting: false,
+              agentPresetOptions: undefined,
+              agentPresetLoading: false,
+              agentPresetSelecting: false,
+            } : {}),
           }))
           return true
         }
@@ -971,8 +1142,15 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           archivedSessionIds,
           pinnedSessionIds: state.pinnedSessionIds.filter(id => id !== sessionId),
           busyAction: undefined,
-          selectedSession: state.selectedSession?.sessionId === sessionId ? undefined : state.selectedSession,
-          sessionModels: state.selectedSession?.sessionId === sessionId ? undefined : state.sessionModels,
+          ...(state.selectedSession?.sessionId === sessionId ? {
+            selectedSession: undefined,
+            sessionModels: undefined,
+            permissionSelecting: false,
+            modelSelecting: false,
+            agentPresetOptions: undefined,
+            agentPresetLoading: false,
+            agentPresetSelecting: false,
+          } : {}),
         }))
         return true
       } catch (error) {
@@ -1105,8 +1283,18 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
 
     async selectModel(selection) {
       const generation = runtime.connectionGeneration
+      const loadGeneration = runtime.sessionLoadGeneration
       const session = get().selectedSession
       if (session === undefined || get().connection.phase !== 'connected') return false
+      const token = ++modelSelectToken
+      const isCurrent = () => token === modelSelectToken
+        && generation === runtime.connectionGeneration
+        && loadGeneration === runtime.sessionLoadGeneration
+        && get().connection.phase === 'connected'
+        && get().selectedSession?.sessionId === session.sessionId
+      const releaseIfLatest = () => {
+        if (token === modelSelectToken && get().modelSelecting) set({ modelSelecting: false })
+      }
       set({ modelSelecting: true, error: undefined })
       try {
         if (session.backend === 'codex') {
@@ -1120,13 +1308,13 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         }
         if (session.backend === 'pi') {
           const models = await selectPiModel(runtime.connection.requirePi(), cursorNativeId(session), selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
         if (session.backend === 'opencode') {
           const models = await selectOpencodeModel(runtime.connection.requireOpencode(), cursorNativeId(session), selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
@@ -1134,36 +1322,37 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           const models = session.backend === 'hermes'
             ? await selectHermesModel(runtime.connection.requireHermes(), cursorNativeId(session), selection)
             : await selectClaudeModel(runtime.connection.requireClaude(), cursorNativeId(session), selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
         if (session.backend === 'antigravity') {
           const models = await selectAcpModel(runtime.connection.requireAntigravity(), cursorNativeId(session), 'antigravity', selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
         if (session.backend === 'cursor') {
           const models = await selectAcpModel(runtime.connection.requireCursor(), cursorNativeId(session), 'cursor', selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
         if (isAcpManagedBackend(session.backend)) {
           const models = await selectAcpModel(runtime.connection.requireAcpBackend(session.backend), cursorNativeId(session), session.backend, selection)
-          if (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set({ sessionModels: models, modelSelecting: false })
           return true
         }
         const selected = await runtime.connection.requireProxy().sessionSelectModel(session.sessionId, selection)
+        if (!isCurrent()) { releaseIfLatest(); return false }
         set(state => ({
           sessionModels: state.sessionModels === undefined ? undefined : { ...state.sessionModels, current: selected },
           modelSelecting: false,
         }))
         return true
       } catch (error) {
-        if (isAcpManagedBackend(session.backend) && (generation !== runtime.connectionGeneration || get().selectedSession?.sessionId !== session.sessionId)) return false
+        if (!isCurrent()) { releaseIfLatest(); return false }
         set({ modelSelecting: false, error: friendlyError(error) })
         return false
       }
@@ -1173,12 +1362,22 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
       const session = get().selectedSession
       if (session === undefined || get().connection.phase !== 'connected' || get().permissionSelecting) return false
       const generation = runtime.connectionGeneration
+      const loadGeneration = runtime.sessionLoadGeneration
+      const token = ++permissionSelectToken
+      const isCurrent = () => token === permissionSelectToken
+        && generation === runtime.connectionGeneration
+        && loadGeneration === runtime.sessionLoadGeneration
+        && get().connection.phase === 'connected'
+        && get().selectedSession?.sessionId === session.sessionId
+      const releaseIfLatest = () => {
+        if (token === permissionSelectToken && get().permissionSelecting) set({ permissionSelecting: false })
+      }
       set({ permissionSelecting: true, error: undefined })
       try {
         if (isAcpManagedBackend(session.backend)) {
           const client = acpClientForBackend(runtime.connection, session.backend)
           const confirmed = await client.selectPermission(cursorNativeId(session), session.backend, preset)
-          if (generation !== runtime.connectionGeneration) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           const confirmedRecord = typeof confirmed === 'object' && confirmed !== null ? confirmed as Record<string, unknown> : undefined
           const effective = typeof confirmedRecord?.preset === 'string' ? confirmedRecord.preset : preset
           const permissions = acpPermissionsValue(effective)
@@ -1206,9 +1405,10 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
           if (hostDeviceId === undefined) throw new Error(zhCN.runtime.connectHostFirst)
           const threadId = codexThreadId(session)
           const result = await runtime.connection.requireCodex().request('thread/resume', { threadId, permissionPreset: preset })
-          if (generation !== runtime.connectionGeneration) return false
+          if (!isCurrent()) { releaseIfLatest(); return false }
           const effectivePreset = codexPermissionPresetFromResponse(result) ?? preset
           await saveCodexPermissionPreset(hostDeviceId, threadId, effectivePreset)
+          if (!isCurrent()) { releaseIfLatest(); return false }
           set(state => ({
             ...withCodexPermissionState(state, session.sessionId, effectivePreset),
             permissionSelecting: false,
@@ -1217,9 +1417,10 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         }
         const proxy = runtime.connection.requireProxy()
         await proxy.sessionSelectPermission(session.sessionId, preset)
+        if (!isCurrent()) { releaseIfLatest(); return false }
         // Read back the official projection; never fabricate an accepted grant.
         const confirmed = (await proxy.sessionList()).find(item => item.sessionId === session.sessionId)
-        if (generation !== runtime.connectionGeneration) return false
+        if (!isCurrent()) { releaseIfLatest(); return false }
         const permissions = confirmed?.projections?.values?.permissions
         if (typeof permissions !== 'object' || permissions === null || !('currentValue' in permissions) || permissions.currentValue !== preset) {
           throw new Error('The Host did not confirm the selected permission preset.')
@@ -1240,6 +1441,7 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         })
         return true
       } catch (error) {
+        if (!isCurrent()) { releaseIfLatest(); return false }
         set({ permissionSelecting: false, error: friendlyError(error) })
         return false
       }
@@ -1252,13 +1454,22 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
       if (get().agentPresetLoading) return false
       const sessionId = session.sessionId
       const generation = runtime.connectionGeneration
-      const isCurrent = () => generation === runtime.connectionGeneration && get().selectedSession?.sessionId === sessionId
+      const loadGeneration = runtime.sessionLoadGeneration
+      const token = ++agentPresetLoadToken
+      const isCurrent = () => token === agentPresetLoadToken
+        && generation === runtime.connectionGeneration
+        && loadGeneration === runtime.sessionLoadGeneration
+        && get().connection.phase === 'connected'
+        && get().selectedSession?.sessionId === sessionId
+      const releaseIfLatest = () => {
+        if (token === agentPresetLoadToken && get().agentPresetLoading) set({ agentPresetLoading: false })
+      }
       set({ agentPresetLoading: true })
       try {
         if (isAcpManagedBackend(backend)) {
           const modes = await acpClientForBackend(runtime.connection, backend).sessionModes(cursorNativeId(session), backend)
           if (!isCurrent()) {
-            set({ agentPresetLoading: false })
+            releaseIfLatest()
             return false
           }
           const presets = modes.availableModes.map(mode => ({
@@ -1272,14 +1483,14 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         }
         const roster = await runtime.connection.requireProxy().agentPresetList()
         if (!isCurrent()) {
-          set({ agentPresetLoading: false })
+          releaseIfLatest()
           return false
         }
         set({ agentPresetOptions: [...roster.presets], agentPresetLoading: false })
         return true
       } catch (error) {
         if (!isCurrent()) {
-          set({ agentPresetLoading: false })
+          releaseIfLatest()
           return false
         }
         if (isAcpManagedBackend(backend)) {
@@ -1296,11 +1507,23 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
       const session = get().selectedSession
       if (session === undefined || get().connection.phase !== 'connected') return false
       if (session.backend === 'codex') return false
+      const generation = runtime.connectionGeneration
+      const loadGeneration = runtime.sessionLoadGeneration
+      const token = ++agentPresetSelectToken
+      const isCurrent = () => token === agentPresetSelectToken
+        && generation === runtime.connectionGeneration
+        && loadGeneration === runtime.sessionLoadGeneration
+        && get().connection.phase === 'connected'
+        && get().selectedSession?.sessionId === session.sessionId
+      const releaseIfLatest = () => {
+        if (token === agentPresetSelectToken && get().agentPresetSelecting) set({ agentPresetSelecting: false })
+      }
       set({ agentPresetSelecting: true, error: undefined })
       try {
         const committed = isAcpManagedBackend(session.backend)
           ? await acpClientForBackend(runtime.connection, session.backend).setMode(cursorNativeId(session), session.backend, preset).then(res => res.currentModeId ?? preset)
           : await runtime.connection.requireProxy().agentPresetSelect(session.sessionId, preset)
+        if (!isCurrent()) { releaseIfLatest(); return false }
         set(state => {
           const update = (item: RemoteSession): RemoteSession =>
             item.sessionId === session.sessionId ? { ...item, agentPreset: committed } : item
@@ -1312,6 +1535,7 @@ export function createSessionActions({ get, set, runtime }: SessionAccess): Pick
         })
         return true
       } catch (error) {
+        if (!isCurrent()) { releaseIfLatest(); return false }
         set({ agentPresetSelecting: false, error: friendlyError(error) })
         return false
       }
