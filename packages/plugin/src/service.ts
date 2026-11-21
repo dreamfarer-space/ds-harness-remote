@@ -1,3 +1,4 @@
+import { DshWebLanPeer } from './dsh-web-lan.js'
 import { DshWebPeer, type DshWebRuntime } from './dsh-web-host.js'
 import { SessionTransferHost, type TransferServices } from './session-transfer.js'
 import { LanUploadHost } from './lan-upload.js'
@@ -23,6 +24,7 @@ import { RemoteFileViewerBridge, type FileViewerHostServiceLike } from './file-v
 import {
   HostServerApi,
   ServerApiError,
+  type AccountVerification,
   type DeviceAuthorization,
   type OAuthProvider,
   type OAuthProviderInfo,
@@ -31,6 +33,7 @@ import {
 } from './server-api.js'
 import { HostServerConnection } from './server-connection.js'
 import { ServerCredentialStore } from './server-credentials.js'
+import type { MessageFileAttachment } from './message-file-attachment.js'
 import { dispatchCommandForHost, HarnessRemoteBridge, type ScheduleCreateService } from './harness-remote-bridge.js'
 import { readCompactionConfirmation, RemoteCompactionOperations } from './remote-compaction-operations.js'
 import type { PluginRouteDispatcher } from './plugin-route-bridge.js'
@@ -114,6 +117,7 @@ export class HostPluginRuntime {
     transferServices?: () => TransferServices,
     resolveDshWeb?: () => DshWebRuntime | undefined,
     private readonly codexStartupGraceMs: number = CODEX_STARTUP_GRACE_MS,
+    attachmentHostPath?: (ref: MessageFileAttachment) => string | undefined,
   ) {
     this.terminalEnabled = config.terminal.enabled
     this.loopbackPorts = [...config.loopback.ports]
@@ -187,6 +191,7 @@ export class HostPluginRuntime {
             ),
             this.schedule,
             uploadBridge === undefined ? undefined : body => uploadBridge.call({ route: 'api/session/uploadFileBinary', body }, true),
+            attachmentHostPath,
           )
         : undefined
       const fileViewer = new RemoteFileViewerBridge(
@@ -240,6 +245,9 @@ export class HostPluginRuntime {
           clientDeviceId: context.peerDeviceId,
           connectionId: context.connectionId,
         }, resolveDshWeb) : undefined,
+        resolveDshWeb && context.transportMode && context.lanWebAddress
+          ? new DshWebLanPeer(resolveDshWeb, context.transportMode, context.lanWebAddress) : undefined,
+        context.sameLinkIpv6Endpoints,
       )
     }, this.logger)
     if (config.serverUrl !== undefined) {
@@ -462,7 +470,7 @@ export class HostPluginRuntime {
     return result
   }
 
-  async authorizeHostWithAccount(email: string, password: string): Promise<DeviceAuthorization> {
+  async authorizeHostWithAccount(email: string, password: string, verification?: AccountVerification): Promise<DeviceAuthorization> {
     if (this.serverApi === undefined) {
       throw new ServerApiError('SERVER_NOT_CONFIGURED', 'Configure serverUrl before signing in.', false)
     }
@@ -476,7 +484,7 @@ export class HostPluginRuntime {
       this.initializePairing()
       this.logger.info('Rotated revoked Host identity before account authorization')
       return this.identity
-    })
+    }, verification)
     this.serverConnection?.resume()
     this.logger.info('Host account authorized')
     return result

@@ -1,19 +1,33 @@
-import { DSH_WEB_CAPABILITY } from '@dsh-remote/protocol'
+import { dshWebLanGrantSchema, DSH_WEB_LAN_CAPABILITY, DSH_WEB_LAN_IPV6_CAPABILITY, DSH_WEB_CAPABILITY, sameLinkIpv6PairSchema } from '@dsh-remote/protocol'
 import { LanUploadRoutes } from './lan-upload'
 import { nativeWebSocketSender } from './native-websocket-binary'
 import { AgentAcpClient, ClientLiveTransportUpgrader, CodexRemoteClient, HarnessAlphaClient, RemoteClientCore, RemoteTypertGateway, probeRemoteHostFeatures, remoteWorkspaceTypeAvailable, type RemoteHostFeatures } from '@dsh-remote/client-core'
 import { LAN_UPLOAD_CAPABILITY, TRANSPORT_UPGRADE_CAPABILITY, classifyControlClose, wireFromTransportTier } from '@dsh-remote/protocol'
-import { AdaptiveTransport, type AdaptiveConnectionDetails, type RtcIceServer } from '@dsh-remote/webrtc'
+import { AdaptiveTransport, type RtcIceServer } from '@dsh-remote/webrtc'
 import { websocketUrl } from '../lib/server-url'
 import { registerAcpBackendId } from '../lib/session-backend'
 import { connectionFailure, connectionLog } from './connection-log'
 import { strings } from '../locales/i18n'
-import type { DeviceIdentity, MuxStreamFrame, RemoteDevice } from '../types'
+import type { ConnectionNetworkDetails, DeviceIdentity, MuxStreamFrame, RemoteDevice } from '../types'
 import { AcpSessionTools, HarnessSessionTools, type SessionTools } from './session-tools'
 import { SecureTransport } from './secure-transport'
 import { nativeRtcFactory } from './native-rtc-binary'
 import { BotRemoteClient } from './bot-catalog'
 import { compactionStore } from './compaction-store'
+
+function getIpv6Pair(path: NonNullable<ConnectionNetworkDetails['webRtc']>) {
+  if (path.transport !== 'p2p' || path.remoteAddressScope !== 'public' || path.localAddressScope !== 'public'
+    || path.remoteAddress === undefined || path.localAddress === undefined) return undefined
+  const hostSeparator = path.remoteAddress.lastIndexOf(':')
+  const peerSeparator = path.localAddress.lastIndexOf(':')
+  const pair = sameLinkIpv6PairSchema.safeParse({
+    hostAddress: path.remoteAddress.slice(0, hostSeparator),
+    hostPort: Number(path.remoteAddress.slice(hostSeparator + 1)),
+    peerAddress: path.localAddress.slice(0, peerSeparator),
+    peerPort: Number(path.localAddress.slice(peerSeparator + 1)),
+  })
+  return pair.success ? pair.data : undefined
+}
 
 export type MuxFrameHandler = (frame: MuxStreamFrame) => void
 export type CloseHandler = (options?: { retryable: boolean; lastTransport?: 'lan' | 'p2p' | 'turn' | 'relay' }) => void
@@ -36,6 +50,10 @@ export interface AndroidConnectionOptions {
 export class AndroidRemoteConnection {
   private compactHistorySupported = false
   private binaryUploads = false
+  private lanWeb = false
+  private lanWebIpv6 = false
+  private sameLinkIpv6Endpoints: readonly string[] = []
+  private sameLinkIpv6PairProbe = false
   private dshWeb = false
   private lanUploads?: LanUploadRoutes
   private sessionEventsSupported = false
@@ -290,6 +308,10 @@ export class AndroidRemoteConnection {
   private applyBackendFeatures(core: RemoteClientCore, features: RemoteHostFeatures): void {
     this.sessionEventsSupported = features.sessionEvents
     this.pluginRouteSupported = features.pluginRoute
+    this.lanWeb = features.capabilities.includes(DSH_WEB_LAN_CAPABILITY)
+    this.lanWebIpv6 = features.capabilities.includes(DSH_WEB_LAN_IPV6_CAPABILITY)
+    this.sameLinkIpv6Endpoints = features.sameLinkIpv6Endpoints?.map(endpoint => endpoint.toLowerCase()) ?? []
+    this.sameLinkIpv6PairProbe = features.sameLinkIpv6PairProbe === true
     this.dshWeb = features.capabilities.includes(DSH_WEB_CAPABILITY)
     this.codexAvailable = features.capabilities.includes('codex.appserver.transfer.v1')
       && remoteWorkspaceTypeAvailable(features.capabilities, features.workspaceTypes, 'codex', 'codex.appserver.v1')
@@ -363,7 +385,39 @@ export class AndroidRemoteConnection {
     )
   }
 
-  supportsDshWeb(): boolean { return this.core !== undefined && this.dshWeb }
+  openLanWeb(onFailure: () => void) {
+    const core = this.core
+    if (!core || !this.lanWeb) return undefined
+    const mode = core.getStats().mode
+    if (mode !== 'LAN' && (mode !== 'P2P' || !this.lanWebIpv6)) return undefined
+    return (async () => {
+      const path = mode === 'P2P' ? (await this.getNetworkDetails())?.webRtc : undefined
+      const pair = path && getIpv6Pair(path)
+      if (this.core !== core || core.getStats().mode !== mode || (mode === 'P2P' && !pair)) {
+        throw Object.assign(new Error('LAN Web is unavailable.'), { code: 'FEATURE_NOT_SUPPORTED' })
+      }
+      const result = await core.rpc('dsh.web.lan.direct.open', pair ? { sameLinkIpv6Pair: pair } : {})
+      const grant = dshWebLanGrantSchema.parse(result)
+      const close = async () => {
+        await core.rpc('dsh.web.lan.direct.close', { sessionId: grant.sessionId }).catch(() => undefined)
+      }
+      const hostname = new URL(grant.url).hostname
+      const matchesHost = pair ? hostname === new URL(`http://[${pair.hostAddress}]`).hostname : !hostname.startsWith('[')
+      if (this.core !== core || core.getStats().mode !== mode || !matchesHost || grant.expiresAt <= Date.now()) {
+        await close()
+        throw new Error('LAN Web session expired')
+      }
+      const unsubscribe = core.onClose(onFailure)
+      return { ...grant, close: async () => { unsubscribe(); await close() } }
+    })()
+  }
+
+  supportsDshWeb(): boolean {
+    const mode = this.getStats()?.mode
+    return this.core !== undefined && (this.dshWeb || (this.lanWeb && (mode === 'LAN' || (this.lanWebIpv6 && mode === 'P2P'))))
+  }
+
+  supportsDshWebTunnel(): boolean { return this.core !== undefined && this.dshWeb }
 
   supportsBinaryUpload(): boolean { return this.core !== undefined && this.binaryUploads }
 
@@ -547,17 +601,29 @@ export class AndroidRemoteConnection {
     return this.upgrader?.promote(options) ?? Promise.resolve(false)
   }
 
-  async getNetworkDetails(): Promise<AdaptiveConnectionDetails | undefined> {
+  async getNetworkDetails(): Promise<ConnectionNetworkDetails | undefined> {
+    const core = this.core
     const base = await this.transport?.connectionDetails()
     const upgraded = await this.upgrader?.connectionDetails()
-    if (upgraded !== undefined && base !== undefined) {
-      return {
-        ...base,
-        webRtcEnabled: true,
-        webRtc: upgraded,
+    if (base === undefined || this.core !== core) return undefined
+    const details = upgraded === undefined ? base : { ...base, webRtcEnabled: true, webRtc: upgraded }
+    const path = details.webRtc
+    if (core?.getStats().mode === 'P2P' && path?.transport === 'p2p'
+        && path.remoteAddressScope === 'public' && path.remoteAddress !== undefined) {
+      const hostEndpoint = path.remoteAddress.toLowerCase()
+      if (this.sameLinkIpv6Endpoints.includes(hostEndpoint)) return { ...details, sameLinkIpv6: true }
+      if (this.sameLinkIpv6PairProbe && path.localAddressScope === 'public' && path.localAddress !== undefined) {
+        const pair = getIpv6Pair(path)
+        if (pair) {
+          const reply = await core.rpc<{ sameLinkIpv6Endpoints?: string[] }>('harness.transport.describe',
+            { sameLinkIpv6Pair: pair }, undefined, { timeoutMs: 2_500 }).catch(() => undefined)
+          if (this.core !== core) return undefined
+          if (core.getStats().mode === 'P2P' && Array.isArray(reply?.sameLinkIpv6Endpoints)
+              && reply.sameLinkIpv6Endpoints.includes(hostEndpoint)) return { ...details, sameLinkIpv6: true }
+        }
       }
     }
-    return base
+    return details
   }
 
   async close(): Promise<void> {
@@ -572,6 +638,9 @@ export class AndroidRemoteConnection {
     this.closeMux = undefined
     const core = this.core
     this.core = undefined
+    this.sameLinkIpv6Endpoints = []
+    this.sameLinkIpv6PairProbe = false
+    this.lanWebIpv6 = false
     this.binaryUploads = false
     const upgrader = this.upgrader
     this.upgrader = undefined

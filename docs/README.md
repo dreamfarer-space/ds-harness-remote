@@ -25,7 +25,7 @@
 | 文档 | 权威范围 |
 | --- | --- |
 | [Remote Protocol v1](protocol.md) | Host、Client、Server 的线协议 |
-| [Client 接入 DSH Web](dsh-web-client.zh.md) | Host 前置条件、WebView 换票与联调验收 |
+| [DSH Go 与其他 Client 接入 DSH Web](dsh-web-client.zh.md) | LAN 与 hostc 路径选择、WebView 换票与联调验收 |
 | [DSH Go 对话备份与同步](dsh-go-session-backup.md) | 手机本地备份、恢复与双 Host 同步 |
 | [跨机器会话传输接入](session-transfer.md) | 双 Host 能力探测、分块转发和断线恢复 |
 | [Host 插件接入](plugin-integration.md) | 账号、设备身份、凭据、迁移与刷新 |
@@ -36,6 +36,7 @@
 
 ## 维护
 
+- [贡献指南](../CONTRIBUTING.zh.md)（[English](../CONTRIBUTING.md)）：环境准备、构建与验证命令、多语言同步、PR 与安全上报规范。
 - [TODO](TODO.md) 只保留待办与已知限制；版本变更写入 [CHANGELOG](CHANGELOG.md)。
 - 当前版本和依赖以各包 manifest、lockfile 与源码为准；发布状态以正式 Release 为准。
 - 协议变化同步 `protocol.md`、共享 schema 与消费端，不另建重复契约。

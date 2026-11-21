@@ -1295,6 +1295,11 @@ realpath 后的规范根目录计算，避免符号链接父目录或大小写�
 `rpc.error.details.reason` 中携带稳定的安全分类（`scope-missing`、`authority-unavailable`、`root-invalid`、
 `outside-root`、`symlink`、`not-regular-file`、`not-found`、`too-large`、`io`），不得包含路径、文件名、
 文件正文或原始文件系统错误。旧 `fileviewer.read.v1` 仍使用 provider 授权。
+桌面端点击已提交用户消息中的上传附件时，侧栏以会话 ID、附件摘要 ID 和文件名定位原件。
+Host 仅接受同一加密连接上通过官方 `session/follow` 或 `session/page` 交付给该会话的结构化附件引用，
+再通过 Host 附件服务定位原件并复用只读文件预览。浏览器提交的本机路径和消息正文中的路径均不能授予附件访问权限。
+附件引用索引随连接回收。该预览沿用现有 Typert 请求与文件大小限制。
+
 对 `codex:<threadId>` scope，Host 使用 CodeX thread 当前 `cwd` 作为独立根目录，并额外拒绝根目录之外的路径；
 该映射不改变 Harness Session 的既有工作区权限。CodeX 终端同样按 thread 建立独立 context。
 
@@ -2312,3 +2317,17 @@ sets its host-only session cookie, and redirects with 303 to `/`.
 The Host checks authorization at least every 15 seconds while connected and
 before reconnecting the allocated tunnel. The official DSH application cookie
 stays in Host memory and authenticates the local upstream.
+
+### DSH Web LAN handoff
+
+The authenticated `harness.transport.describe` response may include `sameLinkIpv6Endpoints`, a list of up to eight Host IPv6 endpoints formatted as the ICE address followed by a colon and its port. For each endpoint, the Host checks all confirmed nominated peers for a gateway-free kernel route and a matching IPv6 neighbor. A Client may display LAN if its selected direct ICE endpoint matches this list. The hint does not change wire transport selection or authorize a LAN handoff.
+
+A Host advertising `sameLinkIpv6PairProbe: true` also accepts an optional `sameLinkIpv6Pair` object with `hostAddress`, `hostPort`, `peerAddress`, and `peerPort` taken from the Client's current direct ICE pair. When the native Host statistics hide the selected peer-reflexive address, the Host checks its selected local address and both ports, then checks the Client's reported IPv6 address against the local kernel route and neighbor table. A successful probe returns the matching Host endpoint in `sameLinkIpv6Endpoints` for display only.
+
+A Linux Host advertising `dsh.web.lan.ipv6.v1` accepts `dsh.web.lan.direct.open({sameLinkIpv6Pair})` from IPv6-capable Clients. The Host revalidates the selected direct ICE pair, gateway-free route and neighbor before binding its selected IPv6 address. The grant URL uses a bracketed IPv6 literal. Bootstrap, HTTP and WebSocket requests must originate from the verified peer IPv6 address. The lease closes when the parent connection closes or when the selected pair or on-link validation changes.
+
+With `dsh.web.lan.direct.v1`, `harness.transport.describe` also reports the optional boolean `dshWebLanReady`, reflecting the Host-side mode of this authenticated connection at discovery. If a browser sees LAN but the Host reports false, it selects hostc. The capability itself remains stable across in-band transport upgrades. A Host advertising `dsh.web.lan.direct.v1` accepts `dsh.web.lan.direct.open({})` over the authenticated LAN Noise connection. The response contains a UUID `sessionId`, a canonical HTTP root `url` on the selected Host RFC1918 IPv4 or same-machine 127.0.0.1, with an ephemeral port, a 32-byte base64url `browserGrant` and Unix-millisecond `expiresAt`. The grant expires after 30 seconds and can be redeemed once.
+
+The browser opens `/__remote/browser` and signals its opener with `dsh.web.ready`. The opener checks the window and exact origin before posting `{type: "dsh.web.grant", browserGrant}`. The landing page submits the grant to same-origin `POST /__remote/session`. WebViews can use the same form or present the grant as `X-DSH-Web-Grant` to `GET /__remote/session-bootstrap`. Redemption sets an HttpOnly session cookie. The Host checks the cookie before forwarding HTTP or upgrading WebSocket. Anonymous requests receive 401, including the two bootstrap HTML pages, which contain no application data. The upstream DSH credential stays on the Host.
+
+Opening another session on this connection replaces the first. `dsh.web.lan.direct.close({sessionId})`, disconnect, expiry, or loss of LAN closes the listener and streams. Session lifetime is capped at 30 minutes after the grant deadline. HTTP and WS on the LAN are plaintext. Non-LAN connections and Hosts lacking the capability use the existing hostc flow.

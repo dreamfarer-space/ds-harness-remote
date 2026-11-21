@@ -1813,6 +1813,8 @@ If a code was sent, recover the original submission without changing it.`,
     registrationCodeHint: "Generate it after signing in on the Server website. Use it once to connect this device.",
     accountHint: "The account must belong to the selected Server.",
     password: "Password",
+    twoFactorCode: "Verification or recovery code",
+    twoFactorRestart: "Enter password again",
     passwordHint: "Only DSH Remote Web or self-hosted service accounts; not DeepSeek Harness official.",
     modeSavedNeedsAuthorization: "Mode saved. Authorize {role} before connecting. Existing registrations were kept.",
     modeSavedReused: "Mode saved. Existing registration reused. Restart Harness to apply.",
@@ -2211,6 +2213,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     registrationCodeHint: "\u767B\u5F55 Server \u7F51\u9875\u540E\u751F\u6210\uFF0C\u7528\u4E00\u6B21\u5373\u53EF\u8FDE\u63A5\u8FD9\u53F0\u8BBE\u5907\u3002",
     accountHint: "\u8D26\u53F7\u5FC5\u987B\u5C5E\u4E8E\u6240\u9009 Server\u3002",
     password: "\u5BC6\u7801",
+    twoFactorCode: "\u9A8C\u8BC1\u7801\u6216\u6062\u590D\u7801",
+    twoFactorRestart: "\u91CD\u65B0\u8F93\u5165\u5BC6\u7801",
     passwordHint: "\u4EC5\u9650DSH Remote Web\u8D26\u53F7\u6216\u81EA\u6258\u7BA1\u670D\u52A1\u8D26\u53F7\uFF0C\u975E DeepSeek Harness\u5B98\u65B9\u3002",
     modeSavedNeedsAuthorization: "\u6A21\u5F0F\u5DF2\u4FDD\u5B58\u3002\u8FDE\u63A5\u524D\u8BF7\u5148\u6388\u6743 {role}\uFF1B\u5DF2\u6709\u6CE8\u518C\u4FE1\u606F\u5DF2\u4FDD\u7559\u3002",
     modeSavedReused: "\u6A21\u5F0F\u5DF2\u4FDD\u5B58\u5E76\u590D\u7528\u5DF2\u6709\u6CE8\u518C\u4FE1\u606F\u3002\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
@@ -2609,6 +2613,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     registrationCodeHint: "\u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u0435\u0433\u043E \u043F\u043E\u0441\u043B\u0435 \u0432\u0445\u043E\u0434\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435 \u0441\u0435\u0440\u0432\u0435\u0440\u0430. \u041A\u043E\u0434 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u044B\u0439 \u0438 \u0441\u043B\u0443\u0436\u0438\u0442 \u0434\u043B\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430.",
     accountHint: "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u0434\u043E\u043B\u0436\u0435\u043D \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0430\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u043C\u0443 \u0441\u0435\u0440\u0432\u0435\u0440\u0443.",
     password: "\u041F\u0430\u0440\u043E\u043B\u044C",
+    twoFactorCode: "\u041A\u043E\u0434 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F",
+    twoFactorRestart: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043F\u0430\u0440\u043E\u043B\u044C \u0437\u0430\u043D\u043E\u0432\u043E",
     passwordHint: "\u0422\u043E\u043B\u044C\u043A\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u044B DSH Remote Web \u0438\u043B\u0438 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0438\u0441\u0430; \u043D\u0435 \u043E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u044B\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u044B DeepSeek Harness.",
     modeSavedNeedsAuthorization: "\u0420\u0435\u0436\u0438\u043C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D. \u041F\u0435\u0440\u0435\u0434 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u043C \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0430\u0432\u0442\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044E ({role}). \u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B.",
     modeSavedReused: "\u0420\u0435\u0436\u0438\u043C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0430 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0430\u044F \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F. \u041F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 Harness, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C.",
@@ -3007,6 +3013,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     registrationCodeHint: "\u0417\u0433\u0435\u043D\u0435\u0440\u0443\u0439\u0442\u0435 \u0439\u043E\u0433\u043E \u043F\u0456\u0441\u043B\u044F \u0432\u0445\u043E\u0434\u0443 \u043D\u0430 \u0441\u0430\u0439\u0442\u0456 \u0441\u0435\u0440\u0432\u0435\u0440\u0430. \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u043E\u0434\u0438\u043D \u0440\u0430\u0437, \u0449\u043E\u0431 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0438 \u0446\u0435\u0439 \u043F\u0440\u0438\u0441\u0442\u0440\u0456\u0439.",
     accountHint: "\u041E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0439 \u0437\u0430\u043F\u0438\u0441 \u043C\u0430\u0454 \u043D\u0430\u043B\u0435\u0436\u0430\u0442\u0438 \u0434\u043E \u0432\u0438\u0431\u0440\u0430\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430.",
     password: "\u041F\u0430\u0440\u043E\u043B\u044C",
+    twoFactorCode: "\u041A\u043E\u0434 \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F \u0430\u0431\u043E \u0432\u0456\u0434\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F",
+    twoFactorRestart: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043F\u0430\u0440\u043E\u043B\u044C \u0437\u043D\u043E\u0432\u0443",
     passwordHint: "\u041B\u0438\u0448\u0435 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0456 \u0437\u0430\u043F\u0438\u0441\u0438 DSH Remote Web \u0430\u0431\u043E \u0432\u043B\u0430\u0441\u043D\u043E\u0433\u043E \u0440\u043E\u0437\u0433\u043E\u0440\u043D\u0443\u0442\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0456\u0441\u0443; \u043D\u0435 \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0456 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0456 \u0437\u0430\u043F\u0438\u0441\u0438 DeepSeek Harness.",
     modeSavedNeedsAuthorization: "\u0420\u0435\u0436\u0438\u043C \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043E. \u0410\u0432\u0442\u043E\u0440\u0438\u0437\u0443\u0439\u0442\u0435 {role} \u043F\u0435\u0440\u0435\u0434 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F\u043C. \u041D\u0430\u044F\u0432\u043D\u0456 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043E.",
     modeSavedReused: "\u0420\u0435\u0436\u0438\u043C \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043E. \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043E \u043D\u0430\u044F\u0432\u043D\u0443 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E. \u041F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0456\u0442\u044C Harness, \u0449\u043E\u0431 \u0437\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438.",
@@ -3670,9 +3678,9 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     };
     inspect(document.body);
     let observer = new MutationObserver((records) => {
-      for (let record of records) {
-        record.type === "attributes" && inspect(record.target);
-        for (let node of Array.from(record.addedNodes))
+      for (let record2 of records) {
+        record2.type === "attributes" && inspect(record2.target);
+        for (let node of Array.from(record2.addedNodes))
           node instanceof Element && inspect(node);
       }
     });
@@ -3683,6 +3691,39 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       attributeFilter: ["aria-label", "title", "data-tooltip"]
     }), () => {
       observer.disconnect(), document.querySelectorAll(`[${hiddenAttribute}]`).forEach((element) => element.removeAttribute(hiddenAttribute));
+    };
+  }
+
+  // packages/plugin/src/client/account-verification.ts
+  function useAccountVerification(React, scope) {
+    let [pending, setPending] = React.useState(void 0), [code, setCode] = React.useState(""), clear = () => {
+      setPending(void 0), setCode("");
+    };
+    return React.useEffect(clear, [scope]), {
+      pending: pending !== void 0,
+      ready: pending === void 0 || code.trim().length > 0,
+      verification: pending === void 0 ? void 0 : { ...pending, code },
+      clear,
+      handle(error) {
+        let failure = error;
+        return failure?.code === "TWO_FACTOR_EXPIRED" && clear(), failure?.code !== "TWO_FACTOR_REQUIRED" || typeof failure.details?.challenge != "string" || typeof failure.details.serverUrl != "string" ? !1 : (setPending({ challenge: failure.details.challenge, serverUrl: failure.details.serverUrl }), setCode(""), !0);
+      },
+      fields(t, busy, ...passwordFields) {
+        return pending === void 0 ? React.createElement(React.Fragment, null, ...passwordFields) : React.createElement(
+          React.Fragment,
+          null,
+          React.createElement("input", {
+            value: code,
+            disabled: busy,
+            autoComplete: "one-time-code",
+            maxLength: 64,
+            placeholder: t("twoFactorCode"),
+            "aria-label": t("twoFactorCode"),
+            onChange: (event) => setCode(event.target.value)
+          }),
+          React.createElement("button", { type: "button", disabled: busy, onClick: clear }, t("twoFactorRestart"))
+        );
+      }
     };
   }
 
@@ -4131,19 +4172,20 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             setSavingServer(!1), setBusy(!1);
           }
         }
-      }, signInClient = async () => {
-        if (!(savingServer || serverDirty || loginEmail.trim() === "" || loginPassword === "")) {
+      }, verification = useAccountVerification(React, signInOpen && loginMethod === "password" ? serverUrl : void 0), signInClient = async () => {
+        if (!(savingServer || serverDirty || (verification.pending ? !verification.ready : loginEmail.trim() === "" || loginPassword === ""))) {
           setBusy(!0), setError(void 0);
           try {
             let result = await props.control("settings.configure", {
               role: "client",
               serverUrl: serverUrl.trim() || "https://dsh.r2049.cn",
               email: loginEmail.trim(),
-              password: loginPassword
+              password: loginPassword,
+              verification: verification.verification
             });
-            applyView(result.settings), setSignInOpen(!1), setLoginPassword(""), setNotice({ key: "authorizationComplete" });
+            verification.clear(), applyView(result.settings), setSignInOpen(!1), setLoginPassword(""), setNotice({ key: "authorizationComplete" });
           } catch (reason) {
-            setError(messageOf(reason, t));
+            verification.handle(reason) ? setLoginPassword("") : setError(messageOf(reason, t));
           } finally {
             setBusy(!1);
           }
@@ -4806,27 +4848,31 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
               id: "dsh-remote-settings-password-panel",
               "aria-labelledby": "dsh-remote-settings-password-tab"
             },
-            React.createElement("input", {
-              type: "email",
-              value: loginEmail,
-              disabled: busy,
-              autoComplete: "username",
-              placeholder: t("account"),
-              "aria-label": t("account"),
-              onChange: (event) => setLoginEmail(event.target.value)
-            }),
-            React.createElement("input", {
-              type: "password",
-              value: loginPassword,
-              disabled: busy,
-              autoComplete: "current-password",
-              placeholder: t("password"),
-              "aria-label": t("password"),
-              onChange: (event) => setLoginPassword(event.target.value)
-            }),
+            verification.fields(
+              t,
+              busy,
+              React.createElement("input", {
+                type: "email",
+                value: loginEmail,
+                disabled: busy,
+                autoComplete: "username",
+                placeholder: t("account"),
+                "aria-label": t("account"),
+                onChange: (event) => setLoginEmail(event.target.value)
+              }),
+              React.createElement("input", {
+                type: "password",
+                value: loginPassword,
+                disabled: busy,
+                autoComplete: "current-password",
+                placeholder: t("password"),
+                "aria-label": t("password"),
+                onChange: (event) => setLoginPassword(event.target.value)
+              })
+            ),
             React.createElement("button", {
               type: "button",
-              disabled: busy || loginEmail.trim() === "" || loginPassword === "",
+              disabled: busy || (verification.pending ? !verification.ready : loginEmail.trim() === "" || loginPassword === ""),
               onClick: () => void signInClient()
             }, t(busy ? "signingIn" : "startSignIn")),
             React.createElement("p", { className: "dshRemotePasswordHint" }, t("passwordHint"))
@@ -5186,6 +5232,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       ".dshRemoteServerNotice{font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}.dshRemoteServerNotice.isWarning{color:var(--dsw-alias-state-warning-primary,#946200)}.dshRemoteServerNotice.isError{color:var(--dsw-alias-state-error-primary)}.dshRemoteServerNotice.isRestored{color:var(--dsw-alias-state-success-primary)}",
       // Browser navigation still targets the Desktop machine until Harness exposes
       // a Remote URL resolver. Hide the native guide entry in Remote mode only.
+      "[data-dsh-remote-message-file]{cursor:pointer}",
       'html.dshRemoteBrowserUnavailable [data-sidebar-right-guide-entry="browser"]{display:none!important}',
       'html.dshRemoteTargetActive button[aria-label="\u6DFB\u52A0\u5DE5\u4F5C\u533A"],html.dshRemoteTargetActive button[aria-label="Add workspace"]{display:none!important}',
       'html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="\u6307\u4EE4"],html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="Commands"]{display:none!important}',
@@ -5804,29 +5851,30 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             setSavingServer(!1), setBusy(!1);
           }
         }
-      }, signInClient = async () => {
-        if (!(serverDirty || savingServer || email.trim() === "" || password === "" || loginServerUrl.trim() === "")) {
+      }, clientVerification = useAccountVerification(React, open && loginMethod === "password" ? loginServerUrl : void 0), hostVerification = useAccountVerification(React, open ? status?.serverUrl : void 0), signInClient = async () => {
+        if (!(serverDirty || savingServer || loginServerUrl.trim() === "" || (clientVerification.pending ? !clientVerification.ready : email.trim() === "" || password === ""))) {
           setBusy(!0), setError(void 0);
           try {
-            status?.clientAuthRequired ? await props.control("client.account.login", { email: email.trim(), password }) : await props.control("settings.configure", {
+            status?.clientAuthRequired ? await props.control("client.account.login", { email: email.trim(), password, verification: clientVerification.verification }) : await props.control("settings.configure", {
               role: "client",
               serverUrl: loginServerUrl.trim(),
               email: email.trim(),
-              password
-            }), setDevices(await props.control("devices")), setStatus(await props.control("status")), setNeedsAuthorization(!1), setPassword("");
+              password,
+              verification: clientVerification.verification
+            }), clientVerification.clear(), setDevices(await props.control("devices")), setStatus(await props.control("status")), setNeedsAuthorization(!1), setPassword("");
           } catch (reason) {
-            setError(connectionErrorMessageFor(reason, t));
+            clientVerification.handle(reason) ? setPassword("") : setError(connectionErrorMessageFor(reason, t));
           } finally {
             setBusy(!1);
           }
         }
       }, authorizeHost = async (kind) => {
-        if (!(kind === "account" && (hostEmail.trim() === "" || hostPassword === "")) && !(kind === "code" && hostRegistrationCode.trim() === "")) {
+        if (!(kind === "account" && (hostVerification.pending ? !hostVerification.ready : hostEmail.trim() === "" || hostPassword === "")) && !(kind === "code" && hostRegistrationCode.trim() === "")) {
           setBusy(!0), setError(void 0);
           try {
-            kind === "account" ? (await props.control("host.account.login", { email: hostEmail.trim(), password: hostPassword }), setHostPassword("")) : (await props.control("host.registration-code.submit", { code: hostRegistrationCode.trim() }), setHostRegistrationCode("")), setStatus(await props.control("status"));
+            kind === "account" ? (await props.control("host.account.login", { email: hostEmail.trim(), password: hostPassword, verification: hostVerification.verification }), hostVerification.clear(), setHostPassword("")) : (await props.control("host.registration-code.submit", { code: hostRegistrationCode.trim() }), setHostRegistrationCode("")), setStatus(await props.control("status"));
           } catch (reason) {
-            setError(connectionErrorMessageFor(reason, t));
+            kind === "account" && hostVerification.handle(reason) ? setHostPassword("") : setError(connectionErrorMessageFor(reason, t));
           } finally {
             setBusy(!1);
           }
@@ -6186,25 +6234,29 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                       id: "dsh-remote-password-panel",
                       "aria-labelledby": "dsh-remote-password-tab"
                     },
-                    React.createElement("input", {
-                      type: "email",
-                      value: email,
-                      disabled: busy,
-                      autoComplete: "username",
-                      placeholder: t("account"),
-                      "aria-label": t("account"),
-                      onChange: (event) => setEmail(event.target.value)
-                    }),
-                    React.createElement("input", {
-                      type: "password",
-                      value: password,
-                      disabled: busy,
-                      autoComplete: "current-password",
-                      placeholder: t("password"),
-                      "aria-label": t("password"),
-                      onChange: (event) => setPassword(event.target.value)
-                    }),
-                    React.createElement("button", { type: "button", disabled: busy || savingServer || serverDirty || loginServerUrl.trim() === "" || email.trim() === "" || password === "", onClick: () => void signInClient() }, t(busy ? "signingIn" : "startSignIn")),
+                    clientVerification.fields(
+                      t,
+                      busy,
+                      React.createElement("input", {
+                        type: "email",
+                        value: email,
+                        disabled: busy,
+                        autoComplete: "username",
+                        placeholder: t("account"),
+                        "aria-label": t("account"),
+                        onChange: (event) => setEmail(event.target.value)
+                      }),
+                      React.createElement("input", {
+                        type: "password",
+                        value: password,
+                        disabled: busy,
+                        autoComplete: "current-password",
+                        placeholder: t("password"),
+                        "aria-label": t("password"),
+                        onChange: (event) => setPassword(event.target.value)
+                      })
+                    ),
+                    React.createElement("button", { type: "button", disabled: busy || savingServer || serverDirty || loginServerUrl.trim() === "" || (clientVerification.pending ? !clientVerification.ready : email.trim() === "" || password === ""), onClick: () => void signInClient() }, t(busy ? "signingIn" : "startSignIn")),
                     React.createElement("p", { className: "dshRemotePasswordHint" }, t("passwordHint"))
                   ) : selectedProvider !== void 0 ? React.createElement(
                     "div",
@@ -6340,9 +6392,13 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                     React.createElement(
                       "div",
                       { className: "dshRemoteLogin" },
-                      React.createElement("input", { type: "email", value: hostEmail, disabled: busy, autoComplete: "username", placeholder: t("serverAccountEmail"), "aria-label": t("serverAccountEmail"), onChange: (event) => setHostEmail(event.target.value) }),
-                      React.createElement("input", { type: "password", value: hostPassword, disabled: busy, autoComplete: "current-password", placeholder: t("serverAccountPassword"), "aria-label": t("serverAccountPassword"), onChange: (event) => setHostPassword(event.target.value) }),
-                      React.createElement("button", { type: "button", disabled: busy || hostEmail.trim() === "" || hostPassword === "", onClick: () => void authorizeHost("account") }, t(busy ? "signingIn" : "signInRegisterHost")),
+                      hostVerification.fields(
+                        t,
+                        busy,
+                        React.createElement("input", { type: "email", value: hostEmail, disabled: busy, autoComplete: "username", placeholder: t("serverAccountEmail"), "aria-label": t("serverAccountEmail"), onChange: (event) => setHostEmail(event.target.value) }),
+                        React.createElement("input", { type: "password", value: hostPassword, disabled: busy, autoComplete: "current-password", placeholder: t("serverAccountPassword"), "aria-label": t("serverAccountPassword"), onChange: (event) => setHostPassword(event.target.value) })
+                      ),
+                      React.createElement("button", { type: "button", disabled: busy || (hostVerification.pending ? !hostVerification.ready : hostEmail.trim() === "" || hostPassword === ""), onClick: () => void authorizeHost("account") }, t(busy ? "signingIn" : "signInRegisterHost")),
                       React.createElement("input", { value: hostRegistrationCode, disabled: busy, autoComplete: "one-time-code", placeholder: t("hostRegistrationCode"), "aria-label": t("hostRegistrationCode"), onChange: (event) => setHostRegistrationCode(event.target.value) }),
                       React.createElement("button", { type: "button", disabled: busy || hostRegistrationCode.trim() === "", onClick: () => void authorizeHost("code") }, t(busy ? "registering" : "useRegistrationCode"))
                     )
@@ -7148,7 +7204,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "POST" || requestUrl.href !== routeUrl.href) return original(input, init);
       let lifetime = (init?.signal !== void 0 ? init.signal ?? void 0 : input instanceof Request ? input.signal : void 0) ?? AbortSignal.timeout(45e3);
       try {
-        lifetime.throwIfAborted();
+        if (lifetime.throwIfAborted(), options.isLanWeb && await options.isLanWeb(lifetime)) return original(input, init);
         let status, probeTimeout = AbortSignal.timeout(1e4), probeSignal = AbortSignal.any([lifetime, probeTimeout]);
         try {
           status = await control("status", {}, probeSignal);
@@ -7435,6 +7491,63 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     };
   }
 
+  // packages/plugin/src/message-file-attachment.ts
+  var PREFIX = ".dsh-remote-message-file/", attachmentIdPattern = /^sha256:[a-f0-9]{64}$/;
+  function record(value) {
+    return typeof value == "object" && value !== null ? value : void 0;
+  }
+  function messageFileAttachment(block) {
+    let value = record(block), ref = value?.type === "file" ? record(value.attachment) : void 0;
+    if (!(typeof ref?.attachmentId != "string" || !attachmentIdPattern.test(ref.attachmentId) || typeof ref.name != "string" || ref.name.length === 0 || ref.name.length > 255 || ref.name === "." || ref.name === ".." || /[\\/\x00-\x1f]/u.test(ref.name) || typeof ref.bytes != "number" || !Number.isSafeInteger(ref.bytes) || ref.bytes < 0))
+      return { attachmentId: ref.attachmentId, name: ref.name, bytes: ref.bytes };
+  }
+  function messageFilePath(ref) {
+    return `${PREFIX}${ref.attachmentId}/${ref.name}`;
+  }
+
+  // packages/plugin/src/client/message-file-preview.ts
+  var cardSelector = "[data-message-attachments] > span[title]", actionable = "data-dsh-remote-message-file";
+  function fileAddress(card, conversation) {
+    let sessionId = card.closest("[data-conversation-session]")?.getAttribute("data-conversation-session"), nodeKey = card.closest("[data-chat-node-key]")?.getAttribute("data-chat-node-key");
+    if (!sessionId || !nodeKey || !card.parentElement) return;
+    let node;
+    try {
+      node = conversation.binding(sessionId).target("chat").getSnapshot()?.nodes.get(nodeKey);
+    } catch {
+      return;
+    }
+    if (node?.kind !== "user" && node?.kind !== "steering" || !Array.isArray(node.data.content)) return;
+    let attachments = node.data.content.map(messageFileAttachment).filter((ref2) => ref2 !== void 0), cards = Array.from(card.parentElement.querySelectorAll(":scope > span[title]"));
+    if (cards.length !== attachments.length) return;
+    let ref = attachments[cards.indexOf(card)];
+    if (ref === void 0 || ref.name !== card.getAttribute("title")) return;
+    let path = messageFilePath(ref).split("/").map(encodeURIComponent).join("/");
+    return `dsh-resource://file/session/${encodeURIComponent(sessionId)}/${path}`;
+  }
+  function installMessageFilePreview(feed, conversation, sidebar) {
+    let active = !1, refresh = () => {
+      for (let card of Array.from(document.querySelectorAll(`${cardSelector}, [${actionable}]`))) {
+        let enabled = active && card.matches(cardSelector) && fileAddress(card, conversation) !== void 0;
+        enabled && !card.hasAttribute(actionable) ? (card.setAttribute(actionable, ""), card.setAttribute("role", "button"), card.setAttribute("tabindex", "0")) : !enabled && card.hasAttribute(actionable) && (card.removeAttribute(actionable), card.removeAttribute("role"), card.removeAttribute("tabindex"));
+      }
+    }, observer = new MutationObserver(refresh), unsubscribe = feed.subscribe((status) => {
+      let enabled = status.mode === "remote" && status.connected === !0 && status.backend === "harness";
+      enabled !== active && (active = enabled, active ? observer.observe(document.body, {
+        childList: !0,
+        subtree: !0,
+        attributes: !0,
+        attributeFilter: ["data-chat-node-key", "data-conversation-session", "title"]
+      }) : observer.disconnect(), refresh());
+    }), open = (event) => {
+      if (!active || !(event.target instanceof Element) || event instanceof KeyboardEvent && (event.repeat || event.key !== "Enter" && event.key !== " ")) return;
+      let card = event.target.closest(cardSelector), address = card === null ? void 0 : fileAddress(card, conversation);
+      address !== void 0 && (event.preventDefault(), sidebar.openResource(address));
+    };
+    return document.addEventListener("click", open), document.addEventListener("keydown", open), () => {
+      unsubscribe(), observer.disconnect(), active = !1, refresh(), document.removeEventListener("click", open), document.removeEventListener("keydown", open);
+    };
+  }
+
   // packages/plugin/src/client-recovery.ts
   function subscribeRemoteRecovery(feed, reconnect) {
     let previous;
@@ -7449,10 +7562,19 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     constructor(message) {
       super(message), this.name = "ControlRouteUnavailableError";
     }
-  }, originalPluginFetch = window.fetch, readyPluginSessions, pluginSessions = new Promise((resolve) => {
+  }, isHostcTunnel = /\.(?:hostc|tun|tun-test)\.4ba\.io\.?$/.test(window.location?.hostname ?? ""), originalPluginFetch = window.fetch, lanOrigin = window.location?.protocol === "http:" && /^(?:[\d.]+|\[[0-9a-f:]+\])$/i.test(window.location.hostname), verifiedLanOrigin = !1, readyPluginSessions, pluginSessions = new Promise((resolve) => {
     readyPluginSessions = resolve;
-  }), pluginRouteFetch = typeof originalPluginFetch == "function" && typeof document < "u" ? createPluginRouteFetch(originalPluginFetch.bind(window), document.baseURI, {
-    beforeResponse: createPluginRouteCatalogGuard(() => pluginSessions)
+  }), pluginRouteFetch = !isHostcTunnel && typeof originalPluginFetch == "function" && typeof document < "u" ? createPluginRouteFetch(originalPluginFetch.bind(window), document.baseURI, {
+    beforeResponse: createPluginRouteCatalogGuard(() => pluginSessions),
+    isLanWeb: lanOrigin ? async (signal) => {
+      if (verifiedLanOrigin) return !0;
+      let response = await originalPluginFetch(new URL("/__remote/lan-status", window.location.origin), {
+        credentials: "same-origin",
+        signal
+      }).catch(() => {
+      });
+      return verifiedLanOrigin = response?.status === 204 && response.headers.get("x-dsh-web-lan") === "1", verifiedLanOrigin;
+    } : void 0
   }) : void 0;
   pluginRouteFetch !== void 0 && (window.fetch = pluginRouteFetch);
   var uploadGlobal = globalThis, previousUploadHook = uploadGlobal.__DSH_FILE_UPLOAD__, remoteUploadHook = typeof originalPluginFetch == "function" && typeof document < "u" ? { fetch: createRemoteUploadFetch(previousUploadHook?.fetch ?? originalPluginFetch.bind(window), document.baseURI) } : void 0;
@@ -7503,7 +7625,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         "sessions"
       ];
       function RemoteModeAction(props) {
-        let { t } = props, [open, setOpen] = React.useState(!1), [status, setStatus] = React.useState(void 0), [devices, setDevices] = React.useState([]), [hostRegistrationCode, setHostRegistrationCode] = React.useState(""), [email, setEmail] = React.useState(""), [password, setPassword] = React.useState(""), [busy, setBusy] = React.useState(!1), [progress, setProgress] = React.useState(void 0), progressRun = React.useRef(0), [error, setError] = React.useState(void 0), [supported, setSupported] = React.useState(!0), refresh = async () => {
+        let { t } = props, [open, setOpen] = React.useState(!1), [status, setStatus] = React.useState(void 0), [devices, setDevices] = React.useState([]), [hostRegistrationCode, setHostRegistrationCode] = React.useState(""), [email, setEmail] = React.useState(""), [password, setPassword] = React.useState(""), hostVerification = useAccountVerification(React, status?.serverUrl), [busy, setBusy] = React.useState(!1), [progress, setProgress] = React.useState(void 0), progressRun = React.useRef(0), [error, setError] = React.useState(void 0), [supported, setSupported] = React.useState(!0), refresh = async () => {
           let [nextStatus, nextDevices] = await Promise.all([
             props.control("status"),
             props.control("devices").catch(() => [])
@@ -7538,12 +7660,12 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             setError(messageOf(reason, t)), setBusy(!1);
           }
         }, loginHost = async () => {
-          if (!(email.trim() === "" || password === "")) {
+          if (!(hostVerification.pending ? !hostVerification.ready : email.trim() === "" || password === "")) {
             setBusy(!0), setError(void 0);
             try {
-              await props.control("host.account.login", { email: email.trim(), password }), await refreshStatus();
+              await props.control("host.account.login", { email: email.trim(), password, verification: hostVerification.verification }), hostVerification.clear(), await refreshStatus();
             } catch (reason) {
-              setError(messageOf(reason, t));
+              hostVerification.handle(reason) || setError(messageOf(reason, t));
             } finally {
               setPassword(""), setBusy(!1);
             }
@@ -7609,27 +7731,31 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                 status.host.accountRequired ? React.createElement(
                   "div",
                   { className: "dshRemoteLogin" },
-                  React.createElement("input", {
-                    type: "email",
-                    value: email,
-                    disabled: busy,
-                    autoComplete: "username",
-                    placeholder: t("serverAccountEmail"),
-                    "aria-label": t("serverAccountEmail"),
-                    onChange: (event) => setEmail(event.target.value)
-                  }),
-                  React.createElement("input", {
-                    type: "password",
-                    value: password,
-                    disabled: busy,
-                    autoComplete: "current-password",
-                    placeholder: t("password"),
-                    "aria-label": t("serverAccountPassword"),
-                    onChange: (event) => setPassword(event.target.value)
-                  }),
+                  hostVerification.fields(
+                    t,
+                    busy,
+                    React.createElement("input", {
+                      type: "email",
+                      value: email,
+                      disabled: busy,
+                      autoComplete: "username",
+                      placeholder: t("serverAccountEmail"),
+                      "aria-label": t("serverAccountEmail"),
+                      onChange: (event) => setEmail(event.target.value)
+                    }),
+                    React.createElement("input", {
+                      type: "password",
+                      value: password,
+                      disabled: busy,
+                      autoComplete: "current-password",
+                      placeholder: t("password"),
+                      "aria-label": t("serverAccountPassword"),
+                      onChange: (event) => setPassword(event.target.value)
+                    })
+                  ),
                   React.createElement("button", {
                     type: "button",
-                    disabled: busy || email.trim() === "" || password === "",
+                    disabled: busy || (hostVerification.pending ? !hostVerification.ready : email.trim() === "" || password === ""),
                     onClick: () => void loginHost()
                   }, t(busy ? "signingIn" : "signInRegisterHost")),
                   React.createElement("input", {
@@ -7690,7 +7816,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             }
           }
         }, controlRouteRetryAfter = 0, controlRouteBackoffIndex = 0, control = async (endpoint, payload = {}) => {
-          if (endpoint === "status" && Date.now() < controlRouteRetryAfter)
+          if (endpoint === "status" && (isHostcTunnel || Date.now() < controlRouteRetryAfter))
             return controlRouteUnavailableStatus();
           let result;
           try {
@@ -7702,7 +7828,10 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             throw new ControlRouteUnavailableError(t("remoteControlUnavailable"));
           }
           return unwrapControlResult(result, t("remoteRequestFailed"));
-        }, statusFeed = createStatusFeed({
+        }, statusFeed = isHostcTunnel ? { getSnapshot: () => {
+        }, subscribe: () => () => {
+        }, close: () => {
+        } } : createStatusFeed({
           url: STATUS_STREAM_PATH.slice(1),
           readStatus: () => control("status"),
           onFallback: (reason) => {
@@ -7716,7 +7845,10 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           return () => {
             unsubscribe(), document.documentElement.classList.remove("dshRemoteBrowserUnavailable");
           };
-        }, "ds-harness-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-remote: carrier recovery"), ctx.effect(() => {
+        }, "ds-harness-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-remote: carrier recovery"), ctx.inject(["uiConversation", "sidebarRight"], (previewContext) => {
+          let conversation = previewContext.get("uiConversation"), sidebar = previewContext.get("sidebarRight");
+          typeof conversation?.binding != "function" || typeof sidebar?.openResource != "function" || previewContext.effect(() => installMessageFilePreview(statusFeed, conversation, sidebar), "ds-harness-remote: message file preview");
+        }), ctx.effect(() => {
           let disposed = !1, unsubscribeWorkspaces, unsubscribeSessions, selection, opening = !1, reconcile = () => {
             if (disposed || opening || selection === void 0) return;
             let pending = selection, workspaceSnapshot = ctx.workspaces.list.getSnapshot();

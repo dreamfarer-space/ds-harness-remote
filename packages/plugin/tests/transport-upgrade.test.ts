@@ -16,6 +16,7 @@ import {
   type SequencedOutboundTransport,
 } from '@dsh-remote/webrtc'
 import { ServerNoiseChannel } from '../src/server-connection.js'
+import * as ipv6OnLink from '../src/ipv6-on-link.js'
 import { TransportUpgradeHost, wrapUpgradedTransportFrame, type TransportTier } from '../src/transport-upgrade.js'
 
 function makeStats(tier: 'LAN' | 'P2P' | 'TURN' | 'unverified'): RtcStats {
@@ -115,6 +116,81 @@ function createPairedRtcFactories(hostTier: () => 'LAN' | 'P2P' | 'TURN' | 'unve
 
   return { clientFactory, hostFactory, pairs }
 }
+
+describe('LAN Web address selection', () => {
+  it.each([
+    ['LAN', 'loopback', '::1:53718', '127.0.0.1'],
+    ['LAN', 'loopback', '127.0.0.1:53718', '127.0.0.1'],
+    ['LAN', 'private', '192.168.1.10:53718', '192.168.1.10'],
+    ['LAN', 'unknown', undefined, undefined],
+    ['P2P', 'loopback', '::1:53718', undefined],
+  ] as const)('uses the verified %s %s endpoint %s', async (mode, localAddressScope, localAddress, expected) => {
+    const rtc = { connectionDetails: async () => ({
+      transport: mode === 'LAN' ? 'lan' : 'p2p', dataChannelState: 'open', localAddressScope, localAddress,
+    }) }
+    const channel = new ServerNoiseChannel({
+      connectionId: 'c', membershipId: 'm', peer: { deviceId: 'p', publicKey: 'k' }, rtc,
+    } as never, async () => {}, async () => {}, mode)
+    expect(await channel.lanWebAddress()).toBe(expected)
+  })
+
+  it('uses the current Host ICE pair after switching from public IPv6 to private IPv4', async () => {
+    let transport: 'lan' | 'p2p' | undefined = 'p2p'
+    const rtc = { connectionDetails: async () => ({
+      transport, dataChannelState: 'open',
+      localAddressScope: transport === 'lan' ? 'private' : 'public',
+      localAddress: transport === 'lan' ? '192.168.1.10:53718' : '[2001:db8::1]:53718',
+    }) }
+    const channel = new ServerNoiseChannel({
+      connectionId: 'c', membershipId: 'm', peer: { deviceId: 'p', publicKey: 'k' }, rtc,
+    } as never, async () => {}, async () => {}, 'P2P')
+
+    expect(await channel.lanWebAddress()).toBeUndefined()
+    transport = 'lan'
+    expect(await channel.lanWebAddress()).toBe('192.168.1.10')
+    expect(channel.mode).toBe('LAN')
+    transport = undefined
+    expect(await channel.lanWebAddress()).toBeUndefined()
+    transport = 'p2p'
+    expect(await channel.lanWebAddress()).toBeUndefined()
+    expect(channel.mode).toBe('P2P')
+  })
+})
+
+describe('IPv6 on-link display probe', () => {
+  it('requires an explicitly selected Host pair, matching ports and a kernel neighbor', async () => {
+    const verify = vi.spyOn(ipv6OnLink, 'isIpv6OnLink').mockResolvedValue(true)
+    try {
+      const pair = { hostAddress: '2001:db8::1', hostPort: 50_000, peerAddress: '2001:db8::2', peerPort: 50_001 }
+      const path = {
+        dataChannelState: 'open', explicitlySelected: true, transport: 'p2p',
+        localCandidateType: 'host', localAddress: '2001:db8::1:50000',
+        remoteCandidateType: 'prflx', remotePort: pair.peerPort,
+      }
+      const rtc = { connectionDetails: async () => path }
+      const channel = new ServerNoiseChannel({
+        connectionId: 'c', membershipId: 'm', peer: { deviceId: 'p', publicKey: 'k' }, rtc,
+      } as never, async () => {}, async () => {}, 'P2P')
+
+      await expect(channel.sameLinkIpv6Endpoints({ ...pair, hostPort: 50_002 })).resolves.toEqual([])
+      await expect(channel.sameLinkIpv6Endpoints({ ...pair, peerPort: 50_002 })).resolves.toEqual([])
+      path.explicitlySelected = false
+      await expect(channel.sameLinkIpv6Endpoints(pair)).resolves.toEqual([])
+      expect(verify).not.toHaveBeenCalled()
+
+      path.explicitlySelected = true
+      verify.mockResolvedValueOnce(false)
+      await expect(channel.sameLinkIpv6Endpoints(pair)).resolves.toEqual([])
+      await expect(channel.sameLinkIpv6Endpoints(pair)).resolves.toEqual(['2001:db8::1:50000'])
+      await expect(channel.lanWebAddress(pair)).resolves.toBe('2001:db8::1')
+      await expect(channel.lanWebAddress({ ...pair, peerPort: 50_002 })).resolves.toBeUndefined()
+      expect(verify).toHaveBeenCalledWith(pair.hostAddress, pair.peerAddress)
+      expect(channel.mode).toBe('P2P')
+    } finally {
+      verify.mockRestore()
+    }
+  })
+})
 
 describe('In-band Transport Upgrade & Reorder / Drain Boundaries', () => {
   it('strictly trusts Host ICE stats over inflated Client transport claims and rejects unverified paths', async () => {

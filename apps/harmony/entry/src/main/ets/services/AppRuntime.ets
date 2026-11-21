@@ -1,3 +1,4 @@
+import { DshWebLan } from '../net/DshWebLan';
 import { DshWebGrant, parseDshWebGrant } from '../net/DshWebGrant';
 import { PluginSettingOperation, PluginSettingsForm } from '../net/PluginSettings';
 import { BotCatalogRow, parseBotCatalog } from '../net/BotCatalog';
@@ -137,6 +138,7 @@ export class AppRuntime {
   private identity: DeviceIdentity | undefined = undefined;
   private credentials: TokenPair | undefined = undefined;
   private core: RemoteClientCore | undefined = undefined;
+  private lanWebLease?: DshWebLan;
   private webLeaseCore: RemoteClientCore | undefined = undefined;
   private webGrantOperation: Promise<void> = Promise.resolve();
   private harness: HarnessAlphaClient | undefined = undefined;
@@ -627,7 +629,7 @@ export class AppRuntime {
     this.notify();
   }
 
-  async login(baseUrl: string, email: string, password: string): Promise<void> {
+  async login(baseUrl: string, email: string, password: string, challenge: string = '', code: string = ''): Promise<string | undefined> {
     if (this.busy) {
       return;
     }
@@ -638,7 +640,14 @@ export class AppRuntime {
       const normalized: string = normalizeServerUrl(baseUrl);
       const api: RemoteServerApi = new RemoteServerApi(normalized);
       await api.health();
-      const account: AccountLoginResult = await api.loginAccount(email, password);
+      const account: AccountLoginResult = challenge.length > 0
+        ? await api.verifyAccountLogin(challenge, code)
+        : await api.loginAccount(email, password);
+      if (account.challenge.length > 0) {
+        this.setBusy(false);
+        this.notify();
+        return account.challenge;
+      }
       const identity: DeviceIdentity = await this.store.loadOrCreateIdentity();
       const tokens: TokenPair = await api.registerDevice(identity, account.token);
       const config: StoredServerConfig = new StoredServerConfig();
@@ -659,9 +668,11 @@ export class AppRuntime {
       return;
     } catch (error) {
       this.errorMsg = errorMessage(error);
+      this.setBusy(false);
+      this.notify();
+      if (error instanceof RemoteApiError && error.code === 'TWO_FACTOR_EXPIRED') return '';
     }
-    this.setBusy(false);
-    this.notify();
+    return undefined;
   }
 
   async readAccountMembership(): Promise<AccountMembership> {
@@ -1912,7 +1923,12 @@ export class AppRuntime {
   supportsDshWeb(): boolean {
     return (this.phase === PHASE_CHAT || this.phase === PHASE_DEVICES) && this.harness !== undefined
       && this.connectedDeviceId.length > 0 && !this.reconnecting
-      && this.featuresCacheValue?.capabilities.includes('dsh.web.v1') === true;
+      && (this.featuresCacheValue?.capabilities.includes('dsh.web.v1') === true || this.canOpenLanWeb());
+  }
+
+  private canOpenLanWeb(): boolean {
+    return this.activeRelay !== undefined && this.transportLabelFor(this.activeRelay) === 'lan'
+      && this.featuresCacheValue?.capabilities.includes('dsh.web.lan.direct.v1') === true;
   }
 
   async openDshWeb(deviceId: string): Promise<DshWebGrant> {
@@ -1921,6 +1937,22 @@ export class AppRuntime {
       await this.releaseDshWebLease();
       if (core === undefined || core !== this.core || deviceId !== this.connectedDeviceId || !this.supportsDshWeb()) {
         throw new Error(t('未连接'));
+      }
+      if (this.canOpenLanWeb()) {
+        const lease = new DshWebLan(core, () => core === this.core && this.canOpenLanWeb());
+        this.lanWebLease = lease;
+        try {
+          return await lease.open();
+        } catch (error) {
+          await this.releaseDshWebLease();
+          if (!(error instanceof RemoteClientError) || error.code !== 'FEATURE_NOT_SUPPORTED') {
+            throw new Error('DSH_WEB_UNAVAILABLE');
+          }
+        }
+      }
+      if (core !== this.core || deviceId !== this.connectedDeviceId || this.reconnecting
+        || this.featuresCacheValue?.capabilities.includes('dsh.web.v1') !== true) {
+        throw new Error('DSH_WEB_UNAVAILABLE');
       }
       this.webLeaseCore = core;
       try {
@@ -1949,6 +1981,9 @@ export class AppRuntime {
   }
 
   private async releaseDshWebLease(): Promise<void> {
+    const lan = this.lanWebLease;
+    this.lanWebLease = undefined;
+    await lan?.close();
     const core = this.webLeaseCore;
     this.webLeaseCore = undefined;
     if (core !== undefined) {

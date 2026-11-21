@@ -225,6 +225,8 @@ export const rpcMethods = [
   'harness.transport.describe',
   'dsh.web.open',
   'dsh.web.close',
+  'dsh.web.lan.direct.open',
+  'dsh.web.lan.direct.close',
   'remote.history.configure',
   'harness.api.call',
   'harness.api.transfer.open',
@@ -885,6 +887,8 @@ export interface RemoteHistoryConfigureParams {
 export interface HarnessTransportDescription {
   capabilities: string[]
   workspaceTypes?: RemoteWorkspaceTypeDescription[]
+  sameLinkIpv6Endpoints?: string[]
+  sameLinkIpv6PairProbe?: true
 }
 
 export type CodexPermissionPreset = 'workspace-write' | 'danger-full-access'

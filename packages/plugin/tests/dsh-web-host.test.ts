@@ -8,6 +8,7 @@ import { authorizeUpstream, DshWebPeer, type DshWebBrowserAuth } from '../src/ds
 import { Connection } from '../src/hostc/connection.js'
 import {
   CLOSE_SHUTDOWN,
+  decodeClose,
   decodeFrame,
   decodeHead,
   decodeText,
@@ -19,6 +20,7 @@ import {
   FrameType,
   type HeaderList,
   MAX_STREAMS,
+  MAX_WEBSOCKET_MESSAGE_BYTES,
   type OpenMessage,
 } from '../src/hostc/protocol/index.js'
 import type { HostServerApi } from '../src/server-api.js'
@@ -105,7 +107,7 @@ function collectFrames(ws: WebSocket) {
 }
 
 describe('DSH Web Host forwarding boundary', () => {
-  const url = new URL('https://test.hostc.4ba.io/')
+  const url = new URL('https://test.tun-test.4ba.io/')
   const request: OpenMessage = { method: 'GET', path: '/api/web', headers: [], body: false }
 
   it.each(['/ds-harness-remote/api', '/%64s-harness-remote/api', '/%252e%252e/',
@@ -148,7 +150,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
 
     const clientPromise = tunnel.nextClient()
     const conn = await Connection.open({
-      tunnel: { id: 't22222222222', url: 'https://test.hostc.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
       target: local.origin,
       authorize: req => req,
       stripResponseHeaders,
@@ -227,7 +229,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
     const logs: Array<{ path: string; status: number }> = []
     const clientPromise = tunnel.nextClient()
     const conn = await Connection.open({
-      tunnel: { id: 't22222222222', url: 'https://test.hostc.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
       target: local.origin,
       authorize: req => req,
       stripResponseHeaders,
@@ -302,7 +304,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
 
     const clientPromise = tunnel.nextClient()
     const conn = await Connection.open({
-      tunnel: { id: 't22222222222', url: 'https://test.hostc.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
       target: local.origin,
       authorize: req => req,
       stripResponseHeaders,
@@ -324,7 +326,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
     const head1 = decodeHead(frames.find(f => f.stream === 1 && f.type === FrameType.Head)!.payload)
     expect(head1.status).toBe(302)
     expect(head1.headers.some(([k]) => k.toLowerCase() === 'set-cookie')).toBe(false)
-    expect(head1.headers).toContainEqual(['Location', 'https://test.hostc.4ba.io/login'])
+    expect(head1.headers).toContainEqual(['Location', 'https://test.tun-test.4ba.io/login'])
     expect(head1.headers).toContainEqual(['X-Safe', 'ok'])
 
     const head2 = decodeHead(frames.find(f => f.stream === 2 && f.type === FrameType.Head)!.payload)
@@ -364,7 +366,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
 
     const clientPromise = tunnel.nextClient()
     const conn = await Connection.open({
-      tunnel: { id: 't22222222222', url: 'https://test.hostc.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
       target: local.origin,
       authorize: req => req,
       stripResponseHeaders,
@@ -413,7 +415,7 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
     const preAborted = new AbortController()
     preAborted.abort(new Error('already cancelled'))
     await expect(Connection.open({
-      tunnel: { id: 't22222222222', url: 'https://test.hostc.4ba.io/', connectUrl: 'ws://127.0.0.1:1', token: 'tok' },
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: 'ws://127.0.0.1:1', token: 'tok' },
       target: new URL('http://127.0.0.1:1'),
       authorize: req => req,
       stripResponseHeaders,
@@ -673,6 +675,94 @@ describe('hostc tunnel stream and lifecycle hardening', () => {
     await peer.dispose()
     expect(closedSessions).toEqual(['p22222222222', 'p33333333333'])
   })
+
+  it('forwards >4 MiB WebSocket frames bidirectionally without closing', async () => {
+    const local = await listenWs()
+    cleanups.push(local.close)
+
+    const tunnel = await listenWs()
+    cleanups.push(tunnel.close)
+
+    const clientPromise = tunnel.nextClient()
+    const conn = await Connection.open({
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      target: new URL(local.url.replace('ws:', 'http:')),
+      authorize: req => req,
+      stripResponseHeaders,
+      onRequest: () => undefined,
+    })
+    cleanups.push(() => { conn.close(CLOSE_SHUTDOWN, 'test') })
+    const peerWs = await clientPromise
+    const { frames, waitFor } = collectFrames(peerWs)
+
+    const localClientPromise = local.nextClient()
+    peerWs.send(encodeFrame(FrameType.Open, 1, encodeOpen({ method: 'GET', path: '/ws', headers: [], body: false, websocket: [] })))
+    await waitFor(all => all.some(f => f.stream === 1 && f.type === FrameType.Head))
+    expect(decodeHead(frames.find(f => f.stream === 1 && f.type === FrameType.Head)!.payload).status).toBe(101)
+    const localWs = await localClientPromise
+
+    const receivedAtLocal: Array<{ data: Uint8Array; isBinary: boolean }> = []
+    localWs.on('message', (data, isBinary) => {
+      receivedAtLocal.push({ data: rawToUint8Array(data), isBinary })
+    })
+
+    const largeSize = 5 * 1024 * 1024
+    const ingressPayload = Buffer.alloc(largeSize, 0x41)
+    peerWs.send(encodeFrame(FrameType.Text, 1, ingressPayload))
+
+    const deadline = Date.now() + 10_000
+    while (receivedAtLocal.length < 1 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect(receivedAtLocal).toHaveLength(1)
+    expect(receivedAtLocal[0]!.isBinary).toBe(false)
+    expect(Buffer.from(receivedAtLocal[0]!.data).equals(ingressPayload)).toBe(true)
+    expect(localWs.readyState).toBe(WebSocket.OPEN)
+
+    const egressPayload = Buffer.alloc(largeSize, 0x42)
+    localWs.send(egressPayload)
+    await waitFor(all => all.some(f => f.stream === 1 && f.type === FrameType.Data), 10_000)
+
+    const dataFrame = frames.find(f => f.stream === 1 && f.type === FrameType.Data)!
+    expect(Buffer.from(dataFrame.payload).equals(egressPayload)).toBe(true)
+    expect(frames.some(f => f.stream === 1 && (f.type === FrameType.End || f.type === FrameType.Reset))).toBe(false)
+    expect(localWs.readyState).toBe(WebSocket.OPEN)
+  }, 30_000)
+
+  it('maps oversized local WebSocket payload errors to close code 1009', async () => {
+    const local = await listenWs()
+    cleanups.push(local.close)
+
+    const tunnel = await listenWs()
+    cleanups.push(tunnel.close)
+
+    const clientPromise = tunnel.nextClient()
+    const conn = await Connection.open({
+      tunnel: { id: 't22222222222', url: 'https://test.tun-test.4ba.io/', connectUrl: tunnel.url, token: 'tok' },
+      target: new URL(local.url.replace('ws:', 'http:')),
+      authorize: req => req,
+      stripResponseHeaders,
+      onRequest: () => undefined,
+    })
+    cleanups.push(() => { conn.close(CLOSE_SHUTDOWN, 'test') })
+    const peerWs = await clientPromise
+    const { frames, waitFor } = collectFrames(peerWs)
+
+    const localClientPromise = local.nextClient()
+    peerWs.send(encodeFrame(FrameType.Open, 1, encodeOpen({ method: 'GET', path: '/ws', headers: [], body: false, websocket: [] })))
+    await waitFor(all => all.some(f => f.stream === 1 && f.type === FrameType.Head))
+    expect(decodeHead(frames.find(f => f.stream === 1 && f.type === FrameType.Head)!.payload).status).toBe(101)
+    const localWs = await localClientPromise
+
+    localWs.send(Buffer.alloc(MAX_WEBSOCKET_MESSAGE_BYTES + 1, 0x61), { binary: true })
+    await waitFor(all => all.some(f => f.stream === 1 && f.type === FrameType.End), 10_000)
+
+    const endFrame = frames.find(f => f.stream === 1 && f.type === FrameType.End)!
+    expect(decodeClose(endFrame.payload)).toEqual({
+      code: 1009,
+      reason: 'Max payload size exceeded',
+    })
+  }, 30_000)
 })
 
 describe('DSH Web connector establishment', () => {
@@ -683,12 +773,12 @@ describe('DSH Web connector establishment', () => {
 
   it.each(['network_error', 'unauthorized'] as const)('handles initial %s without reallocating', async code => {
     const id = 'tbcdefghijkm'
-    const url = `https://${id}.hostc.4ba.io/`
+    const url = `https://${id}.tun-test.4ba.io/`
     const leaseExpiresAt = Date.now() + 30 * 60_000
     const grant = { url, browserGrant: 'b'.repeat(43), expiresAt: Date.now() + 30_000 }
     const api = {
       dshWebRequest: vi.fn(async (action: string, _input: unknown) => action === 'allocate' ? {
-        sessionId: id, url, connectUrl: `wss://hostc.4ba.io/api/tunnels/${id}/connect`,
+        sessionId: id, url, connectUrl: `wss://tun-test.4ba.io/api/tunnels/${id}/connect`,
         connectToken: 't'.repeat(43), leaseExpiresAt,
       } : grant),
       closeDshWeb: vi.fn(async () => undefined),
@@ -736,5 +826,91 @@ describe('DSH Web connector establishment', () => {
       await host.dispose()
     }
     expect(api.closeDshWeb).toHaveBeenCalledWith(id)
+  })
+})
+
+describe('LAN Web connection ownership', () => {
+  it.each([
+    ['missing candidate', async (): Promise<string | undefined> => undefined],
+    ['ineligible address', async (): Promise<string | undefined> => '192.0.2.1'],
+    ['unavailable ICE stats', async (): Promise<string | undefined> => { throw new Error('RTC path unavailable') }],
+  ] as const)('allows tunnel fallback for %s even while mode is LAN', async (_, address) => {
+    const { DshWebLanPeer } = await import('../src/dsh-web-lan.js')
+    const auth = { authenticatedUrl: vi.fn(), authorizeIndex: vi.fn(), requestRejection: vi.fn() }
+    const peer = new DshWebLanPeer(() => ({ origin: new URL('http://127.0.0.1'), auth }), () => 'LAN', address)
+    try {
+      expect(await peer.onLan()).toBe(false)
+      await expect(peer.open({})).rejects.toMatchObject({ code: 'FEATURE_NOT_SUPPORTED' })
+      expect(auth.authorizeIndex).not.toHaveBeenCalled()
+    } finally {
+      peer.dispose()
+    }
+  })
+
+  it.each(['private IPv4', 'loopback'])('requires a one-time Noise grant and retires the %s lease', async scope => {
+    const { DshWebLanPeer } = await import('../src/dsh-web-lan.js')
+    const { networkInterfaces } = await import('node:os')
+    const { dshWebLanGrantSchema, isLanUploadAddress } = await import('@dsh-remote/protocol')
+    const address = scope === 'loopback' ? '127.0.0.1' : Object.values(networkInterfaces()).flat().find(i => i && !i.internal && isLanUploadAddress(i.address))?.address
+    const upstream = await listenHttp((req, res) => {
+      res.writeHead(req.headers.cookie === 'local=owned' ? 200 : 401, { 'content-type': 'text/html', 'set-cookie': 'local=owned' })
+      res.end('hello')
+    })
+    const wsServer = new WebSocketServer({ server: upstream.server })
+    wsServer.on('connection', (ws, req) => ws.send(req.headers.cookie === 'local=owned' ? 'hello' : 'denied'))
+    let mode = 'LAN'
+    const auth: DshWebBrowserAuth = {
+      authenticatedUrl: url => url,
+      authorizeIndex: (_, res) => { res.writeHead(303, { 'set-cookie': 'local=owned' }); return true },
+      requestRejection: () => undefined,
+    }
+    const peer = new DshWebLanPeer(() => ({ origin: upstream.origin, auth }), () => mode, async () => address)
+    try {
+      for (mode of ['P2P', 'TURN', 'Relay']) {
+        expect(await peer.onLan()).toBe(false)
+        await expect(peer.open({})).rejects.toMatchObject({ code: 'FEATURE_NOT_SUPPORTED' })
+      }
+      mode = 'LAN'
+      expect(await peer.onLan()).toBe(true)
+      const stale = await peer.open({})
+      const current = dshWebLanGrantSchema.parse(await peer.open({}))
+      expect(new URL(current.url).hostname).toBe(address)
+      peer.close({ sessionId: stale.sessionId })
+      const { url, browserGrant } = current
+      for (const path of ['', 'api/test', '__remote/browser', '__remote/session-bootstrap', '__remote/lan-status']) {
+        expect((await fetch(url + path)).status).toBe(401)
+      }
+      const wsUrl = url.replace('http:', 'ws:')
+      const anonymous = new WebSocket(wsUrl)
+      await expect(new Promise((_resolve, reject) => anonymous.once('error', reject))).rejects.toThrow('401')
+      const redeem = () => fetch(url + '__remote/session', { method: 'POST', redirect: 'manual',
+        headers: { origin: new URL(url).origin }, body: new URLSearchParams({ browserGrant }) })
+      const [first, second] = await Promise.all([redeem(), redeem()])
+      expect([first.status, second.status].sort()).toEqual([303, 401])
+      const cookie = (first.status === 303 ? first : second).headers.get('set-cookie')!.split(';')[0]!
+      const lanStatus = await fetch(url + '__remote/lan-status', { headers: { cookie } })
+      expect(lanStatus.status).toBe(204)
+      expect(lanStatus.headers.get('x-dsh-web-lan')).toBe('1')
+      const bot = await fetch(url + 'api/bot', {
+        method: 'POST', headers: { cookie, origin: new URL(url).origin }, body: '{}',
+      })
+      expect(await bot.text()).toBe('hello')
+      const page = await fetch(url, { headers: { cookie } })
+      expect(await page.text()).toBe('hello')
+      expect(page.headers.has('set-cookie')).toBe(false)
+      expect((await fetch(url + 'ds-harness-remote', { headers: { cookie } })).status).toBe(403)
+      expect((await fetch(url, { method: 'POST', headers: { cookie, origin: 'http://example.invalid' } })).status).toBe(403)
+      const ws = new WebSocket(wsUrl, { headers: { cookie, origin: new URL(url).origin } })
+      expect(await new Promise((resolve, reject) => ws.once('message', data => resolve(data.toString())).once('error', reject))).toBe('hello')
+      const closed = new Promise(resolve => ws.once('close', resolve))
+      mode = 'TURN'
+      await closed
+      await expect(peer.open({})).rejects.toMatchObject({ code: 'FEATURE_NOT_SUPPORTED' })
+      await expect(fetch(url, { headers: { cookie } })).rejects.toThrow()
+    } finally {
+      peer.dispose()
+      wsServer.close()
+      await upstream.close()
+    }
   })
 })

@@ -31,6 +31,7 @@ import {
   type HelloAckPayload,
   type RelayPayload,
   type RemoteMessage,
+  type SameLinkIpv6Pair,
   type SecureHandshakePayload,
   type SelectedTransport,
   type SignalIcePayload,
@@ -56,6 +57,7 @@ import { createNodeWebSocket } from './node-websocket.js'
 import { TransportUpgradeHost, wrapUpgradedTransportFrame } from './transport-upgrade.js'
 import type { AuthenticatedPeerChannel } from './types.js'
 import { PLUGIN_VERSION } from './version.js'
+import { isIpv6OnLink } from './ipv6-on-link.js'
 
 interface WebSocketLike {
   readonly readyState: number
@@ -1597,6 +1599,59 @@ export class ServerNoiseChannel implements AuthenticatedPeerChannel {
     }
     this.peerDeviceId = tunnel.peer.deviceId
     this.peerIdentityKey = tunnel.peer.publicKey
+  }
+
+  async sameLinkIpv6Endpoints(pair?: SameLinkIpv6Pair): Promise<string[]> {
+    const rtc = this.tunnel.rtc
+    if (rtc === undefined || this.mode === 'TURN' || this.mode === 'Relay') return []
+    if (pair !== undefined) {
+      const path = await rtc.connectionDetails()
+      const hostEndpoint = `${pair.hostAddress}:${pair.hostPort}`
+      // Native libwebrtc can mask peer-reflexive addresses but preserves the
+      // selected pair and port. If it reports an address, require a match.
+      if (path.dataChannelState !== 'open' || path.explicitlySelected !== true
+        || path.transport !== 'p2p' || path.localCandidateType !== 'host'
+        || path.localAddress?.toLowerCase() !== hostEndpoint.toLowerCase()
+        || (path.remoteCandidateType !== 'prflx' && path.remoteCandidateType !== 'host')
+        || (path.remoteAddress === undefined ? path.remoteCandidateType !== 'prflx'
+          : path.remoteAddress.toLowerCase() !== `${pair.peerAddress.toLowerCase()}:${pair.peerPort}`)
+        || path.remotePort !== pair.peerPort || !await isIpv6OnLink(pair.hostAddress, pair.peerAddress)) return []
+      return this.closed || rtc !== this.tunnel.rtc ? [] : [hostEndpoint]
+    }
+    const endpoints = await rtc.nominatedGlobalIpv6Endpoints().catch(() => undefined)
+    if (endpoints === undefined || endpoints.size > 8) return []
+    const verified = await Promise.all([...endpoints].map(async ([address, { local, remotes }]) => {
+      if (remotes.has(undefined) || remotes.size > 2) return undefined
+      for (const remote of remotes) {
+        if (remote === undefined || !await isIpv6OnLink(local, remote)) return undefined
+      }
+      return address
+    }))
+    return this.closed || rtc !== this.tunnel.rtc ? [] : verified.filter(address => address !== undefined)
+  }
+
+  async lanWebAddress(pair?: SameLinkIpv6Pair) {
+    if (pair !== undefined) {
+      const verified = await this.sameLinkIpv6Endpoints(pair)
+      return verified.length === 1 ? pair.hostAddress : undefined
+    }
+    const rtc = this.tunnel.rtc
+    const mode = this.mode
+    if (this.closed || !rtc || (mode !== 'LAN' && mode !== 'P2P')) return undefined
+    const path = await rtc.connectionDetails()
+    if (this.closed || rtc !== this.tunnel.rtc || this.mode !== mode || path.dataChannelState !== 'open') return undefined
+    // ICE can switch from an early IPv6 pair to IPv4 after Noise has connected.
+    // Use fresh local stats before granting access to the LAN listener.
+    if (path.transport === 'p2p') this.mode = 'P2P'
+    if (path.transport === 'lan') {
+      this.mode = 'LAN'
+      // A selected loopback interface reaches this machine in either IP family.
+      // The browser handoff consistently uses the IPv4 loopback listener.
+      if (path.localAddressScope === 'loopback') return '127.0.0.1'
+      // RTC diagnostics include the selected candidate port when available.
+      return /^(\d+\.\d+\.\d+\.\d+)(?::\d+)?$/.exec(path.localAddress ?? '')?.[1]
+    }
+    return undefined
   }
 
   get outboundCounter(): number { return Number(this.tunnel.noise.sendingCounter()) }
