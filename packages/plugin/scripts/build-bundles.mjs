@@ -21,7 +21,7 @@ async function buildBundle(options) {
         // esbuild derives source module comments from the process cwd. Keep
         // the committed GitHub bundle stable when CI builds from the repo
         // root while local package builds run from packages/plugin.
-        .replace(/^([ \t]*\/\/ )src\//gm, '$1packages/plugin/src/')
+        .replace(/^([ \t]*(?:\/\/ |"))src\//gm, '$1packages/plugin/src/')
         .replace(/^([ \t]*\/\/ )\.\.\/(protocol|client-core|crypto|webrtc)\//gm, '$1packages/$2/')
       : file.contents
     await mkdir(dirname(file.path), { recursive: true })
@@ -63,6 +63,7 @@ for (const [moduleId, outfile] of [
     bundle: true,
     platform: 'browser',
     format: 'iife',
+    inject: [join(root, 'src/client/page-globals.ts')],
     minifySyntax: true,
     define: {
       DSH_REMOTE_CLIENT_MODULE_ID: JSON.stringify(moduleId),

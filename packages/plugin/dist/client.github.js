@@ -5,6 +5,9 @@
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __esm = (fn, res) => function() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  };
   var __commonJS = (cb, mod) => function() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
@@ -23,9 +26,26 @@
     mod
   ));
 
+  // packages/plugin/src/client/page-globals.ts
+  function harnessPage() {
+    let parent = window.parent;
+    try {
+      if (parent !== void 0 && parent !== window && window.__ModuleLoader__ !== void 0 && parent.__ModuleLoader__ === window.__ModuleLoader__) return parent;
+    } catch {
+    }
+    return window;
+  }
+  var page, pageDocument, Element, KeyboardEvent, EventSource, CustomEvent, MutationObserver, ResizeObserver, Request, Response, ReadableStream, Error2, init_page_globals = __esm({
+    "packages/plugin/src/client/page-globals.ts"() {
+      "use strict";
+      page = harnessPage(), pageDocument = page.document ?? (typeof document > "u" ? void 0 : document), Element = page.Element, KeyboardEvent = page.KeyboardEvent, EventSource = page.EventSource, CustomEvent = page.CustomEvent, MutationObserver = page.MutationObserver, ResizeObserver = page.ResizeObserver, Request = page.Request, Response = page.Response, ReadableStream = page.ReadableStream, Error2 = page.Error ?? globalThis.Error;
+    }
+  });
+
   // node_modules/qrcode/lib/can-promise.js
   var require_can_promise = __commonJS({
     "node_modules/qrcode/lib/can-promise.js"(exports, module) {
+      init_page_globals();
       module.exports = function() {
         return typeof Promise == "function" && Promise.prototype && Promise.prototype.then;
       };
@@ -35,6 +55,7 @@
   // node_modules/qrcode/lib/core/utils.js
   var require_utils = __commonJS({
     "node_modules/qrcode/lib/core/utils.js"(exports) {
+      init_page_globals();
       var toSJISFunction, CODEWORDS_COUNT = [
         0,
         // Not used
@@ -80,8 +101,8 @@
         3706
       ];
       exports.getSymbolSize = function(version) {
-        if (!version) throw new Error('"version" cannot be null or undefined');
-        if (version < 1 || version > 40) throw new Error('"version" should be in range from 1 to 40');
+        if (!version) throw new Error2('"version" cannot be null or undefined');
+        if (version < 1 || version > 40) throw new Error2('"version" should be in range from 1 to 40');
         return version * 4 + 17;
       };
       exports.getSymbolTotalCodewords = function(version) {
@@ -95,7 +116,7 @@
       };
       exports.setToSJISFunction = function(f) {
         if (typeof f != "function")
-          throw new Error('"toSJISFunc" is not a valid function.');
+          throw new Error2('"toSJISFunc" is not a valid function.');
         toSJISFunction = f;
       };
       exports.isKanjiModeEnabled = function() {
@@ -110,13 +131,14 @@
   // node_modules/qrcode/lib/core/error-correction-level.js
   var require_error_correction_level = __commonJS({
     "node_modules/qrcode/lib/core/error-correction-level.js"(exports) {
+      init_page_globals();
       exports.L = { bit: 1 };
       exports.M = { bit: 0 };
       exports.Q = { bit: 3 };
       exports.H = { bit: 2 };
       function fromString(string) {
         if (typeof string != "string")
-          throw new Error("Param is not a string");
+          throw new Error2("Param is not a string");
         switch (string.toLowerCase()) {
           case "l":
           case "low":
@@ -131,7 +153,7 @@
           case "high":
             return exports.H;
           default:
-            throw new Error("Unknown EC Level: " + string);
+            throw new Error2("Unknown EC Level: " + string);
         }
       }
       exports.isValid = function(level) {
@@ -152,6 +174,7 @@
   // node_modules/qrcode/lib/core/bit-buffer.js
   var require_bit_buffer = __commonJS({
     "node_modules/qrcode/lib/core/bit-buffer.js"(exports, module) {
+      init_page_globals();
       function BitBuffer() {
         this.buffer = [], this.length = 0;
       }
@@ -179,9 +202,10 @@
   // node_modules/qrcode/lib/core/bit-matrix.js
   var require_bit_matrix = __commonJS({
     "node_modules/qrcode/lib/core/bit-matrix.js"(exports, module) {
+      init_page_globals();
       function BitMatrix(size) {
         if (!size || size < 1)
-          throw new Error("BitMatrix size must be defined and greater than 0");
+          throw new Error2("BitMatrix size must be defined and greater than 0");
         this.size = size, this.data = new Uint8Array(size * size), this.reservedBit = new Uint8Array(size * size);
       }
       BitMatrix.prototype.set = function(row, col, value, reserved) {
@@ -204,6 +228,7 @@
   // node_modules/qrcode/lib/core/alignment-pattern.js
   var require_alignment_pattern = __commonJS({
     "node_modules/qrcode/lib/core/alignment-pattern.js"(exports) {
+      init_page_globals();
       var getSymbolSize = require_utils().getSymbolSize;
       exports.getRowColCoords = function(version) {
         if (version === 1) return [];
@@ -227,6 +252,7 @@
   // node_modules/qrcode/lib/core/finder-pattern.js
   var require_finder_pattern = __commonJS({
     "node_modules/qrcode/lib/core/finder-pattern.js"(exports) {
+      init_page_globals();
       var getSymbolSize = require_utils().getSymbolSize, FINDER_PATTERN_SIZE = 7;
       exports.getPositions = function(version) {
         let size = getSymbolSize(version);
@@ -245,6 +271,7 @@
   // node_modules/qrcode/lib/core/mask-pattern.js
   var require_mask_pattern = __commonJS({
     "node_modules/qrcode/lib/core/mask-pattern.js"(exports) {
+      init_page_globals();
       exports.Patterns = {
         PATTERN000: 0,
         PATTERN001: 1,
@@ -321,7 +348,7 @@
           case exports.Patterns.PATTERN111:
             return (i * j % 3 + (i + j) % 2) % 2 === 0;
           default:
-            throw new Error("bad maskPattern:" + maskPattern);
+            throw new Error2("bad maskPattern:" + maskPattern);
         }
       }
       exports.applyMask = function(pattern, data) {
@@ -345,6 +372,7 @@
   // node_modules/qrcode/lib/core/error-correction-code.js
   var require_error_correction_code = __commonJS({
     "node_modules/qrcode/lib/core/error-correction-code.js"(exports) {
+      init_page_globals();
       var ECLevel = require_error_correction_level(), EC_BLOCKS_TABLE = [
         // L  M  Q  H
         1,
@@ -704,6 +732,7 @@
   // node_modules/qrcode/lib/core/galois-field.js
   var require_galois_field = __commonJS({
     "node_modules/qrcode/lib/core/galois-field.js"(exports) {
+      init_page_globals();
       var EXP_TABLE = new Uint8Array(512), LOG_TABLE = new Uint8Array(256);
       (function() {
         let x = 1;
@@ -713,7 +742,7 @@
           EXP_TABLE[i] = EXP_TABLE[i - 255];
       })();
       exports.log = function(n) {
-        if (n < 1) throw new Error("log(" + n + ")");
+        if (n < 1) throw new Error2("log(" + n + ")");
         return LOG_TABLE[n];
       };
       exports.exp = function(n) {
@@ -728,6 +757,7 @@
   // node_modules/qrcode/lib/core/polynomial.js
   var require_polynomial = __commonJS({
     "node_modules/qrcode/lib/core/polynomial.js"(exports) {
+      init_page_globals();
       var GF = require_galois_field();
       exports.mul = function(p1, p2) {
         let coeff = new Uint8Array(p1.length + p2.length - 1);
@@ -760,6 +790,7 @@
   // node_modules/qrcode/lib/core/reed-solomon-encoder.js
   var require_reed_solomon_encoder = __commonJS({
     "node_modules/qrcode/lib/core/reed-solomon-encoder.js"(exports, module) {
+      init_page_globals();
       var Polynomial = require_polynomial();
       function ReedSolomonEncoder(degree) {
         this.genPoly = void 0, this.degree = degree, this.degree && this.initialize(this.degree);
@@ -769,7 +800,7 @@
       };
       ReedSolomonEncoder.prototype.encode = function(data) {
         if (!this.genPoly)
-          throw new Error("Encoder not initialized");
+          throw new Error2("Encoder not initialized");
         let paddedData = new Uint8Array(data.length + this.degree);
         paddedData.set(data);
         let remainder = Polynomial.mod(paddedData, this.genPoly), start = this.degree - remainder.length;
@@ -786,6 +817,7 @@
   // node_modules/qrcode/lib/core/version-check.js
   var require_version_check = __commonJS({
     "node_modules/qrcode/lib/core/version-check.js"(exports) {
+      init_page_globals();
       exports.isValid = function(version) {
         return !isNaN(version) && version >= 1 && version <= 40;
       };
@@ -795,6 +827,7 @@
   // node_modules/qrcode/lib/core/regex.js
   var require_regex = __commonJS({
     "node_modules/qrcode/lib/core/regex.js"(exports) {
+      init_page_globals();
       var numeric = "[0-9]+", alphanumeric = "[A-Z $%*+\\-./:]+", kanji = "(?:[u3000-u303F]|[u3040-u309F]|[u30A0-u30FF]|[uFF00-uFFEF]|[u4E00-u9FAF]|[u2605-u2606]|[u2190-u2195]|u203B|[u2010u2015u2018u2019u2025u2026u201Cu201Du2225u2260]|[u0391-u0451]|[u00A7u00A8u00B1u00B4u00D7u00F7])+";
       kanji = kanji.replace(/u/g, "\\u");
       var byte = "(?:(?![A-Z0-9 $%*+\\-./:]|" + kanji + `)(?:.|[\r
@@ -820,6 +853,7 @@
   // node_modules/qrcode/lib/core/mode.js
   var require_mode = __commonJS({
     "node_modules/qrcode/lib/core/mode.js"(exports) {
+      init_page_globals();
       var VersionCheck = require_version_check(), Regex = require_regex();
       exports.NUMERIC = {
         id: "Numeric",
@@ -845,9 +879,9 @@
         bit: -1
       };
       exports.getCharCountIndicator = function(mode, version) {
-        if (!mode.ccBits) throw new Error("Invalid mode: " + mode);
+        if (!mode.ccBits) throw new Error2("Invalid mode: " + mode);
         if (!VersionCheck.isValid(version))
-          throw new Error("Invalid version: " + version);
+          throw new Error2("Invalid version: " + version);
         return version >= 1 && version < 10 ? mode.ccBits[0] : version < 27 ? mode.ccBits[1] : mode.ccBits[2];
       };
       exports.getBestModeForData = function(dataStr) {
@@ -855,14 +889,14 @@
       };
       exports.toString = function(mode) {
         if (mode && mode.id) return mode.id;
-        throw new Error("Invalid mode");
+        throw new Error2("Invalid mode");
       };
       exports.isValid = function(mode) {
         return mode && mode.bit && mode.ccBits;
       };
       function fromString(string) {
         if (typeof string != "string")
-          throw new Error("Param is not a string");
+          throw new Error2("Param is not a string");
         switch (string.toLowerCase()) {
           case "numeric":
             return exports.NUMERIC;
@@ -873,7 +907,7 @@
           case "byte":
             return exports.BYTE;
           default:
-            throw new Error("Unknown mode: " + string);
+            throw new Error2("Unknown mode: " + string);
         }
       }
       exports.from = function(value, defaultValue) {
@@ -891,6 +925,7 @@
   // node_modules/qrcode/lib/core/version.js
   var require_version = __commonJS({
     "node_modules/qrcode/lib/core/version.js"(exports) {
+      init_page_globals();
       var Utils = require_utils(), ECCode = require_error_correction_code(), ECLevel = require_error_correction_level(), Mode = require_mode(), VersionCheck = require_version_check(), G18 = 7973, G18_BCH = Utils.getBCHDigit(G18);
       function getBestVersionForDataLength(mode, length, errorCorrectionLevel) {
         for (let currentVersion = 1; currentVersion <= 40; currentVersion++)
@@ -917,7 +952,7 @@
       };
       exports.getCapacity = function(version, errorCorrectionLevel, mode) {
         if (!VersionCheck.isValid(version))
-          throw new Error("Invalid QR Code version");
+          throw new Error2("Invalid QR Code version");
         typeof mode > "u" && (mode = Mode.BYTE);
         let totalCodewords = Utils.getSymbolTotalCodewords(version), ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel), dataTotalCodewordsBits = (totalCodewords - ecTotalCodewords) * 8;
         if (mode === Mode.MIXED) return dataTotalCodewordsBits;
@@ -948,7 +983,7 @@
       };
       exports.getEncodedBits = function(version) {
         if (!VersionCheck.isValid(version) || version < 7)
-          throw new Error("Invalid QR Code version");
+          throw new Error2("Invalid QR Code version");
         let d = version << 12;
         for (; Utils.getBCHDigit(d) - G18_BCH >= 0; )
           d ^= G18 << Utils.getBCHDigit(d) - G18_BCH;
@@ -960,6 +995,7 @@
   // node_modules/qrcode/lib/core/format-info.js
   var require_format_info = __commonJS({
     "node_modules/qrcode/lib/core/format-info.js"(exports) {
+      init_page_globals();
       var Utils = require_utils(), G15 = 1335, G15_MASK = 21522, G15_BCH = Utils.getBCHDigit(G15);
       exports.getEncodedBits = function(errorCorrectionLevel, mask) {
         let data = errorCorrectionLevel.bit << 3 | mask, d = data << 10;
@@ -973,6 +1009,7 @@
   // node_modules/qrcode/lib/core/numeric-data.js
   var require_numeric_data = __commonJS({
     "node_modules/qrcode/lib/core/numeric-data.js"(exports, module) {
+      init_page_globals();
       var Mode = require_mode();
       function NumericData(data) {
         this.mode = Mode.NUMERIC, this.data = data.toString();
@@ -1000,6 +1037,7 @@
   // node_modules/qrcode/lib/core/alphanumeric-data.js
   var require_alphanumeric_data = __commonJS({
     "node_modules/qrcode/lib/core/alphanumeric-data.js"(exports, module) {
+      init_page_globals();
       var Mode = require_mode(), ALPHA_NUM_CHARS = [
         "0",
         "1",
@@ -1074,6 +1112,7 @@
   // node_modules/qrcode/lib/core/byte-data.js
   var require_byte_data = __commonJS({
     "node_modules/qrcode/lib/core/byte-data.js"(exports, module) {
+      init_page_globals();
       var Mode = require_mode();
       function ByteData(data) {
         this.mode = Mode.BYTE, typeof data == "string" ? this.data = new TextEncoder().encode(data) : this.data = new Uint8Array(data);
@@ -1098,6 +1137,7 @@
   // node_modules/qrcode/lib/core/kanji-data.js
   var require_kanji_data = __commonJS({
     "node_modules/qrcode/lib/core/kanji-data.js"(exports, module) {
+      init_page_globals();
       var Mode = require_mode(), Utils = require_utils();
       function KanjiData(data) {
         this.mode = Mode.KANJI, this.data = data;
@@ -1120,7 +1160,7 @@
           else if (value >= 57408 && value <= 60351)
             value -= 49472;
           else
-            throw new Error(
+            throw new Error2(
               "Invalid SJIS character: " + this.data[i] + `
 Make sure your charset is UTF-8`
             );
@@ -1135,6 +1175,7 @@ Make sure your charset is UTF-8`
   var require_dijkstra = __commonJS({
     "node_modules/dijkstrajs/dijkstra.js"(exports, module) {
       "use strict";
+      init_page_globals();
       var dijkstra = {
         single_source_shortest_paths: function(graph, s, d) {
           var predecessors = {}, costs = {};
@@ -1148,7 +1189,7 @@ Make sure your charset is UTF-8`
           }
           if (typeof d < "u" && typeof costs[d] > "u") {
             var msg = ["Could not find a path from ", s, " to ", d, "."].join("");
-            throw new Error(msg);
+            throw new Error2(msg);
           }
           return predecessors;
         },
@@ -1204,6 +1245,7 @@ Make sure your charset is UTF-8`
   // node_modules/qrcode/lib/core/segments.js
   var require_segments = __commonJS({
     "node_modules/qrcode/lib/core/segments.js"(exports) {
+      init_page_globals();
       var Mode = require_mode(), NumericData = require_numeric_data(), AlphanumericData = require_alphanumeric_data(), ByteData = require_byte_data(), KanjiData = require_kanji_data(), Regex = require_regex(), Utils = require_utils(), dijkstra = require_dijkstra();
       function getStringByteLength(str) {
         return unescape(encodeURIComponent(str)).length;
@@ -1302,7 +1344,7 @@ Make sure your charset is UTF-8`
       function buildSingleSegment(data, modesHint) {
         let mode, bestMode = Mode.getBestModeForData(data);
         if (mode = Mode.from(modesHint, bestMode), mode !== Mode.BYTE && mode.bit < bestMode.bit)
-          throw new Error('"' + data + '" cannot be encoded with mode ' + Mode.toString(mode) + `.
+          throw new Error2('"' + data + '" cannot be encoded with mode ' + Mode.toString(mode) + `.
  Suggested mode is: ` + Mode.toString(bestMode));
         switch (mode === Mode.KANJI && !Utils.isKanjiModeEnabled() && (mode = Mode.BYTE), mode) {
           case Mode.NUMERIC:
@@ -1337,6 +1379,7 @@ Make sure your charset is UTF-8`
   // node_modules/qrcode/lib/core/qrcode.js
   var require_qrcode = __commonJS({
     "node_modules/qrcode/lib/core/qrcode.js"(exports) {
+      init_page_globals();
       var Utils = require_utils(), ECLevel = require_error_correction_level(), BitBuffer = require_bit_buffer(), BitMatrix = require_bit_matrix(), AlignmentPattern = require_alignment_pattern(), FinderPattern = require_finder_pattern(), MaskPattern = require_mask_pattern(), ECCode = require_error_correction_code(), ReedSolomonEncoder = require_reed_solomon_encoder(), Version = require_version(), FormatInfo = require_format_info(), Mode = require_mode(), Segments = require_segments();
       function setupFinderPattern(matrix, version) {
         let size = matrix.size, pos = FinderPattern.getPositions(version);
@@ -1430,14 +1473,14 @@ Make sure your charset is UTF-8`
           }
           segments = Segments.fromString(data, estimatedVersion || 40);
         } else
-          throw new Error("Invalid data");
+          throw new Error2("Invalid data");
         let bestVersion = Version.getBestVersionForData(segments, errorCorrectionLevel);
         if (!bestVersion)
-          throw new Error("The amount of data is too big to be stored in a QR Code");
+          throw new Error2("The amount of data is too big to be stored in a QR Code");
         if (!version)
           version = bestVersion;
         else if (version < bestVersion)
-          throw new Error(
+          throw new Error2(
             `
 The chosen QR Code version cannot contain this amount of data.
 Minimum version required to store current data is: ` + bestVersion + `.
@@ -1457,7 +1500,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
       }
       exports.create = function(data, options) {
         if (typeof data > "u" || data === "")
-          throw new Error("No input text");
+          throw new Error2("No input text");
         let errorCorrectionLevel = ECLevel.M, version, mask;
         return typeof options < "u" && (errorCorrectionLevel = ECLevel.from(options.errorCorrectionLevel, ECLevel.M), version = Version.from(options.version), mask = MaskPattern.from(options.maskPattern), options.toSJISFunc && Utils.setToSJISFunction(options.toSJISFunc)), createSymbol(data, version, errorCorrectionLevel, mask);
       };
@@ -1467,12 +1510,13 @@ Minimum version required to store current data is: ` + bestVersion + `.
   // node_modules/qrcode/lib/renderer/utils.js
   var require_utils2 = __commonJS({
     "node_modules/qrcode/lib/renderer/utils.js"(exports) {
+      init_page_globals();
       function hex2rgba(hex) {
         if (typeof hex == "number" && (hex = hex.toString()), typeof hex != "string")
-          throw new Error("Color should be defined as hex string");
+          throw new Error2("Color should be defined as hex string");
         let hexCode = hex.slice().replace("#", "").split("");
         if (hexCode.length < 3 || hexCode.length === 5 || hexCode.length > 8)
-          throw new Error("Invalid hex color: " + hex);
+          throw new Error2("Invalid hex color: " + hex);
         (hexCode.length === 3 || hexCode.length === 4) && (hexCode = Array.prototype.concat.apply([], hexCode.map(function(c) {
           return [c, c];
         }))), hexCode.length === 6 && hexCode.push("F", "F");
@@ -1525,15 +1569,16 @@ Minimum version required to store current data is: ` + bestVersion + `.
   // node_modules/qrcode/lib/renderer/canvas.js
   var require_canvas = __commonJS({
     "node_modules/qrcode/lib/renderer/canvas.js"(exports) {
+      init_page_globals();
       var Utils = require_utils2();
       function clearCanvas(ctx, canvas, size) {
         ctx.clearRect(0, 0, canvas.width, canvas.height), canvas.style || (canvas.style = {}), canvas.height = size, canvas.width = size, canvas.style.height = size + "px", canvas.style.width = size + "px";
       }
       function getCanvasElement() {
         try {
-          return document.createElement("canvas");
+          return pageDocument.createElement("canvas");
         } catch {
-          throw new Error("You need to specify a canvas element");
+          throw new Error2("You need to specify a canvas element");
         }
       }
       exports.render = function(qrData, canvas, options) {
@@ -1554,6 +1599,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   // node_modules/qrcode/lib/renderer/svg-tag.js
   var require_svg_tag = __commonJS({
     "node_modules/qrcode/lib/renderer/svg-tag.js"(exports) {
+      init_page_globals();
       var Utils = require_utils2();
       function getColorAttrib(color, attrib) {
         let alpha = color.a / 255, str = attrib + '="' + color.hex + '"';
@@ -1582,18 +1628,19 @@ Minimum version required to store current data is: ` + bestVersion + `.
   // node_modules/qrcode/lib/browser.js
   var require_browser = __commonJS({
     "node_modules/qrcode/lib/browser.js"(exports) {
+      init_page_globals();
       var canPromise = require_can_promise(), QRCode4 = require_qrcode(), CanvasRenderer = require_canvas(), SvgRenderer = require_svg_tag();
       function renderCanvas(renderFunc, canvas, text, opts, cb) {
         let args = [].slice.call(arguments, 1), argsNum = args.length, isLastArgCb = typeof args[argsNum - 1] == "function";
         if (!isLastArgCb && !canPromise())
-          throw new Error("Callback required as last argument");
+          throw new Error2("Callback required as last argument");
         if (isLastArgCb) {
           if (argsNum < 2)
-            throw new Error("Too few arguments provided");
+            throw new Error2("Too few arguments provided");
           argsNum === 2 ? (cb = text, text = canvas, canvas = opts = void 0) : argsNum === 3 && (canvas.getContext && typeof cb > "u" ? (cb = opts, opts = void 0) : (cb = opts, opts = text, text = canvas, canvas = void 0));
         } else {
           if (argsNum < 1)
-            throw new Error("Too few arguments provided");
+            throw new Error2("Too few arguments provided");
           return argsNum === 1 ? (text = canvas, canvas = opts = void 0) : argsNum === 2 && !canvas.getContext && (opts = text, text = canvas, canvas = void 0), new Promise(function(resolve, reject) {
             try {
               let data = QRCode4.create(text, opts);
@@ -1619,7 +1666,14 @@ Minimum version required to store current data is: ` + bestVersion + `.
     }
   });
 
+  // packages/plugin/src/client.ts
+  init_page_globals();
+
+  // packages/plugin/src/remote-upload-client.ts
+  init_page_globals();
+
   // packages/plugin/src/control-route.ts
+  init_page_globals();
   var CONTROL_RPC_PREFIX = "/ds-harness-remote", STATUS_STREAM_ENDPOINT = "status.events", STATUS_STREAM_PATH = `${CONTROL_RPC_PREFIX}/${STATUS_STREAM_ENDPOINT}`;
 
   // packages/plugin/src/remote-upload-client.ts
@@ -1652,15 +1706,15 @@ Minimum version required to store current data is: ` + bestVersion + `.
         body: JSON.stringify({ type: "client-request", rpcId, method, payload }),
         signal
       });
-      if (!response.ok) throw new Error(`Remote upload control failed (HTTP ${response.status}).`);
+      if (!response.ok) throw new Error2(`Remote upload control failed (HTTP ${response.status}).`);
       let envelope = await response.json();
       if (envelope.type !== "server-response" || envelope.rpcId !== rpcId || envelope.result?.ok !== !0) {
         let details = envelope.result?.error?.details, bytes = details?.uploadLimitBytes;
         if (t && envelope.rpcId === rpcId && typeof bytes == "number" && Number.isSafeInteger(bytes) && bytes > 0) {
           let size = bytes === 1073741824 ? "1 GiB" : `${bytes / 1048576} MiB`;
-          throw new Error(t(details?.relay ? "relayUploadTooLarge" : "uploadTooLarge", { size }));
+          throw new Error2(t(details?.relay ? "relayUploadTooLarge" : "uploadTooLarge", { size }));
         }
-        throw new Error(envelope.result?.error?.message ?? "Remote upload requires an updated Host plugin.");
+        throw new Error2(envelope.result?.error?.message ?? "Remote upload requires an updated Host plugin.");
       }
       return envelope.result.value;
     };
@@ -1670,11 +1724,11 @@ Minimum version required to store current data is: ` + bestVersion + `.
       let source = input instanceof Request ? input : void 0;
       if ((init?.method ?? source?.method ?? "GET").toUpperCase() !== "POST") return original(input, init);
       let signal = AbortSignal.any([init?.signal ?? source?.signal ?? new AbortController().signal, AbortSignal.timeout(6e4)]), status = await control("status", {}, signal);
-      if (status.mode !== "remote" || !status.connected) throw new Error("Remote Host is disconnected. Reconnect before uploading a file.");
-      if (status.backend !== void 0 && status.backend !== "harness" && status.backend !== "codex") throw new Error("Remote attachment receipts require a Harness or CodeX session.");
+      if (status.mode !== "remote" || !status.connected) throw new Error2("Remote Host is disconnected. Reconnect before uploading a file.");
+      if (status.backend !== void 0 && status.backend !== "harness" && status.backend !== "codex") throw new Error2("Remote attachment receipts require a Harness or CodeX session.");
       let sessionId = url.searchParams.get("sessionId"), mediaType = url.searchParams.get("mediaType");
       if (!sessionId || mediaType !== null && !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mediaType))
-        throw new Error("A Session and a supported image media type, when provided, are required.");
+        throw new Error2("A Session and a supported image media type, when provided, are required.");
       let reader = (source ? new Request(source, init) : new Request(url, init)).body?.getReader(), abortRead = () => {
         reader?.cancel(signal.reason).catch(() => {
         });
@@ -1686,7 +1740,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
           signal.throwIfAborted();
           let next = await reader.read();
           if (next.done) break;
-          if (size += next.value.byteLength, size > REMOTE_UPLOAD_MAX_BYTES) throw new Error("Remote upload exceeds the Remote transfer safety limit.");
+          if (size += next.value.byteLength, size > REMOTE_UPLOAD_MAX_BYTES) throw new Error2("Remote upload exceeds the Remote transfer safety limit.");
           chunks.push(next.value);
         }
       } finally {
@@ -1710,9 +1764,10 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // packages/plugin/src/client/portal.ts
+  init_page_globals();
   function renderBodyPortal(portal, children) {
-    if (typeof portal != "function" || typeof document > "u" || document === null) return children;
-    let body = document.body;
+    if (typeof portal != "function" || typeof pageDocument > "u" || pageDocument === null) return children;
+    let body = pageDocument.body;
     if (body == null) return children;
     try {
       return portal(children, body);
@@ -1722,6 +1777,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // packages/plugin/src/client-locale.ts
+  init_page_globals();
   var localeNamespace = "ds-harness-remote", en = {
     uploadTooLarge: "The file exceeds the current upload limit of {size}.",
     relayUploadTooLarge: "The file exceeds the current upload limit of {size}. Relay and TURN allow 20 MiB per file, or 100 MiB on connections with member upload support.",
@@ -3356,7 +3412,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     codexVirtualSessions: "\u0421\u0435\u0441\u0456\u0457"
   };
 
+  // packages/plugin/src/client/header.ts
+  init_page_globals();
+
   // packages/plugin/src/client/server-notice.ts
+  init_page_globals();
   function createServerNotice(React) {
     return function(props) {
       let { offline, linked, expiresAt, t } = props, wasOffline = React.useRef(!1), hadLink = React.useRef(linked), [restored, setRestored] = React.useState(!1), [now, setNow] = React.useState(Date.now());
@@ -3384,6 +3444,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/presentation.ts
+  init_page_globals();
   var defaultPreferredTransports = ["lan", "p2p", "turn", "relay"];
   function normalizedPreferredTransports(value) {
     return value === void 0 || value.length === 0 ? [...defaultPreferredTransports] : [...value];
@@ -3503,7 +3564,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       if (reason.code === "SERVER_CREDENTIALS_LOCK_DIRECTORY") return t("connectionCredentialsLockDirectory");
       if (reason.code === "SERVER_CREDENTIALS_LOCK_UNSUPPORTED") return t("connectionCredentialsLockUnsupported");
     }
-    return reason instanceof Error ? reason.message : String(reason);
+    return reason instanceof Error2 ? reason.message : String(reason);
   }
   function formatPlatform(value) {
     let normalized = value.toLowerCase();
@@ -3530,33 +3591,33 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           let detail = event.detail;
           detail === null || typeof detail != "object" || typeof detail.label != "string" || typeof detail.platform != "string" || typeof detail.deviceId != "string" || typeof detail.invocation != "string" || setHostReference(detail);
         };
-        return window.addEventListener("dsh-remote-host-reference", onReference), () => window.removeEventListener("dsh-remote-host-reference", onReference);
+        return page.addEventListener("dsh-remote-host-reference", onReference), () => page.removeEventListener("dsh-remote-host-reference", onReference);
       }, []), React.useEffect(() => {
         if (status?.mode === "remote")
           return hideLocalSessionActions();
-      }, [status?.mode]), React.useEffect(() => (document.documentElement.classList.toggle(
+      }, [status?.mode]), React.useEffect(() => (pageDocument.documentElement.classList.toggle(
         "dshRemoteCodexTargetActive",
         status?.mode === "remote" && status.backend === "codex"
-      ), document.documentElement.classList.toggle(
+      ), pageDocument.documentElement.classList.toggle(
         "dshRemoteCursorTargetActive",
         status?.mode === "remote" && status.backend === "cursor"
-      ), document.documentElement.classList.toggle(
+      ), pageDocument.documentElement.classList.toggle(
         "dshRemoteAntigravityTargetActive",
         status?.mode === "remote" && status.backend === "antigravity"
-      ), document.documentElement.classList.toggle(
+      ), pageDocument.documentElement.classList.toggle(
         "dshRemotePiTargetActive",
         status?.mode === "remote" && status.backend === "pi"
-      ), document.documentElement.classList.toggle(
+      ), pageDocument.documentElement.classList.toggle(
         "dshRemoteOpencodeTargetActive",
         status?.mode === "remote" && status.backend === "opencode"
       ), () => {
-        document.documentElement.classList.remove("dshRemoteCodexTargetActive"), document.documentElement.classList.remove("dshRemoteCursorTargetActive"), document.documentElement.classList.remove("dshRemoteAntigravityTargetActive"), document.documentElement.classList.remove("dshRemotePiTargetActive"), document.documentElement.classList.remove("dshRemoteOpencodeTargetActive");
+        pageDocument.documentElement.classList.remove("dshRemoteCodexTargetActive"), pageDocument.documentElement.classList.remove("dshRemoteCursorTargetActive"), pageDocument.documentElement.classList.remove("dshRemoteAntigravityTargetActive"), pageDocument.documentElement.classList.remove("dshRemotePiTargetActive"), pageDocument.documentElement.classList.remove("dshRemoteOpencodeTargetActive");
       }), [status?.mode, status?.backend]), React.useEffect(() => {
         if (!routeOpen) return;
         let closeOnEscape = (event) => {
           event.key === "Escape" && setRouteOpen(!1);
         };
-        return document.addEventListener("keydown", closeOnEscape), () => document.removeEventListener("keydown", closeOnEscape);
+        return pageDocument.addEventListener("keydown", closeOnEscape), () => pageDocument.removeEventListener("keydown", closeOnEscape);
       }, [routeOpen]);
       let renderHostReference = () => hostReference === void 0 ? null : renderBodyPortal(portal, React.createElement(
         "aside",
@@ -3580,7 +3641,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       let exit = async () => {
         setBusy(!0);
         try {
-          await props.control("mode.set", { mode: "local" }), window.location.reload();
+          await props.control("mode.set", { mode: "local" }), page.location.reload();
         } finally {
           setBusy(!1);
         }
@@ -3733,7 +3794,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         localAction.test(label) && candidate.setAttribute(hiddenAttribute, "");
       }
     };
-    inspect(document.body);
+    inspect(pageDocument.body);
     let observer = new MutationObserver((records) => {
       for (let record2 of records) {
         record2.type === "attributes" && inspect(record2.target);
@@ -3741,17 +3802,18 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           node instanceof Element && inspect(node);
       }
     });
-    return observer.observe(document.body, {
+    return observer.observe(pageDocument.body, {
       subtree: !0,
       childList: !0,
       attributes: !0,
       attributeFilter: ["aria-label", "title", "data-tooltip"]
     }), () => {
-      observer.disconnect(), document.querySelectorAll(`[${hiddenAttribute}]`).forEach((element) => element.removeAttribute(hiddenAttribute));
+      observer.disconnect(), pageDocument.querySelectorAll(`[${hiddenAttribute}]`).forEach((element) => element.removeAttribute(hiddenAttribute));
     };
   }
 
   // packages/plugin/src/client/account-verification.ts
+  init_page_globals();
   function useAccountVerification(React, scope) {
     let [pending, setPending] = React.useState(void 0), [code, setCode] = React.useState(""), clear = () => {
       setPending(void 0), setCode("");
@@ -3785,10 +3847,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/control-result.ts
+  init_page_globals();
   function unwrapControlResult(result, fallbackMessage) {
     if (!result.ok) {
       let remoteCode = result.error?.details?.remoteCode;
-      throw Object.assign(new Error(result.error?.message ?? fallbackMessage), {
+      throw Object.assign(new Error2(result.error?.message ?? fallbackMessage), {
         code: typeof remoteCode == "string" ? remoteCode : result.error?.code,
         details: result.error?.details
       });
@@ -3802,18 +3865,19 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/navigation.ts
+  init_page_globals();
   var pendingWorkspaceSelectionKey = "dsh-remote:pending-workspace-selection";
   function storedWorkspaceSelection() {
-    let raw = window.sessionStorage.getItem(pendingWorkspaceSelectionKey);
+    let raw = page.sessionStorage.getItem(pendingWorkspaceSelectionKey);
     if (raw !== null)
       try {
         let value = JSON.parse(raw);
-        if (typeof value.targetDeviceId != "string" || typeof value.workspaceId != "string") throw new Error("invalid");
-        if (value.backend !== void 0 && value.backend !== "harness" && value.backend !== "codex" && (typeof value.backend != "string" || !/^[a-z0-9][a-z0-9_-]{0,31}$/i.test(value.backend) || value.backend.toLowerCase() === "acp")) throw new Error("invalid");
-        if (value.sessionId !== void 0 && typeof value.sessionId != "string") throw new Error("invalid");
+        if (typeof value.targetDeviceId != "string" || typeof value.workspaceId != "string") throw new Error2("invalid");
+        if (value.backend !== void 0 && value.backend !== "harness" && value.backend !== "codex" && (typeof value.backend != "string" || !/^[a-z0-9][a-z0-9_-]{0,31}$/i.test(value.backend) || value.backend.toLowerCase() === "acp")) throw new Error2("invalid");
+        if (value.sessionId !== void 0 && typeof value.sessionId != "string") throw new Error2("invalid");
         return value;
       } catch {
-        window.sessionStorage.removeItem(pendingWorkspaceSelectionKey);
+        page.sessionStorage.removeItem(pendingWorkspaceSelectionKey);
         return;
       }
   }
@@ -3822,6 +3886,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/progress.ts
+  init_page_globals();
   function createRemoteProgressView(React) {
     function RemoteProgressView(props) {
       let progress = props.progress;
@@ -3884,7 +3949,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         next !== void 0 && apply(next);
       } catch {
       } finally {
-        polling && progressRun.current === runId && (pollTimer = window.setTimeout(() => {
+        polling && progressRun.current === runId && (pollTimer = page.setTimeout(() => {
           poll();
         }, 300));
       }
@@ -3894,13 +3959,17 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     poll();
     try {
       let result = await pending;
-      return polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), apply(readyProgress?.(result) ?? { label: "remoteProgressReady", detail: "remoteProgressReadyDetail", percent: 100 }), await new Promise((resolve) => window.setTimeout(resolve, 520)), result;
+      return polling = !1, pollTimer !== void 0 && page.clearTimeout(pollTimer), apply(readyProgress?.(result) ?? { label: "remoteProgressReady", detail: "remoteProgressReadyDetail", percent: 100 }), await new Promise((resolve) => page.setTimeout(resolve, 520)), result;
     } finally {
-      polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), progressRun.current === runId && setProgress(void 0);
+      polling = !1, pollTimer !== void 0 && page.clearTimeout(pollTimer), progressRun.current === runId && setProgress(void 0);
     }
   }
 
+  // packages/plugin/src/client/settings.ts
+  init_page_globals();
+
   // packages/plugin/src/client/pairing.ts
+  init_page_globals();
   var import_qrcode = __toESM(require_browser(), 1);
   function createHostPairingPanel(React) {
     return function(props) {
@@ -4405,12 +4474,12 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       }, exportLogs = () => {
         let lines = logsSnapshot?.entries.map((entry) => entry.line).join(`
 `) ?? "";
-        if (!lines || typeof document > "u" || typeof Blob > "u" || typeof URL > "u") return;
+        if (!lines || typeof pageDocument > "u" || typeof Blob > "u" || typeof URL > "u") return;
         let blob = new Blob([lines + `
 `], { type: "text/plain;charset=utf-8" }), href = URL.createObjectURL(blob);
         try {
-          let link = document.createElement("a");
-          link.href = href, link.download = "ds-harness-remote-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19) + ".log", document.body?.appendChild(link), link.click(), link.remove();
+          let link = pageDocument.createElement("a");
+          link.href = href, link.download = "ds-harness-remote-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19) + ".log", pageDocument.body?.appendChild(link), link.click(), link.remove();
         } finally {
           URL.revokeObjectURL(href);
         }
@@ -4618,7 +4687,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           })
         )
       ), resetIdentity = async () => {
-        if (!window.confirm(t("resetIdentityConfirm"))) return;
+        if (!page.confirm(t("resetIdentityConfirm"))) return;
         let run = ++associationReadRun.current;
         setResetBusy(!0), setError(void 0), setNotice(void 0);
         try {
@@ -5293,8 +5362,9 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/shell.ts
+  init_page_globals();
   function installStyle(clientModuleId2) {
-    let style = document.createElement("style");
+    let style = pageDocument.createElement("style");
     return style.dataset.plugin = clientModuleId2, style.dataset.pluginCss = "dsh-remote", style.textContent = [
       ".dshRemoteWebFooter{position:fixed;inset-inline:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);z-index:10;display:flex;align-items:center;justify-content:center;gap:3px;font-size:11px;line-height:1.4;color:var(--dsw-alias-label-secondary);pointer-events:none}",
       ".dshRemoteWebFooter a{color:inherit;text-decoration:none;text-underline-offset:2px;pointer-events:auto;white-space:nowrap}",
@@ -5437,25 +5507,29 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       '.dshRemoteDebugLogGroup{border-top:1px solid var(--dsw-alias-border-l2);padding:14px 0}.dshRemoteDevelopmentSettings>.dshRemoteDebugLogGroup:first-child{border-top:0}.dshRemoteError+.dshRemoteDevelopmentSettings>.dshRemoteDebugLogGroup:first-child{border-top:1px solid var(--dsw-alias-border-l2)}.dshRemoteDebugLogHeader{display:flex;align-items:center;justify-content:space-between;gap:24px}.dshRemoteDebugLogTrigger{appearance:none;border:0;border-radius:6px;background:transparent;padding:0;margin:0;text-align:left;color:inherit;font:inherit;cursor:pointer;min-width:0;flex:1;white-space:normal}.dshRemoteDebugLogTrigger:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:4px;border-radius:6px}.dshRemoteDebugLogTitleRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.dshRemoteDebugLogTitleRow strong{font-size:13px;font-weight:500;line-height:1.45;color:var(--dsw-alias-label-primary)}.dshRemoteDebugLogTrigger p{max-width:58ch;margin:4px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.45;white-space:normal}.dshRemoteDebugLogLevelBadge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;line-height:1.45;color:var(--dsw-alias-label-tertiary)}.dshRemoteDebugLogLevelBadge::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--dsw-alias-label-dimmed);flex:0 0 auto}.dshRemoteDebugLogLevelBadge.isDebug{color:var(--dsw-alias-label-secondary)}.dshRemoteDebugLogLevelBadge.isDebug::before{background:var(--dsw-alias-state-success-primary)}.dshRemoteDebugLogControls{display:flex;align-items:center;gap:10px;flex:0 0 auto}',
       '.dshRemoteLogToggleBtn,.dshRemoteLogActionBtn,.dshRemoteLogFilterBtn{appearance:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:4px;font:inherit;cursor:pointer;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);min-height:28px;padding:0 10px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;transition:color .14s,border-color .14s,background .14s}.dshRemoteLogToggleBtn{border-color:transparent;background:transparent;padding:0 8px}.dshRemoteLogToggleChevron{flex:0 0 auto;transition:transform .18s ease-out}.dshRemoteLogToggleBtn[aria-expanded="true"] .dshRemoteLogToggleChevron{transform:rotate(180deg)}.dshRemoteLogToggleBtn:hover:not(:disabled){color:var(--dsw-alias-label-primary);border-color:transparent;background:var(--dsw-alias-interactive-bg-hover)}.dshRemoteLogActionBtn:hover:not(:disabled),.dshRemoteLogFilterBtn:hover:not(:disabled){color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-dimmed);background:var(--dsw-alias-interactive-bg-hover)}.dshRemoteLogToggleBtn:disabled,.dshRemoteLogActionBtn:disabled,.dshRemoteLogFilterBtn:disabled{opacity:.45;cursor:default}.dshRemoteLogFilterBtn.isActive{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-label-secondary);font-weight:500}.dshRemoteLogDrawer{margin-top:12px;padding:12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-layer-1));display:flex;flex-direction:column;gap:8px}.dshRemoteLogToolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.dshRemoteLogFilterGroup,.dshRemoteLogActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.dshRemoteLogMeta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:1.4}.dshRemoteLogMeta code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}.dshRemoteLogFallback{color:var(--dsw-alias-state-warn-primary)}.dshRemoteLogViewport{box-sizing:border-box;width:100%;max-height:260px;min-height:120px;overflow:auto;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-3);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;margin:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal}.dshRemoteLogLine{display:block;color:var(--dsw-alias-label-primary);margin-bottom:3px}.dshRemoteLogLine:last-child{margin-bottom:0}.dshRemoteLogLine.isDebug{color:var(--dsw-alias-label-tertiary)}.dshRemoteLogLine.isWarn{color:var(--dsw-alias-state-warn-primary)}.dshRemoteLogLine.isError{color:var(--dsw-alias-state-error-primary)}.dshRemoteLogEmpty{color:var(--dsw-alias-label-tertiary);font-size:12px;margin:0;padding:16px 0;text-align:center}',
       "@media(max-width:620px){.dshRemotePluginCardStatus{display:none}.dshRemoteSettingsTop{gap:10px}.dshRemoteAssociation{grid-template-columns:1fr}.dshRemoteAssociation p{grid-column:1;grid-row:3}.dshRemoteHostIdentity{grid-template-columns:1fr}.dshRemoteConnection{align-items:flex-start}.dshRemoteReconnect{min-height:36px}.dshRemotePortsRow{flex-direction:column}.dshRemoteAcpList{padding-left:8px}.dshRemoteAcpRowMain{column-gap:10px}.dshRemoteAcpAddInputs{grid-template-columns:1fr}.dshRemoteAcpAddInputs button{min-height:36px}}"
-    ].join(""), document.head.append(style), () => style.remove();
+    ].join(""), pageDocument.head.append(style), () => style.remove();
   }
   function installTerminalAvailabilityNotice(feed, t) {
     let latest, notice, update = () => {
-      let terminal = document.querySelector("[data-sidebar-terminal]"), unavailable = latest?.mode === "remote" && latest.remoteFeatures?.terminal !== !0;
+      let terminal = pageDocument.querySelector("[data-sidebar-terminal]"), unavailable = latest?.mode === "remote" && latest.remoteFeatures?.terminal !== !0;
       if (!terminal || !unavailable) {
         notice?.remove(), notice = void 0;
         return;
       }
-      notice !== void 0 && notice.isConnected || (notice = document.createElement("div"), notice.className = "dshRemoteTerminalUnavailable", notice.setAttribute("role", "alert"), notice.textContent = t("terminalRemoteUnavailable"), terminal.prepend(notice));
+      notice !== void 0 && notice.isConnected || (notice = pageDocument.createElement("div"), notice.className = "dshRemoteTerminalUnavailable", notice.setAttribute("role", "alert"), notice.textContent = t("terminalRemoteUnavailable"), terminal.prepend(notice));
     }, unsubscribe = feed.subscribe((status) => {
       latest = status, update();
     }), observer = new MutationObserver(update);
-    return observer.observe(document.body, { childList: !0, subtree: !0 }), update(), () => {
+    return observer.observe(pageDocument.body, { childList: !0, subtree: !0 }), update(), () => {
       unsubscribe(), observer.disconnect(), notice?.remove();
     };
   }
 
+  // packages/plugin/src/client/workspaces.ts
+  init_page_globals();
+
   // packages/plugin/src/client/account-entry.ts
+  init_page_globals();
   var NATIVE_ROW_SELECTOR = '[class*="settingsArea"] [class*="triggerRow"]', DS_BOT_ROW_SELECTOR = '[class*="settingsArea"] .bt-settings-row', accountRowSelectors = [NATIVE_ROW_SELECTOR, DS_BOT_ROW_SELECTOR], accountRowRetry = { intervalMs: 50, attempts: 40 }, MISSING_ANCHOR_WARNING = 'ds-harness-remote: Compact sidebar entry found no account row ([class*="settingsArea"] [class*="triggerRow"] or [class*="settingsArea"] .bt-settings-row). This host/DS-Bot combination exposes no Compact slot; the Standard entry stays in the sidebar footer.', warned = /* @__PURE__ */ new Set();
   function reportMissingAnchor() {
     warned.has(MISSING_ANCHOR_WARNING) || (warned.add(MISSING_ANCHOR_WARNING), console.warn(MISSING_ANCHOR_WARNING));
@@ -5471,22 +5545,23 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
   function mountAccountEntry(attach) {
     let attempt = 0, timer, host, attached = !1, observer, sync = () => {
-      timer !== void 0 && (window.clearTimeout(timer), timer = void 0);
-      let row = findAccountRow(document);
+      timer !== void 0 && (page.clearTimeout(timer), timer = void 0);
+      let row = findAccountRow(pageDocument);
       if (row === null) {
-        attached && (attached = !1, attach(null)), attempt < accountRowRetry.attempts ? (attempt += 1, timer = window.setTimeout(sync, accountRowRetry.intervalMs)) : reportMissingAnchor();
+        attached && (attached = !1, attach(null)), attempt < accountRowRetry.attempts ? (attempt += 1, timer = page.setTimeout(sync, accountRowRetry.intervalMs)) : reportMissingAnchor();
         return;
       }
-      attempt = 0, host === void 0 && (host = document.createElement("span")), (host.parentElement !== row || !host.isConnected) && row.append(host), attached || (attached = !0, attach(host)), observer === void 0 && document.body !== null && (observer = new MutationObserver(() => {
+      attempt = 0, host === void 0 && (host = pageDocument.createElement("span")), (host.parentElement !== row || !host.isConnected) && row.append(host), attached || (attached = !0, attach(host)), observer === void 0 && pageDocument.body !== null && (observer = new MutationObserver(() => {
         (!attached || host?.isConnected !== !0) && sync();
-      }), observer.observe(document.body, { childList: !0, subtree: !0 }));
+      }), observer.observe(pageDocument.body, { childList: !0, subtree: !0 }));
     };
     return sync(), () => {
-      timer !== void 0 && window.clearTimeout(timer), observer?.disconnect(), host?.remove();
+      timer !== void 0 && page.clearTimeout(timer), observer?.disconnect(), host?.remove();
     };
   }
 
   // packages/plugin/src/client/footer-lane.ts
+  init_page_globals();
   var NO_FACTS = { row: null, lane: !1, wrapped: !1, count: 0, rowWidth: Number.NaN };
   function footerRequiredWidth(count) {
     return count <= 0 ? 0 : count * 112 + (count - 1) * 4 + 16;
@@ -5547,8 +5622,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       let facts = measureFooterSeat(entry, view), nextForm = footerFormFor(facts, wide());
       nextForm !== reported && (reported = nextForm, onForm(nextForm)), facts.row !== row && (resize?.disconnect(), mutation?.disconnect(), resize = void 0, mutation = void 0, row = facts.row, row !== null && (typeof ResizeObserver == "function" && (resize = new ResizeObserver(sync), resize.observe(row), resize.observe(entry)), typeof MutationObserver == "function" && (mutation = new MutationObserver(sync), mutation.observe(row, { childList: !0, subtree: !0, attributes: !0, attributeFilter: ["style", "class", "hidden"] }))));
     };
-    return sync(), typeof window < "u" && window.addEventListener("resize", sync), () => {
-      disposed = !0, resize?.disconnect(), mutation?.disconnect(), typeof window < "u" && window.removeEventListener("resize", sync);
+    return sync(), typeof page < "u" && page.addEventListener("resize", sync), () => {
+      disposed = !0, resize?.disconnect(), mutation?.disconnect(), typeof page < "u" && page.removeEventListener("resize", sync);
     };
   }
 
@@ -5556,6 +5631,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   var import_qrcode3 = __toESM(require_browser(), 1);
 
   // packages/plugin/src/version-compare.ts
+  init_page_globals();
   var VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
   function parseVersion(value) {
     let match = VERSION_PATTERN.exec(value.trim().replace(/^v/, ""));
@@ -5589,9 +5665,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client/icons.ts
+  init_page_globals();
   var deepSeekWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAACVBMVEUAAADy8vXx8fUsA3vyAAAAAXRSTlMAQObYZgAAAOxJREFUWMPtlsEOwyAMQxP+/6OnTZMGxHGcot3wDYgfhkJbs6urprzveGtu9d1NgEdto8w93GuA7zPS2RFg7ynsCOAokbtAmLr2YaeKgJ6fxpT8jCAC0qSqPyNoO5DXdvyouj4ClFAdYaDxK09uiBDCIYBf6CxLesnR0uF2pG+JmhCqrUb0AOvjjoQaYDTCEAAgMg5grhAeAQIB+/M15IcKlnUIp4CkTCd0AKb4zVsRSJVGYEVzT0agK107IMGMEurvromEpaX4wzk/IKw378kq4LafED6Oowxfk7AP2q8W16EdM3p29Eyvrv6vF0WIBfBziKyCAAAAAElFTkSuQmCC", gptWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAclBMVEX////v7+++wMf////s7O3k5OTExcrX2Ny6vMTv8PPW19yXmqRqboJmaHd3eoaqrLPs7fGMjpfb3eKlpq1eYXOxs7pWWWd+gY5HSVdRVGVub3k+QU74+Pg4OkcvMT1ISlUoKjUiIy4fICueoKkaGyUSFB21Bp+qAAAAAXRSTlMAQObYZgAABChJREFUWMPtl916qjoQhlsdEwIECEgMYCBxx/u/xT1DrFUL1LO1DtY8LSLJvPnmB4gfH//sr7TPDfvdebf/xXZbkE/4zZ0MVhGHd9zJDsv+7F3//Z69tT5wljAu3tXw+TIlzXKJlhflYmJ+5uF5WpWhb54X+C/zZCmT2wJA4dJZwus0UYjIGqWyMhVbEp4yKNRRqlv0opW5PJLJ4rFJXvP4JKDRMqturBZjkMVJFYjR6iHQDQDI4+k2k51wZbWrqwp4mR/1CVYATyko9TFGxBUqL5IvMbXSWt0T8bkGgFLqgqZBI/Uxbx5UAxLaNcCNLBpttM7wbCc1pmJOpWAsDtey68UaQMyrFgb9uxLPjqg3+nGluyKN0XUdWw0BJ0NvTFFqgzpr9J+Dh4w0Ga1qkqBNswagxdRgFPAbgHRQG5jumGWyMxrTIaRRa4AzFs0YrNMXgI4MJWnsKYFhGNMnIh/mBOPsV8CZBFjN9w8ArowxnZzDr5IcvxTaKpxJCVsoI3SWysz1UM4AqQdzlCgho1IKrK+x1mKFzisANtgEU8E7GwHDgOqxe4w9tnM166wbaA2xBMBLrTWcAGYGdCiYVUJUrMCF+7l6gklrW1RwPi8ByjuActANqhKzVWoYrFGcCFzbDgNaBrTWpncFQMcI2DfWoAiDqRCiHcYM/ZdCEKkZqfR8spj4F0CiJjv2gHL6URNoCQDaYacL6O1oFDO2eQDUFP7AKdCRdC4CRDZaNifbjA41l/uYb/SZMAFNTBGzY7sG4J2jTsJgToOzIzXF3HZqBpSOAGduXbkGEKV1OqVGqRJpRxtvwbSw5IqAiUJItwBCOT9R32FCGo3nCkAN3t0UTBRC6zDONcBeOee9pr4T+ASbnDOdc5OmtREwEEB5w8Wqgt4bOV5c7Lt9iiK8zdP/IsBbutUGX4gNwEVCqd3FUt/xYnRWt7BvPBYQjwjAGXa3ASguHVAZ/WXKlA3eZDX1wRegFsr7E2wAlB9xFbx/7MV70kFT8aqNgLL3F8nFBmA3hrn/IJHjKJOK2oj1WI4Z4FzwN/81AOhgYD6v2xbIvaZIurLC9AfvB1WLTYAoXejF1xeBL5cpBIyEbmxkZymIXwDQh1BAfOrhI1lfwtgz8tozF5T4ttf3+32AyxC6klwAgw/YVTHpoK82xYt3wLP/Bw4AAI4D7/01TLKXBj9NEz2wEuGiKpoy68S/FwCLMQAZ3gXhihaCa25vQo6RyToOz9PE6wYjJgGi1YnqZX8qMIK+TDlnargGzSv4NvFjlwXf/nfLLMrAB4O/Xl3BH0d+RIASFgDA8IYMIXgr2+cBsbDdPSwAAHjSZFmb3txETCKIxc0uWwI8rxsLJcTiVndNwyMgKljbbNN2/zcEAja2+4RgIDYN2Bu/WtAOaEodnu2dnzz/7I/Y/w/LaEcX/MdfAAAAAElFTkSuQmCC";
 
   // packages/plugin/src/client/plugin-upgrade.ts
+  init_page_globals();
   var DEFAULTS = {
     intervalMs: 1e3,
     unreachableDeadlineMs: 6e4,
@@ -5658,8 +5736,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         open || (setDevicesOpen(!1), qrFlowRun.current += 1, setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setQrFailed(!1), setBusy(!1));
       }, [open]), React.useEffect(() => {
         if (!open) return;
-        let frame = window.requestAnimationFrame(() => pageRef.current?.focus());
-        return () => window.cancelAnimationFrame(frame);
+        let frame = page.requestAnimationFrame(() => pageRef.current?.focus());
+        return () => page.cancelAnimationFrame(frame);
       }, [open]), React.useEffect(() => {
         if (!open) return;
         let closeOnEscape = (event) => {
@@ -5671,14 +5749,14 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             setOpen(!1);
           }
         };
-        return window.addEventListener("keydown", closeOnEscape), () => window.removeEventListener("keydown", closeOnEscape);
+        return page.addEventListener("keydown", closeOnEscape), () => page.removeEventListener("keydown", closeOnEscape);
       }, [open, devicesOpen]), React.useEffect(() => {
         if (!devicesOpen) return;
         let closeOnPointer = (event) => {
           let target = event.target;
           target instanceof Element && target.closest(".dshRemoteConnectedMenu") === null && setDevicesOpen(!1);
         };
-        return window.addEventListener("mousedown", closeOnPointer), () => window.removeEventListener("mousedown", closeOnPointer);
+        return page.addEventListener("mousedown", closeOnPointer), () => page.removeEventListener("mousedown", closeOnPointer);
       }, [devicesOpen]), React.useEffect(() => {
         (status?.host?.connectedClients?.length ?? 0) === 0 && setDevicesOpen(!1);
       }, [status?.host?.connectedClients?.length]), React.useEffect(() => {
@@ -5688,8 +5766,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         status?.serverUrl !== void 0 && setLoginServerUrl(status.serverUrl), setPairingServerUrl(void 0), setLoginMethod((current) => current === "device_pairing" ? "password" : current);
       }, [status?.serverUrl]), React.useEffect(() => {
         let remoteActive2 = status?.mode === "remote";
-        return document.documentElement.classList.toggle("dshRemoteTargetActive", remoteActive2), () => {
-          remoteActive2 && document.documentElement.classList.remove("dshRemoteTargetActive");
+        return pageDocument.documentElement.classList.toggle("dshRemoteTargetActive", remoteActive2), () => {
+          remoteActive2 && pageDocument.documentElement.classList.remove("dshRemoteTargetActive");
         };
       }, [status?.mode]);
       let startQrLogin = async (provider) => {
@@ -5737,7 +5815,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           polling || settled || (polling = !0, props.control("client.account.qr.poll", { qrId: qrSession.qrId }).then(async (result) => {
             if (!(!active || settled || run !== qrFlowRun.current))
               if (result.status === "complete") {
-                settled = !0, timer !== void 0 && window.clearInterval(timer), setBusy(!0), setError(void 0), setQrExpired(!1), setQrFailed(!1), setNeedsAuthorization(!1);
+                settled = !0, timer !== void 0 && page.clearInterval(timer), setBusy(!0), setError(void 0), setQrExpired(!1), setQrFailed(!1), setNeedsAuthorization(!1);
                 try {
                   let [statusResult, devicesResult] = await Promise.allSettled([
                     props.control("status"),
@@ -5753,15 +5831,15 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                 } finally {
                   run === qrFlowRun.current && (setQrSession(void 0), setQrImage(void 0), setBusy(!1));
                 }
-              } else result.status === "expired" && (settled = !0, timer !== void 0 && window.clearInterval(timer), setQrExpired(!0), setQrSession(void 0), setQrImage(void 0));
+              } else result.status === "expired" && (settled = !0, timer !== void 0 && page.clearInterval(timer), setQrExpired(!0), setQrSession(void 0), setQrImage(void 0));
           }).catch((reason) => {
-            !active || settled || run !== qrFlowRun.current || (isNonRetryableControlError(reason) && (settled = !0, timer !== void 0 && window.clearInterval(timer), setQrFailed(!0), setQrSession(void 0), setQrImage(void 0)), setError(messageOf(reason, t)));
+            !active || settled || run !== qrFlowRun.current || (isNonRetryableControlError(reason) && (settled = !0, timer !== void 0 && page.clearInterval(timer), setQrFailed(!0), setQrSession(void 0), setQrImage(void 0)), setError(messageOf(reason, t)));
           }).finally(() => {
             polling = !1;
           }));
         };
-        return poll(), timer = window.setInterval(poll, 1500), () => {
-          active = !1, timer !== void 0 && window.clearInterval(timer);
+        return poll(), timer = page.setInterval(poll, 1500), () => {
+          active = !1, timer !== void 0 && page.clearInterval(timer);
         };
       }, [open, loginMethod, qrSession, savingServer, serverDirty]);
       let selectLoginMethod = (method) => {
@@ -5840,7 +5918,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       React.useEffect(() => {
         let targetDeviceId = selectedHost?.deviceId;
         if (!addingWorkspace || !previewPath || !targetDeviceId || busy) return;
-        let active = !0, timer = window.setTimeout(() => {
+        let active = !0, timer = page.setTimeout(() => {
           props.control("directory.list", { targetDeviceId, path: previewPath }).then((listing) => {
             active && setDirectory(listing);
           }).catch(() => {
@@ -5848,7 +5926,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           });
         }, 350);
         return () => {
-          active = !1, window.clearTimeout(timer);
+          active = !1, page.clearTimeout(timer);
         };
       }, [addingWorkspace, previewPath, selectedHost?.deviceId, busy, props.control]);
       let browseDirectory = async (nextPath) => {
@@ -5892,9 +5970,9 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           }
           try {
             if (nextStatus.clientAuthRequired)
-              throw Object.assign(new Error("Sign in again."), { code: "AUTH_INVALID" });
+              throw Object.assign(new Error2("Sign in again."), { code: "AUTH_INVALID" });
             if (!(await props.control("client.authorization.status")).hasCredentials)
-              throw Object.assign(new Error("Remote account authorization is required."), { code: "ACCOUNT_AUTH_REQUIRED" });
+              throw Object.assign(new Error2("Remote account authorization is required."), { code: "ACCOUNT_AUTH_REQUIRED" });
             setNeedsAuthorization(!1);
             let nextDevices = await props.control("devices");
             if (setDevices(nextDevices), setDiscoveryUnavailable(!1), selectedHost !== void 0) {
@@ -5979,7 +6057,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       }, openLocalWorkspaces = async () => {
         setBusy(!0), setError(void 0);
         try {
-          await props.control("mode.set", { mode: "local" }), window.location.reload();
+          await props.control("mode.set", { mode: "local" }), page.location.reload();
         } catch (reason) {
           setError(messageOf(reason, t)), setBusy(!1);
         }
@@ -6027,7 +6105,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
               targetDeviceId: selectedHost.deviceId,
               path: targetPath
             }));
-            setStatus(nextStatus), nextStatus.workspaceSelection !== void 0 && window.sessionStorage.setItem(pendingWorkspaceSelectionKey, JSON.stringify(nextStatus.workspaceSelection)), window.location.reload();
+            setStatus(nextStatus), nextStatus.workspaceSelection !== void 0 && page.sessionStorage.setItem(pendingWorkspaceSelectionKey, JSON.stringify(nextStatus.workspaceSelection)), page.location.reload();
           } catch (reason) {
             setError(messageOf(reason, t)), setBusy(!1);
           }
@@ -6044,7 +6122,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
               return;
             }
             if (result.status === "manual") {
-              setUpgradePhase("idle"), window.open(releasesUrl, "_blank", "noopener");
+              setUpgradePhase("idle"), page.open(releasesUrl, "_blank", "noopener");
               return;
             }
             setUpgradePhase("failed"), setUpgradeError(typeof result.message == "string" && result.message !== "" ? result.message : t("pluginUpdateFailed"));
@@ -7317,7 +7395,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/plugin-route-client.ts
-  var PluginRouteFailure = class extends Error {
+  init_page_globals();
+  var PluginRouteFailure = class extends Error2 {
     constructor(code, message, details = {}) {
       super(message);
       this.code = code;
@@ -7475,36 +7554,36 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         if (sessions.refresh === void 0) break;
         await sessions.refresh();
       }
-      if (signal.throwIfAborted(), !containsSessions()) throw new Error("The Remote Session catalog does not contain the published Sessions.");
+      if (signal.throwIfAborted(), !containsSessions()) throw new Error2("The Remote Session catalog does not contain the published Sessions.");
     };
   }
   function botSessionIds(endpoint, value) {
     let ids = /* @__PURE__ */ new Set(), add = (id) => {
       if (id != null) {
-        if (typeof id != "string" || id.length === 0) throw new Error("Invalid Bot Session identity.");
+        if (typeof id != "string" || id.length === 0) throw new Error2("Invalid Bot Session identity.");
         ids.add(id);
       }
     }, addArray = (input) => {
       if (input !== void 0) {
-        if (!Array.isArray(input)) throw new Error("Invalid Bot Session identities.");
+        if (!Array.isArray(input)) throw new Error2("Invalid Bot Session identities.");
         input.forEach(add);
       }
     }, bot = (input) => {
-      if (!isRecord(input)) throw new Error("Invalid Bot catalog entry.");
+      if (!isRecord(input)) throw new Error2("Invalid Bot catalog entry.");
       add(input.id), add(input.sessionId), addArray(input.parts), Array.isArray(input.segments) && input.segments.forEach((segment) => {
-        if (!isRecord(segment)) throw new Error("Invalid Bot Session segment.");
+        if (!isRecord(segment)) throw new Error2("Invalid Bot Session segment.");
         add(segment.sessionId);
       });
     }, room = (input) => {
-      if (!isRecord(input)) throw new Error("Invalid Bot room entry.");
+      if (!isRecord(input)) throw new Error2("Invalid Bot room entry.");
       add(input.id), add(input.sessionId), addArray(input.ownParts), addArray(input.parts), isRecord(input.sessions) && Object.values(input.sessions).forEach(add);
     }, agent = (input) => {
-      if (!isRecord(input)) throw new Error("Invalid Bot agent entry.");
+      if (!isRecord(input)) throw new Error2("Invalid Bot agent entry.");
       addArray(input.sessions);
     }, roster = () => {
       for (let [key, visit] of [["bots", bot], ["rooms", room], ["agents", agent]])
         if (value[key] !== void 0) {
-          if (!Array.isArray(value[key])) throw new Error("Invalid Bot roster.");
+          if (!Array.isArray(value[key])) throw new Error2("Invalid Bot roster.");
           value[key].forEach(visit);
         }
     };
@@ -7555,6 +7634,12 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/remote-file-content-provider.ts
+  init_page_globals();
+
+  // packages/plugin/src/file-viewer-contract.ts
+  init_page_globals();
+
+  // packages/plugin/src/remote-file-content-provider.ts
   function shouldUseRemoteFileViewer(status) {
     return status.mode === "remote" && status.remoteFeatures?.fileViewer === !0;
   }
@@ -7586,15 +7671,15 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           };
       },
       async read(locator, request) {
-        if (!Number.isInteger(request.offset) || request.offset < 0) throw new Error("A non-negative integer offset is required.");
-        if (!Number.isInteger(request.length) || request.length <= 0) throw new Error("A positive integer length is required.");
+        if (!Number.isInteger(request.offset) || request.offset < 0) throw new Error2("A non-negative integer offset is required.");
+        if (!Number.isInteger(request.length) || request.length <= 0) throw new Error2("A positive integer length is required.");
         let chunks = [], received = 0;
         for (; received < request.length; ) {
           request.signal.throwIfAborted();
           let length = Math.min(524288, request.length - received), offset = request.offset + received, range = await call("fileviewer.readRange", { path: locator, offset, length }, request.signal);
-          if (range.offset !== offset) throw new Error("The Remote Host returned a mismatched file range.");
+          if (range.offset !== offset) throw new Error2("The Remote Host returned a mismatched file range.");
           let bytes = decodeBase64(range.data);
-          if (bytes.byteLength > length) throw new Error("The Remote Host returned more file bytes than requested.");
+          if (bytes.byteLength > length) throw new Error2("The Remote Host returned more file bytes than requested.");
           if (chunks.push(bytes), received += bytes.byteLength, range.eof || bytes.byteLength === 0) break;
         }
         let merged = new Uint8Array(received), cursor = 0;
@@ -7626,6 +7711,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/status-stream.ts
+  init_page_globals();
   function parseStatus(data) {
     if (typeof data == "string")
       try {
@@ -7679,7 +7765,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
     };
   }
 
+  // packages/plugin/src/client/message-file-preview.ts
+  init_page_globals();
+
   // packages/plugin/src/message-file-attachment.ts
+  init_page_globals();
   var PREFIX = ".dsh-remote-message-file/", attachmentIdPattern = /^sha256:[a-f0-9]{64}$/;
   function record(value) {
     return typeof value == "object" && value !== null ? value : void 0;
@@ -7714,13 +7804,13 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
   function installMessageFilePreview(feed, conversation, sidebar) {
     let active = !1, refresh = () => {
-      for (let card of Array.from(document.querySelectorAll(`${cardSelector}, [${actionable}]`))) {
+      for (let card of Array.from(pageDocument.querySelectorAll(`${cardSelector}, [${actionable}]`))) {
         let enabled = active && card.matches(cardSelector) && fileAddress(card, conversation) !== void 0;
         enabled && !card.hasAttribute(actionable) ? (card.setAttribute(actionable, ""), card.setAttribute("role", "button"), card.setAttribute("tabindex", "0")) : !enabled && card.hasAttribute(actionable) && (card.removeAttribute(actionable), card.removeAttribute("role"), card.removeAttribute("tabindex"));
       }
     }, observer = new MutationObserver(refresh), unsubscribe = feed.subscribe((status) => {
       let enabled = status.mode === "remote" && status.connected === !0 && status.backend === "harness";
-      enabled !== active && (active = enabled, active ? observer.observe(document.body, {
+      enabled !== active && (active = enabled, active ? observer.observe(pageDocument.body, {
         childList: !0,
         subtree: !0,
         attributes: !0,
@@ -7731,12 +7821,13 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       let card = event.target.closest(cardSelector), address = card === null ? void 0 : fileAddress(card, conversation);
       address !== void 0 && (event.preventDefault(), sidebar.openResource(address));
     };
-    return document.addEventListener("click", open), document.addEventListener("keydown", open), () => {
-      unsubscribe(), observer.disconnect(), active = !1, refresh(), document.removeEventListener("click", open), document.removeEventListener("keydown", open);
+    return pageDocument.addEventListener("click", open), pageDocument.addEventListener("keydown", open), () => {
+      unsubscribe(), observer.disconnect(), active = !1, refresh(), pageDocument.removeEventListener("click", open), pageDocument.removeEventListener("keydown", open);
     };
   }
 
   // packages/plugin/src/client-recovery.ts
+  init_page_globals();
   function subscribeRemoteRecovery(feed, reconnect) {
     let previous;
     return feed.subscribe((status) => {
@@ -7746,17 +7837,17 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
   }
 
   // packages/plugin/src/client.ts
-  var clientModuleId = "ds-harness-remote", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error {
+  var clientModuleId = "ds-harness-remote", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error2 {
     constructor(message) {
       super(message), this.name = "ControlRouteUnavailableError";
     }
-  }, isHostcTunnel = /\.(?:hostc|tun|tun-test)\.4ba\.io\.?$/.test(window.location?.hostname ?? ""), originalPluginFetch = window.fetch, lanOrigin = window.location?.protocol === "http:" && /^(?:[\d.]+|\[[0-9a-f:]+\])$/i.test(window.location.hostname), verifiedLanOrigin = !1, readyPluginSessions, pluginSessions = new Promise((resolve) => {
+  }, isHostcTunnel = /\.(?:hostc|tun|tun-test)\.4ba\.io\.?$/.test(page.location?.hostname ?? ""), originalPluginFetch = page.fetch, lanOrigin = page.location?.protocol === "http:" && /^(?:[\d.]+|\[[0-9a-f:]+\])$/i.test(page.location.hostname), verifiedLanOrigin = !1, readyPluginSessions, pluginSessions = new Promise((resolve) => {
     readyPluginSessions = resolve;
-  }), pluginRouteFetch = !isHostcTunnel && typeof originalPluginFetch == "function" && typeof document < "u" ? createPluginRouteFetch(originalPluginFetch.bind(window), document.baseURI, {
+  }), pluginRouteFetch = !isHostcTunnel && typeof originalPluginFetch == "function" && typeof pageDocument < "u" ? createPluginRouteFetch(originalPluginFetch.bind(page), pageDocument.baseURI, {
     beforeResponse: createPluginRouteCatalogGuard(() => pluginSessions),
     isLanWeb: lanOrigin ? async (signal) => {
       if (verifiedLanOrigin) return !0;
-      let response = await originalPluginFetch(new URL("/__remote/lan-status", window.location.origin), {
+      let response = await originalPluginFetch(new URL("/__remote/lan-status", page.location.origin), {
         credentials: "same-origin",
         signal
       }).catch(() => {
@@ -7764,7 +7855,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       return verifiedLanOrigin = response?.status === 204 && response.headers.get("x-dsh-web-lan") === "1", verifiedLanOrigin;
     } : void 0
   }) : void 0;
-  pluginRouteFetch !== void 0 && (window.fetch = pluginRouteFetch);
+  pluginRouteFetch !== void 0 && (page.fetch = pluginRouteFetch);
   function controlRouteUnavailableStatus() {
     return {
       mode: "local",
@@ -7776,7 +7867,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
       hostAuthorizationAvailable: !1
     };
   }
-  window.__ModuleLoader__.load({
+  page.__ModuleLoader__.load({
     id: clientModuleId,
     factory: (require2) => {
       let module = { exports: {} }, React = require2("react"), portal = (() => {
@@ -7795,7 +7886,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
           className: "dshRemoteDetailSettingsAction",
           "aria-label": label,
           onClick: (event) => {
-            (event.currentTarget?.closest("[data-plugin-detail],[data-plugin-row-detail]") ?? document).querySelector("[data-dsh-remote-settings]")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            (event.currentTarget?.closest("[data-plugin-detail],[data-plugin-row-detail]") ?? pageDocument).querySelector("[data-dsh-remote-settings]")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }, label);
       }
@@ -7841,7 +7932,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
               progressRun,
               action,
               connectedProgress
-            ) : await action()), window.location.reload();
+            ) : await action()), page.location.reload();
           } catch (reason) {
             setError(messageOf(reason, t)), setBusy(!1);
           }
@@ -7965,11 +8056,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         ) : null;
       }
       function apply(ctx) {
-        if (window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__) return;
-        window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !0, readyPluginSessions(ctx.sessions), ctx.effect(() => () => {
-          window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !1;
+        if (page.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__) return;
+        page.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !0, readyPluginSessions(ctx.sessions), ctx.effect(() => () => {
+          page.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !1;
         }, "ds-harness-remote: client singleton"), ctx.effect(() => () => {
-          pluginRouteFetch !== void 0 && window.fetch === pluginRouteFetch && (window.fetch = originalPluginFetch);
+          pluginRouteFetch !== void 0 && page.fetch === pluginRouteFetch && (page.fetch = originalPluginFetch);
         }, "ds-harness-remote: plugin route fetch");
         let t = ctx.locale.bind(localeNamespace), remoteOpenListeners = /* @__PURE__ */ new Set(), openRemote = () => {
           for (let listener of remoteOpenListeners) listener();
@@ -8012,15 +8103,15 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         ctx.inject(["fileUpload"], (uploadContext) => {
           let service = uploadContext.get("fileUpload");
           service === void 0 || isHostcTunnel || typeof originalPluginFetch != "function" || uploadContext.effect(
-            () => installRemoteUploadCarrier(service, statusFeed, originalPluginFetch.bind(window), document.baseURI, t),
+            () => installRemoteUploadCarrier(service, statusFeed, originalPluginFetch.bind(page), pageDocument.baseURI, t),
             "ds-harness-remote: attachment upload carrier"
           );
         }), ctx.effect(() => () => statusFeed.close(), "ds-harness-remote: status stream"), ctx.effect(() => {
           let unsubscribe = statusFeed.subscribe((status) => {
-            document.documentElement.classList.toggle("dshRemoteBrowserUnavailable", status.mode === "remote");
+            pageDocument.documentElement.classList.toggle("dshRemoteBrowserUnavailable", status.mode === "remote");
           });
           return () => {
-            unsubscribe(), document.documentElement.classList.remove("dshRemoteBrowserUnavailable");
+            unsubscribe(), pageDocument.documentElement.classList.remove("dshRemoteBrowserUnavailable");
           };
         }, "ds-harness-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-remote: carrier recovery"), ctx.inject(["uiConversation", "sidebarRight"], (previewContext) => {
           let conversation = previewContext.get("uiConversation"), sidebar = previewContext.get("sidebarRight");
@@ -8043,8 +8134,8 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                 else if (typeof ctx.sessions.open == "function")
                   ctx.sessions.open(sessionId);
                 else
-                  throw new Error("No supported Session open API is available.");
-                window.sessionStorage.removeItem(pendingWorkspaceSelectionKey), await control("workspace.selection.consume", pending).catch(() => {
+                  throw new Error2("No supported Session open API is available.");
+                page.sessionStorage.removeItem(pendingWorkspaceSelectionKey), await control("workspace.selection.consume", pending).catch(() => {
                 });
               }
             }).catch((reason) => {
@@ -8125,25 +8216,25 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
                 let candidate = container.textContent?.trim() ?? "";
                 candidate.includes(device.name) && candidate.length > invocation.length && candidate.length < 4e3 && (invocation = candidate), container = container.parentElement;
               }
-              window.dispatchEvent(new CustomEvent("dsh-remote-host-reference", {
+              page.dispatchEvent(new CustomEvent("dsh-remote-host-reference", {
                 detail: { label: device.name, platform: device.platform, deviceId: device.deviceId, invocation }
               }));
             };
-            document.addEventListener("click", stopHostFileOpen, !0);
+            pageDocument.addEventListener("click", stopHostFileOpen, !0);
             let unregister = inputTriggers.registerSource(source);
             return () => {
-              document.removeEventListener("click", stopHostFileOpen, !0), unregister();
+              pageDocument.removeEventListener("click", stopHostFileOpen, !0), unregister();
             };
           }, "ds-harness-remote: host mention source");
         }), ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en, ru, uk }), "ds-harness-remote: dictionaries"), ctx.effect(() => installStyle(clientModuleId), "ds-harness-remote: client styles"), ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), "ds-harness-remote: terminal availability notice"), isHostcTunnel) {
           let WebFooter2 = function() {
             let [dismissed, setDismissed] = React.useState(() => {
               try {
-                if (document.cookie.split(";").some((value) => value.trim() === dismissedCookie)) return !0;
+                if (pageDocument.cookie.split(";").some((value) => value.trim() === dismissedCookie)) return !0;
               } catch {
               }
               try {
-                let stored = window.localStorage.getItem(dismissedKey);
+                let stored = page.localStorage.getItem(dismissedKey);
                 return stored === "1" || Number(stored) > Date.now();
               } catch {
                 return !1;
@@ -8153,11 +8244,11 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             let dismiss = () => {
               setDismissed(!0);
               try {
-                document.cookie = `${dismissedCookie}; Domain=4ba.io; Path=/; Max-Age=${dismissalSeconds}; Secure; SameSite=Strict`;
+                pageDocument.cookie = `${dismissedCookie}; Domain=4ba.io; Path=/; Max-Age=${dismissalSeconds}; Secure; SameSite=Strict`;
               } catch {
               }
               try {
-                window.localStorage.setItem(dismissedKey, String(Date.now() + dismissalSeconds * 1e3));
+                page.localStorage.setItem(dismissedKey, String(Date.now() + dismissalSeconds * 1e3));
               } catch {
               }
             };
@@ -8185,7 +8276,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
             id: "ds-harness-remote-web-footer"
           }, WebFooter2));
         }
-        let nativeTitlebar = document.documentElement.hasAttribute("data-windows-titlebar") || document.documentElement.dataset.platform === "darwin", headerSlot = nativeTitlebar ? "shell.overlay" : "conversation.session.header.utilities";
+        let nativeTitlebar = pageDocument.documentElement.hasAttribute("data-windows-titlebar") || pageDocument.documentElement.dataset.platform === "darwin", headerSlot = nativeTitlebar ? "shell.overlay" : "conversation.session.header.utilities";
         ctx.slots.inject(headerSlot, () => ctx.slots.register({
           name: headerSlot,
           id: "ds-harness-remote-global-context",
@@ -8247,7 +8338,7 @@ DSH Go \u626B\u7801\u6682\u4E0D\u652F\u6301\u591A\u53F0\u8BBE\u5907\u63A7\u5236\
         return typeof name == "string" ? name : void 0;
       }
       function isMissingControlRoute(reason) {
-        return reason instanceof Error && reason.message.startsWith(`transport failure for ${CONTROL_RPC_PREFIX}/`) && (reason.message.endsWith(": HTTP 404") || reason.message.endsWith(": HTTP 405"));
+        return reason instanceof Error2 && reason.message.startsWith(`transport failure for ${CONTROL_RPC_PREFIX}/`) && (reason.message.endsWith(": HTTP 404") || reason.message.endsWith(": HTTP 405"));
       }
       return module.exports.apply = apply, module.exports.inject = inject, module.exports;
     }

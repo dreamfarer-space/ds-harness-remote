@@ -164,7 +164,7 @@ export function pickActiveLiveTask(state: LiveTaskEvaluationState): LiveTaskSumm
     ? resolvedTitle
     : strings.comfort.liveTaskDefaultTitle
   const detail = taskPhase(state, top.session)
-  const count = candidates.filter(item => item.active && !item.session.parentSessionId && item.session.origin !== 'subagent').length
+  const count = candidates.filter(item => item.active && !item.session.parentSessionId && item.session.origin === undefined).length
 
   return {
     hostId: device.deviceId,

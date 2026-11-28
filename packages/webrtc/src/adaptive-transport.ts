@@ -191,7 +191,9 @@ export class AdaptiveTransport extends BaseTransport {
         })
       }
       socket.onerror = () => {
-        if (this.lifetime === lifetime && this.socket === socket) this.controlLost(Object.assign(new Error('Control socket failed'), { code: 'TRANSPORT_SETUP_FAILED' }), { reason: 'control-error' })
+        if (this.lifetime !== lifetime || this.socket !== socket) return
+        const code = this.connectedAt === undefined ? 'TRANSPORT_SETUP_FAILED' : 'TRANSPORT_CLOSED'
+        this.controlLost(Object.assign(new Error('Control socket failed'), { code }), { reason: 'control-error' })
       }
       socket.onclose = event => {
         if (this.lifetime === lifetime && this.socket === socket) this.controlLost(adaptiveControlCloseError(event), { reason: 'control-closed', closeCode: event.code, closeReason: event.reason })

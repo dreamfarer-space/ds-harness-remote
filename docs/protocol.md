@@ -1125,7 +1125,7 @@ Message（含 role/content 数组）、ToolCall（含 callId/input/output）和 
 
 `harness.api.*` RPC、`harness.api.v1` / `harness.api.transfer.v1` capability 和相应事件仅保留于部分旧 Client 类型中。当前 Host 不注册这些路由，不能将它们作为安装或调用示例。旧定义可从版本历史追溯；当前业务使用下述 Typert carrier。
 
-### Harness Typert Remote bridge（当前基线 0.2.3-alpha.2）
+### Harness Typert Remote bridge（当前基线 0.2.3-alpha.3）
 
 `harness.remote.v1` 只承载 `dsh-v0.1.2-alpha.1`–`rc.1` 官方 `TypertGateway` 已编码的 carrier
 envelope；`harness.remote.v3` 承载 `dsh-v0.1.5-rc.1` 的相同官方 carrier 与 Session V3
@@ -1310,7 +1310,7 @@ Android 用户可显式下载工作区原文件到手机（Android 10+ 使用 Me
 
 固定只读 allowlist：`workspaceFiles/list|stat|read|readBytes|readAll|readRelated|changes`，以及
 `officeKit/generation|render`、`officeToPdf/generation|render`。Host 官方 Session lookup、组合文件系统、分页与大小限制继续生效。
-注意：上游 `list` / `changes` 限于工作区；为修复 #250 任意文件读取漏洞，原生 `workspaceFiles/read*`、`stat`
+从 Harness 0.2.3-alpha.3 起，上游目录树可以跟随指向工作区外的链接。Remote Host 的 `list` / `changes` 仍以物理工作区为边界，仅转发解析到工作区内的路径。原生 `workspaceFiles/read*`、`stat`
 与非消息附件的 `officeKit/render` / `officeToPdf/render` 严格限制在 Session 工作区根目录（cwd）物理包含范围内，拒绝未授权的工作区外路径与越界符号链接。包含性一律以
 realpath 后的规范根目录计算，避免符号链接父目录或大小写差异造成误拒；边界本身不变。当 Host 尚未迁移或已迁移包名时，桥接层仅在收到 `gateway/invocation-unavailable` 时在 `officeKit/*` 与 `officeToPdf/*` 之间做只读回退。拒绝结果可在
 `rpc.error.details.reason` 中携带稳定的安全分类（`scope-missing`、`authority-unavailable`、`root-invalid`、

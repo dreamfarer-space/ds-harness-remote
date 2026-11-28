@@ -258,7 +258,7 @@ export class RemoteSessionTools {
     const rows = z.array(rowSchema).parse(response.items)
     const allowed = new Set(found.sessionIds)
     // Workspace ownership comes from the official catalog, never a guessed cwd.
-    const owned = rows.filter(row => allowed.has(row.sessionId) && row.parentSessionId === undefined && row.origin !== 'subagent')
+    const owned = rows.filter(row => allowed.has(row.sessionId) && row.parentSessionId === undefined && row.origin === undefined)
     return owned.length > MAX_REMOTE_SESSIONS ? owned.slice(0, MAX_REMOTE_SESSIONS) : owned
   }
 

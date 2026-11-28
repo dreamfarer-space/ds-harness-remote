@@ -99,7 +99,7 @@ export function createSessionEventActions({ get, set, runtime }: SessionAccess):
         let needsWorkspaceSync = false
         set(state => {
           const existing = state.sessions.find(item => item.sessionId === incoming.sessionId)
-          const isRoot = incoming.parentSessionId === undefined && incoming.origin !== 'subagent'
+          const isRoot = incoming.parentSessionId === undefined && incoming.origin === undefined
           const assigned = state.workspaces.some(w => (w.backend ?? 'harness') === 'harness' && w.sessionIds.includes(incoming.sessionId))
           if (existing === undefined && isRoot && !assigned) needsWorkspaceSync = true
           const merged = existing === undefined

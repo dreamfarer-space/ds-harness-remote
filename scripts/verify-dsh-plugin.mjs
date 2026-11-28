@@ -208,7 +208,7 @@ assert.doesNotMatch(
   unpublishedWorkspaceImportPattern,
   'GitHub browser client bundle must not import unpublished workspace packages',
 )
-assert.match(clientBundle, /window\.__ModuleLoader__\.load/, 'browser client entry must register with the DSH module loader')
+assert.match(clientBundle, /\.__ModuleLoader__\.load\(/, 'browser client entry must register with the DSH module loader')
 assert.match(clientBundle, /status\.events/, 'browser client must open the Host status event stream')
 assert.match(clientBundle, /new EventSource/, 'browser client must push-render Host status through EventSource')
 assert.match(clientBundle, /useSyncExternalStore/, 'browser client must render Host status from the pushed stream')

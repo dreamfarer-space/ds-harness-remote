@@ -428,6 +428,34 @@ describe('AdaptiveTransport capability negotiation', () => {
     } })), cleanupScenario1)
   })
 
+  it('distinguishes socket errors during setup from errors on a connected Relay', async () => {
+    await runScenarios([
+      { name: 'socket error before authorization', connected: false, code: 'TRANSPORT_SETUP_FAILED' },
+      { name: 'socket error after authorization', connected: true, code: 'TRANSPORT_CLOSED' },
+    ].map(row => ({ name: row.name, run: async () => {
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      const transport = createAdaptiveTransport({ forceRelay: true })
+      const closed = vi.fn()
+      transport.onClose(closed)
+      const connecting = transport.connect()
+      const socket = FakeWebSocket.latest!
+      socket.open()
+      if (row.connected) {
+        socket.receive(helloAck({ capabilities: ['transport.relay'] }))
+        socket.receive(createControlFrame('connect.accepted', { connectionId: 'connection-1' }))
+        await connecting
+        socket.onerror?.()
+      } else {
+        const failed = expect(connecting).rejects.toMatchObject({ code: row.code })
+        socket.onerror?.()
+        await failed
+      }
+      expect(closed).toHaveBeenCalledOnce()
+      expect(closed).toHaveBeenCalledWith(expect.objectContaining({ code: row.code }))
+      await transport.close()
+    } })), cleanupScenario1)
+  })
+
   it('retries the self-hosted heartbeat close without retrying authorization or unknown application closes', async () => {
     await runScenarios([
       { code: 4001, reason: 'CONNECTION_FAILED', retryable: true },

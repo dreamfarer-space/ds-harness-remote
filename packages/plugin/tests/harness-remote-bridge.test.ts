@@ -921,6 +921,54 @@ describe('HarnessRemoteBridge', () => {
     )
   })
 
+  it('confines alpha.3 workspace tree requests to the session root', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-remote-tree-'))
+    try {
+      const root = join(directory, 'workspace')
+      const outside = join(directory, 'outside')
+      await Promise.all([mkdir(join(root, 'inside'), { recursive: true }), mkdir(outside)])
+      const linkType = process.platform === 'win32' ? 'junction' : 'dir'
+      await Promise.all([
+        symlink(outside, join(root, 'external-link'), linkType),
+        symlink(join(root, 'inside'), join(root, 'internal-link'), linkType),
+      ])
+      await runScenarios(['workspaceFiles/list', 'workspaceFiles/changes'].map(endpoint => ({
+        name: endpoint,
+        run: async () => {
+          const dispatch = vi.fn(async () => ({ ok: true as const, value: {} }))
+          const open = vi.fn(async () => (async function* () { yield { kind: 'ready' } })())
+          const bridge = new HarnessRemoteBridge(gateway({ dispatch, open }), vi.fn(async () => undefined), undefined, '0.2.3-alpha.3',
+            undefined, undefined, async () => root)
+          const request = (path?: string) => {
+            const payload = { args: { workspaceFileScopeId: 'session-1', ...(path === undefined ? {} : { path }) } }
+            return endpoint === 'workspaceFiles/list'
+              ? bridge.call({ endpoint, payload })
+              : bridge.openStream({ endpoint, payload, streamId: path ?? 'root' })
+          }
+          const native = endpoint === 'workspaceFiles/list' ? dispatch : open
+          try {
+            await expect(request('external-link')).rejects.toMatchObject({
+              code: 'WORKSPACE_PATH_DENIED', details: { reason: 'outside-root' },
+            })
+            expect(native).not.toHaveBeenCalled()
+            await request('internal-link')
+            expect(native).toHaveBeenLastCalledWith(endpoint,
+              { args: { workspaceFileScopeId: 'session-1', path: 'inside' } }, expect.any(AbortSignal))
+            if (endpoint === 'workspaceFiles/changes') {
+              await request()
+              expect(open).toHaveBeenLastCalledWith(endpoint,
+                { args: { workspaceFileScopeId: 'session-1', path: '.' } }, expect.any(AbortSignal))
+            }
+          } finally {
+            await bridge.closeAll()
+          }
+        },
+      })))
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('nests readBytes ranges for modern Host versions', async () => {
     const rows = ['0.1.7-rc.1', '0.2.0-rc.1'] as const
     await runScenarios(

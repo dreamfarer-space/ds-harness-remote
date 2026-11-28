@@ -171,8 +171,11 @@ export class SessionTransferPeer {
         for (const sessionId of ids) {
           if (this.closed) fail('SESSION_TRANSFER_CLOSED', 'The connection closed.')
           const snapshot = await this.snapshot(sessionId)
-          if (snapshot.session.origin === 'subagent') {
-            if (selection.kind === 'session') fail('FEATURE_NOT_SUPPORTED', 'Subagent export is unavailable.')
+          if (snapshot.session.origin !== undefined) {
+            if (selection.kind === 'session') {
+              fail('FEATURE_NOT_SUPPORTED', snapshot.session.origin === 'subagent'
+                ? 'Subagent export is unavailable.' : 'Side conversation export is unavailable.')
+            }
             continue
           }
           let throughSeq = snapshot.events.length - 1

@@ -83,7 +83,7 @@ dsh plugin --profile web add -w ds-harness-remote@0.6.8
 
 ## Compatibility
 
-The development baseline is DeepSeek Harness `dsh-v0.2.3-alpha.2`, retaining the official Typert Remote / Session V3 carrier from `0.2.1-rc.5` and `0.2.0` RC. Earlier Typert carrier support remains capability-based.
+The development baseline is DeepSeek Harness `dsh-v0.2.3-alpha.3`, retaining the official Typert Remote / Session V3 carrier from `0.2.1-rc.5` and `0.2.0` RC. Earlier Typert carrier support remains capability-based.
 
 `0.5.19` removes Harness `0.1.1-rc.2` ApiProxy support from the Host and bundled Remote client. ApiProxy-only Hosts and missing capability discovery are rejected. CodeX/ACP Desktop projection also uses Typert only.
 

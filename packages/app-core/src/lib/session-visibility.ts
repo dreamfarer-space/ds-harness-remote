@@ -7,7 +7,7 @@ export function isVisibleSession(
   currentSessionId: string | undefined,
   searchQuery = '',
 ): boolean {
-  if (session.origin === 'subagent') return false
+  if (session.origin !== undefined) return false
   if (session.blank && (session.sessionId !== currentSessionId || searchQuery.trim().length > 0)) return false
   return true
 }

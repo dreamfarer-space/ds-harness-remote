@@ -78964,8 +78964,10 @@ var AdaptiveTransport = class extends BaseTransport {
         });
       };
       socket.onerror = () => {
-        if (this.lifetime === lifetime2 && this.socket === socket)
-          this.controlLost(Object.assign(new Error("Control socket failed"), { code: "TRANSPORT_SETUP_FAILED" }), { reason: "control-error" });
+        if (this.lifetime !== lifetime2 || this.socket !== socket)
+          return;
+        const code = this.connectedAt === void 0 ? "TRANSPORT_SETUP_FAILED" : "TRANSPORT_CLOSED";
+        this.controlLost(Object.assign(new Error("Control socket failed"), { code }), { reason: "control-error" });
       };
       socket.onclose = (event2) => {
         if (this.lifetime === lifetime2 && this.socket === socket)
@@ -90110,7 +90112,7 @@ var RemoteSessionTools = class {
     const response = record7(await gateway.invoke({ namespace: "session", method: "list", args: { _request: {} }, signal }));
     const rows = external_exports.array(rowSchema).parse(response.items);
     const allowed = new Set(found.sessionIds);
-    const owned = rows.filter((row) => allowed.has(row.sessionId) && row.parentSessionId === void 0 && row.origin !== "subagent");
+    const owned = rows.filter((row) => allowed.has(row.sessionId) && row.parentSessionId === void 0 && row.origin === void 0);
     return owned.length > MAX_REMOTE_SESSIONS ? owned.slice(0, MAX_REMOTE_SESSIONS) : owned;
   }
   async requireSession(gateway, args, signal) {
@@ -108977,8 +108979,10 @@ var SessionTransferPeer = class {
         for (const sessionId of ids) {
           if (this.closed) fail6("SESSION_TRANSFER_CLOSED", "The connection closed.");
           const snapshot2 = await this.snapshot(sessionId);
-          if (snapshot2.session.origin === "subagent") {
-            if (selection.kind === "session") fail6("FEATURE_NOT_SUPPORTED", "Subagent export is unavailable.");
+          if (snapshot2.session.origin !== void 0) {
+            if (selection.kind === "session") {
+              fail6("FEATURE_NOT_SUPPORTED", snapshot2.session.origin === "subagent" ? "Subagent export is unavailable." : "Side conversation export is unavailable.");
+            }
             continue;
           }
           let throughSeq = snapshot2.events.length - 1;
@@ -114363,6 +114367,47 @@ var MessageFileAttachments = class {
   }
 };
 
+// packages/plugin/src/version-compare.ts
+var VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
+function parseVersion(value) {
+  const match = VERSION_PATTERN.exec(value.trim().replace(/^v/, ""));
+  if (match === null) return void 0;
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] === void 0 ? [] : match[4].split(".")
+  };
+}
+function comparePrerelease(left, right) {
+  if (left.length === 0 && right.length === 0) return 0;
+  if (left.length === 0) return 1;
+  if (right.length === 0) return -1;
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const part = left[index];
+    const other = right[index];
+    if (part === void 0) return -1;
+    if (other === void 0) return 1;
+    if (part === other) continue;
+    const partNumeric = /^\d+$/.test(part);
+    const otherNumeric = /^\d+$/.test(other);
+    if (partNumeric && otherNumeric) return Math.sign(Number(part) - Number(other));
+    if (partNumeric) return -1;
+    if (otherNumeric) return 1;
+    return part < other ? -1 : 1;
+  }
+  return 0;
+}
+function compareVersions(left, right) {
+  const parsedLeft = parseVersion(left);
+  const parsedRight = parseVersion(right);
+  if (parsedLeft === void 0 || parsedRight === void 0) return 0;
+  for (let index = 0; index < 3; index += 1) {
+    if (parsedLeft.core[index] !== parsedRight.core[index]) {
+      return Math.sign(parsedLeft.core[index] - parsedRight.core[index]);
+    }
+  }
+  return comparePrerelease(parsedLeft.prerelease, parsedRight.prerelease);
+}
+
 // packages/plugin/src/harness-remote-bridge.ts
 var endpointSchema = external_exports.string().min(1).max(128).regex(/^(?:\$events(?:\/result)?|[A-Za-z0-9_$.-]+\/[A-Za-z0-9_$.-]+)$/);
 var callSchema3 = external_exports.object({ endpoint: endpointSchema, payload: external_exports.unknown() }).strict();
@@ -114675,7 +114720,7 @@ var HarnessRemoteBridge = class {
         nativePayload = search;
       } else if ((WORKSPACE_FILE_READ_ENDPOINTS.has(params.endpoint) || OFFICE_RENDER_ENDPOINTS.has(params.endpoint)) && isMessageFilePath(requestArgs(nativePayload).path)) {
         nativePayload = await this.resolveMessageFilePayload(nativePayload, params.endpoint, signal);
-      } else if (this.resolveWorkspaceRoot !== void 0 && (WORKSPACE_FILE_READ_ENDPOINTS.has(params.endpoint) || OFFICE_RENDER_ENDPOINTS.has(params.endpoint))) {
+      } else if (this.resolveWorkspaceRoot !== void 0 && (WORKSPACE_FILE_READ_ENDPOINTS.has(params.endpoint) || OFFICE_RENDER_ENDPOINTS.has(params.endpoint) || params.endpoint === "workspaceFiles/list" && this.requiresWorkspaceTreeContainment())) {
         nativePayload = await this.assertNativeWorkspaceFileCall(params.endpoint, nativePayload, signal);
       }
       const nativeResult = params.endpoint === "commands/execute" ? await dispatchCommandForHost(this.gateway, params.payload, signal, this.harnessVersion) : this.terminalCarrier !== void 0 && (params.endpoint === "terminal/write" || params.endpoint === "terminal/resize") ? await this.terminalCarrier.call(params.endpoint, nativePayload, signal) : await this.dispatchWithOfficeFallback(params.endpoint, nativePayload, signal);
@@ -114949,8 +114994,16 @@ var HarnessRemoteBridge = class {
     this.streams.set(params.streamId, { controller });
     let source;
     try {
-      const payload = params.endpoint === "workspaceFiles/changes" && isMessageFilePath(requestArgs(params.payload).path) ? await this.resolveMessageFilePayload(params.payload, params.endpoint, controller.signal) : normalizeWorkspaceChangesPayload(params.endpoint, params.payload, this.harnessVersion);
-      source = (this.codexWorkspace === void 0 ? void 0 : await this.codexWorkspace.open(params.endpoint, params.payload, controller.signal)) ?? await (params.endpoint === "terminal/follow" && this.terminalCarrier !== void 0 ? this.terminalCarrier.open(params.payload, controller.signal) : this.gateway.open(params.endpoint, payload, controller.signal));
+      let payload = normalizeWorkspaceChangesPayload(params.endpoint, params.payload, this.harnessVersion);
+      const messageFileWatch = params.endpoint === "workspaceFiles/changes" && isMessageFilePath(requestArgs(params.payload).path);
+      if (messageFileWatch) {
+        payload = await this.resolveMessageFilePayload(params.payload, params.endpoint, controller.signal);
+      }
+      const virtualSource = await this.codexWorkspace?.open(params.endpoint, params.payload, controller.signal);
+      if (virtualSource === void 0 && params.endpoint === "workspaceFiles/changes" && !messageFileWatch && this.resolveWorkspaceRoot !== void 0 && this.requiresWorkspaceTreeContainment()) {
+        payload = await this.assertNativeWorkspaceFileCall(params.endpoint, payload, controller.signal);
+      }
+      source = virtualSource ?? await (params.endpoint === "terminal/follow" && this.terminalCarrier !== void 0 ? this.terminalCarrier.open(params.payload, controller.signal) : this.gateway.open(params.endpoint, payload, controller.signal));
       controller.signal.throwIfAborted();
     } catch (error62) {
       this.streams.delete(params.streamId);
@@ -115230,6 +115283,9 @@ var HarnessRemoteBridge = class {
   async assertNativeWorkspaceFileCall(endpoint, payload, signal) {
     const rootPayload = isRecord27(payload) ? payload : {};
     const args = requestArgs(payload);
+    if ((endpoint === "workspaceFiles/list" || endpoint === "workspaceFiles/changes") && typeof args.path !== "string") {
+      throw new RpcError("INVALID_MESSAGE", "A workspace path is required.");
+    }
     const sessionId = typeof args.workspaceFileScopeId === "string" ? args.workspaceFileScopeId : typeof args.sessionId === "string" ? args.sessionId : typeof args.agentId === "string" ? args.agentId : void 0;
     if (sessionId === void 0) {
       throw workspaceFileFailure("WORKSPACE_UNAVAILABLE", "The workspace identifier is missing.", "scope-missing");
@@ -115346,6 +115402,13 @@ var HarnessRemoteBridge = class {
       if (rootLstat.isSymbolicLink() || !rootLstat.isDirectory()) {
         throw workspaceFileFailure("WORKSPACE_PATH_DENIED", "The workspace root is invalid or a symlink.", "root-invalid");
       }
+      if (endpoint === "workspaceFiles/list" || endpoint === "workspaceFiles/changes") {
+        const canonicalRel2 = relative6(root2, await realpath8(candidate));
+        if (isPathOutside2(canonicalRel2)) {
+          throw workspaceFileFailure("WORKSPACE_PATH_DENIED", "The requested workspace path is outside the workspace.", "outside-root");
+        }
+        return canonicalRel2 === "" ? "." : process.platform === "win32" ? canonicalRel2.replaceAll("\\", "/") : canonicalRel2;
+      }
       const rel = relative6(root2, candidate);
       const parts = rel.split(sep4).filter((p) => p.length > 0 && p !== ".");
       let currentPath = root2;
@@ -115398,6 +115461,9 @@ var HarnessRemoteBridge = class {
       const reason = error62?.code === "ENOENT" ? "not-found" : "io";
       throw workspaceFileFailure("WORKSPACE_PATH_DENIED", "The requested workspace path is unavailable.", reason);
     }
+  }
+  requiresWorkspaceTreeContainment() {
+    return compareVersions(this.harnessVersion?.trim().replace(/^dsh-/, "") ?? "", "0.2.3-alpha.3") >= 0;
   }
 };
 function journalSessionId(payload) {
@@ -115707,7 +115773,7 @@ function trimSessionCatalogRows(endpoint, items) {
   return kept.length <= SESSION_LIST_ROW_BUDGET ? kept : kept.slice().sort((left, right) => updatedAtOf(right) - updatedAtOf(left)).slice(0, SESSION_LIST_ROW_BUDGET);
 }
 function isListableRemoteSession(session2) {
-  return isRecord27(session2) && session2.parentSessionId === void 0 && session2.origin !== "subagent";
+  return isRecord27(session2) && session2.parentSessionId === void 0 && session2.origin === void 0;
 }
 function updatedAtOf(session2) {
   return isRecord27(session2) && typeof session2.updatedAt === "number" ? session2.updatedAt : 0;
@@ -117433,49 +117499,6 @@ var PluginUpdateChecker = class {
 
 // packages/plugin/src/plugin-self-update.ts
 import { randomUUID as randomUUID21 } from "node:crypto";
-
-// packages/plugin/src/version-compare.ts
-var VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
-function parseVersion(value) {
-  const match = VERSION_PATTERN.exec(value.trim().replace(/^v/, ""));
-  if (match === null) return void 0;
-  return {
-    core: [Number(match[1]), Number(match[2]), Number(match[3])],
-    prerelease: match[4] === void 0 ? [] : match[4].split(".")
-  };
-}
-function comparePrerelease(left, right) {
-  if (left.length === 0 && right.length === 0) return 0;
-  if (left.length === 0) return 1;
-  if (right.length === 0) return -1;
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const part = left[index];
-    const other = right[index];
-    if (part === void 0) return -1;
-    if (other === void 0) return 1;
-    if (part === other) continue;
-    const partNumeric = /^\d+$/.test(part);
-    const otherNumeric = /^\d+$/.test(other);
-    if (partNumeric && otherNumeric) return Math.sign(Number(part) - Number(other));
-    if (partNumeric) return -1;
-    if (otherNumeric) return 1;
-    return part < other ? -1 : 1;
-  }
-  return 0;
-}
-function compareVersions(left, right) {
-  const parsedLeft = parseVersion(left);
-  const parsedRight = parseVersion(right);
-  if (parsedLeft === void 0 || parsedRight === void 0) return 0;
-  for (let index = 0; index < 3; index += 1) {
-    if (parsedLeft.core[index] !== parsedRight.core[index]) {
-      return Math.sign(parsedLeft.core[index] - parsedRight.core[index]);
-    }
-  }
-  return comparePrerelease(parsedLeft.prerelease, parsedRight.prerelease);
-}
-
-// packages/plugin/src/plugin-self-update.ts
 var REMOTE_PLUGIN_PACKAGE = "ds-harness-remote";
 var LocalPluginUpgrade = class {
   constructor(checker, manager, subscribe, requestId2 = randomUUID21) {

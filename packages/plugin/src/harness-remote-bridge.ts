@@ -35,6 +35,7 @@ import { workspaceFileFailure, workspaceFileFailureReason } from './safe-error.j
 import type { LocalTypertGateway, TypertRpcResult } from './typert-gateway-contract.js'
 import { isMessageFilePath, MessageFileAttachments, type MessageFileAttachment } from './message-file-attachment.js'
 import { CodexWorkspaceBridge } from './codex-workspace-bridge.js'
+import { compareVersions } from './version-compare.js'
 
 type PublishRemoteFrame = (
   event: 'harness.remote.frame' | 'harness.remote.stream.closed',
@@ -422,7 +423,8 @@ export class HarnessRemoteBridge {
         && isMessageFilePath(requestArgs(nativePayload).path)) {
         nativePayload = await this.resolveMessageFilePayload(nativePayload, params.endpoint, signal)
       } else if (this.resolveWorkspaceRoot !== undefined
-        && (WORKSPACE_FILE_READ_ENDPOINTS.has(params.endpoint) || OFFICE_RENDER_ENDPOINTS.has(params.endpoint))) {
+        && (WORKSPACE_FILE_READ_ENDPOINTS.has(params.endpoint) || OFFICE_RENDER_ENDPOINTS.has(params.endpoint)
+          || (params.endpoint === 'workspaceFiles/list' && this.requiresWorkspaceTreeContainment()))) {
         nativePayload = await this.assertNativeWorkspaceFileCall(params.endpoint, nativePayload, signal)
       }
       const nativeResult = params.endpoint === 'commands/execute'
@@ -725,11 +727,17 @@ export class HarnessRemoteBridge {
     this.streams.set(params.streamId, { controller })
     let source: AsyncIterable<unknown>
     try {
-      const payload = params.endpoint === 'workspaceFiles/changes' && isMessageFilePath(requestArgs(params.payload).path)
-        ? await this.resolveMessageFilePayload(params.payload, params.endpoint, controller.signal)
-        : normalizeWorkspaceChangesPayload(params.endpoint, params.payload, this.harnessVersion)
-      source = (this.codexWorkspace === undefined ? undefined : await this.codexWorkspace.open(params.endpoint, params.payload, controller.signal))
-        ?? await (params.endpoint === 'terminal/follow' && this.terminalCarrier !== undefined
+      let payload = normalizeWorkspaceChangesPayload(params.endpoint, params.payload, this.harnessVersion)
+      const messageFileWatch = params.endpoint === 'workspaceFiles/changes' && isMessageFilePath(requestArgs(params.payload).path)
+      if (messageFileWatch) {
+        payload = await this.resolveMessageFilePayload(params.payload, params.endpoint, controller.signal)
+      }
+      const virtualSource = await this.codexWorkspace?.open(params.endpoint, params.payload, controller.signal)
+      if (virtualSource === undefined && params.endpoint === 'workspaceFiles/changes' && !messageFileWatch
+        && this.resolveWorkspaceRoot !== undefined && this.requiresWorkspaceTreeContainment()) {
+        payload = await this.assertNativeWorkspaceFileCall(params.endpoint, payload, controller.signal)
+      }
+      source = virtualSource ?? await (params.endpoint === 'terminal/follow' && this.terminalCarrier !== undefined
           ? this.terminalCarrier.open(params.payload, controller.signal)
           : this.gateway.open(params.endpoint, payload, controller.signal))
       controller.signal.throwIfAborted()
@@ -1041,6 +1049,9 @@ export class HarnessRemoteBridge {
   ): Promise<unknown> {
     const rootPayload = isRecord(payload) ? payload : {}
     const args = requestArgs(payload)
+    if ((endpoint === 'workspaceFiles/list' || endpoint === 'workspaceFiles/changes') && typeof args.path !== 'string') {
+      throw new RpcError('INVALID_MESSAGE', 'A workspace path is required.')
+    }
     const sessionId = typeof args.workspaceFileScopeId === 'string'
       ? args.workspaceFileScopeId
       : typeof args.sessionId === 'string'
@@ -1188,6 +1199,16 @@ export class HarnessRemoteBridge {
         throw workspaceFileFailure('WORKSPACE_PATH_DENIED', 'The workspace root is invalid or a symlink.', 'root-invalid')
       }
 
+      // Alpha.3's native tree follows workspace links outside the root. For
+      // Remote listings and watches, dispatch only the verified in-root path.
+      if (endpoint === 'workspaceFiles/list' || endpoint === 'workspaceFiles/changes') {
+        const canonicalRel = relative(root, await realpath(candidate))
+        if (isPathOutside(canonicalRel)) {
+          throw workspaceFileFailure('WORKSPACE_PATH_DENIED', 'The requested workspace path is outside the workspace.', 'outside-root')
+        }
+        return canonicalRel === '' ? '.' : process.platform === 'win32' ? canonicalRel.replaceAll('\\', '/') : canonicalRel
+      }
+
       const rel = relative(root, candidate)
       const parts = rel.split(sep).filter(p => p.length > 0 && p !== '.')
       let currentPath = root
@@ -1249,6 +1270,10 @@ export class HarnessRemoteBridge {
       const reason = (error as NodeJS.ErrnoException)?.code === 'ENOENT' ? 'not-found' as const : 'io' as const
       throw workspaceFileFailure('WORKSPACE_PATH_DENIED', 'The requested workspace path is unavailable.', reason)
     }
+  }
+
+  private requiresWorkspaceTreeContainment(): boolean {
+    return compareVersions(this.harnessVersion?.trim().replace(/^dsh-/, '') ?? '', '0.2.3-alpha.3') >= 0
   }
 
 }
@@ -1669,7 +1694,7 @@ function trimSessionCatalogRows(endpoint: string | undefined, items: unknown[]):
 }
 
 function isListableRemoteSession(session: unknown): boolean {
-  return isRecord(session) && session.parentSessionId === undefined && session.origin !== 'subagent'
+  return isRecord(session) && session.parentSessionId === undefined && session.origin === undefined
 }
 
 function updatedAtOf(session: unknown): number {

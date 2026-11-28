@@ -1,4 +1,5 @@
 import type { AttentionDigest, TransportStats } from '@dsh-remote/protocol'
+import type { HarnessRemoteSession } from '@dsh-remote/client-core'
 import type { AdaptiveConnectionDetails } from '@dsh-remote/webrtc'
 import { strings as zhCN } from './locales/i18n'
 
@@ -215,7 +216,7 @@ export interface RemoteSession {
   blank: boolean
   title?: string
   parentSessionId?: string
-  origin?: 'subagent'
+  origin?: HarnessRemoteSession['origin']
   cwd?: string
   agentPreset?: string
   availableCommands?: Array<{ name: string; description?: string; input?: { hint?: string } }>

@@ -5,13 +5,13 @@
 | Component | Scope |
 | --- | --- |
 | Remote | Source version 0.6.8; Android versionCode / Expo iOS buildNumber 76. This does not establish publication status |
-| Harness development baseline | 0.2.3-alpha.2, Node.js `^24.22.3 || >=26.13.1` |
+| Harness development baseline | 0.2.3-alpha.3, Node.js `^24.22.3 || >=26.13.1` |
 | Older Harness | Official Typert / Session V3 paths for 0.2.2 RCs, 0.2.1-rc.5 and 0.2.0-rc.2 / rc.1 |
 | Peer range | 0.2.1 / 0.2.2 / 0.2.3 prereleases and stable versions; range acceptance is not runtime validation of every version |
 | TUI | Matching standalone `ds-harness-remote-tui`; core Android Relay flow validated with dsh-TUI 0.20.1 + Harness 0.2.2-rc.1 |
 | DS-Bot | Fixed named routes aligned with 0.3.8; route coverage is not full mobile E2E coverage |
 
-On 0.2.3-alpha.2, the official Gateway, Connection and Session Controller descriptor have been exercised for session list discovery and dispatch. The cross-device Relay validation above used 0.2.2-rc.1.
+Harness 0.2.3-alpha.3 uses React 19 for Web and Desktop. Remote uses the React and slot registry supplied by Harness. The cross-device Relay validation above used 0.2.2-rc.1.
 
 If the upload status probe returns HTTP 404 or 405 before a remote mode is reported, the upload hook passes the original request to the local uploader. After remote mode is reported, control failures stop the upload until local mode is explicitly confirmed. Remote upload mutations are never replayed locally.
 

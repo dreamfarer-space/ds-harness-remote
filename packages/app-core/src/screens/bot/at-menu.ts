@@ -152,7 +152,7 @@ export function buildReferenceChatGroups({
       && row.sessionId !== currentSessionId
       && !teamIds.has(row.sessionId)
       && !archivedSet.has(row.sessionId)
-      && row.origin !== 'subagent'
+      && row.origin === undefined
       && !isSubagentSession(row),
   )
   const nonBlank = eligibleSessions.filter(row => row.blank !== true)

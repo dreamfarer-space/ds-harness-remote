@@ -102,7 +102,7 @@ export interface HarnessRemoteSession {
   blank: boolean
   title?: string
   parentSessionId?: string
-  origin?: 'subagent'
+  origin?: 'subagent' | 'side'
   cwd?: string
   agentPreset?: string
   projections?: {
