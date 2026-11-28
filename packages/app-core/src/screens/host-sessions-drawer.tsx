@@ -90,8 +90,8 @@ import {
 import { clampDrawerTranslate, shouldConfirmSwipeLeftClose, shouldStartSwipeLeftToClose } from '../lib/gesture-swipe-rules'
 import { createStoreGate, shouldAllowDrawerClose, useStoreGateSelector, type StoreGate } from '../lib/gated-store'
 import { buildTreeSections, applyManualOrder, reorderSessionIds } from '../lib/workspace-tree'
-import { BOT_MODALS_LINGER_MS, isDrawerHostHidden, shouldRenderBotModalsHost } from './bot/popover-menu'
-import { BotModalsHost, BotSidebarSection, useBotTeamLoad } from './bot-sidebar-section'
+import { isDrawerHostHidden } from './bot/popover-menu'
+import { BotModalsGate, BotSidebarSection, useBotTeamLoad } from './bot-sidebar-section'
 import { HomeActionsMenu, openMembershipPlan } from './setup-screens'
 import { createModalActionQueue } from './chat/modal-action-queue'
 import { SessionContextMenuModal } from './session-context-menu-modal'
@@ -216,39 +216,6 @@ const BotTeamLoadBridge = memo(function BotTeamLoadBridge({ enabled }: { enabled
 })
 
 export { isDrawerHostHidden }
-
-const BotModalsGate = memo(function BotModalsGate({ visible }: { visible: boolean; gate: StoreGate }) {
-  const hasStoreModal = useBotTeamStore(
-    store =>
-      store.editor !== undefined
-      || store.detailsOpen
-      || store.report !== undefined
-      || store.contextMenu !== undefined,
-  )
-  const [deleteConfirmActive, setDeleteConfirmActive] = useState(false)
-  const active = hasStoreModal || deleteConfirmActive
-  const [lingerMounted, setLingerMounted] = useState(false)
-
-  useEffect(() => {
-    if (active) {
-      if (!visible) {
-        if (lingerMounted) setLingerMounted(false)
-        if (deleteConfirmActive) setDeleteConfirmActive(false)
-        return
-      }
-      if (!lingerMounted) setLingerMounted(true)
-      return
-    }
-    if (!lingerMounted) return
-    const timer = setTimeout(() => setLingerMounted(false), BOT_MODALS_LINGER_MS)
-    return () => clearTimeout(timer)
-  }, [visible, active, lingerMounted, deleteConfirmActive])
-
-  if (!shouldRenderBotModalsHost({ visible, hasStoreModal, deleteConfirmActive, lingerMounted })) {
-    return null
-  }
-  return <BotModalsHost onDeleteConfirmChange={setDeleteConfirmActive} />
-})
 
 interface SessionListRowProps {
   item: RemoteSession
@@ -2949,7 +2916,7 @@ export const HostSessionsDrawer = memo(function HostSessionsDrawer({
       <View style={[styles.drawer, styles.inlineDrawer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         {body}
         <BotTeamLoadBridge enabled={visible && botTabActive} />
-        <BotModalsGate visible={visible} gate={gate} />
+        <BotModalsGate visible={visible} />
       </View>
     )
   }
@@ -3009,7 +2976,7 @@ export const HostSessionsDrawer = memo(function HostSessionsDrawer({
         </Animated.View>
       </View>
       <BotTeamLoadBridge enabled={visible && botTabActive} />
-      <BotModalsGate visible={visible} gate={gate} />
+      <BotModalsGate visible={visible} />
     </View>
   )
 })

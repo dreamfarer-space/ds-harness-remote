@@ -606,6 +606,7 @@ vi.mock('../src/screens/bot/shared-panels', () => ({
 }))
 
 vi.mock('../src/screens/bot-sidebar-section', () => ({
+  BotModalsGate: 'BotModalsGate',
   BotModalsHost: 'BotModalsHost',
   BotSidebarSection: 'BotSidebarSection',
   DsBotInstallCard: 'DsBotInstallCard',
@@ -617,6 +618,7 @@ import {
   BotFloatingPopover,
   isDrawerHostHidden,
   shouldRenderBotModalsHost,
+  useBotModalsGate,
 } from '../src/screens/bot/popover-menu'
 import { BotProfilePage } from '../src/screens/bot/profile-page'
 import { runBotConversationEnterMotion } from '../src/screens/bot-mode-screen'
@@ -1150,5 +1152,92 @@ describe('iOS DS-Bot session switching modal, scrim, and opacity regression suit
         lingerMounted: true,
       }),
     ).toBe(false)
+  })
+
+  it('useBotModalsGate manages delete-confirm state, linger timer, and visibility handover cleanly', async () => {
+    type GateParams = Parameters<typeof useBotModalsGate>[0]
+    type GateResult = ReturnType<typeof useBotModalsGate>
+    function mountGate(initial: GateParams) {
+      let current = initial
+      const inst = reactHarness.mount(() => useBotModalsGate(current))
+      return {
+        get state() {
+          return inst.tree as GateResult
+        },
+        update(patch: Partial<GateParams>) {
+          current = { ...current, ...patch }
+          reactHarness.act(() => {
+            reactHarness.triggerRender(inst)
+          })
+        },
+      }
+    }
+
+    await runScenarios([
+      {
+        name: 'keeps host mounted during linger after modal closes and host hides, then unmounts at BOT_MODALS_LINGER_MS',
+        run: () => {
+          vi.useFakeTimers()
+          const gate = mountGate({ visible: true, hasStoreModal: false })
+          expect(gate.state.shouldRender).toBe(false)
+
+          gate.update({ hasStoreModal: true })
+          expect(gate.state.shouldRender).toBe(true)
+
+          // Modal closes right as host hides -> stays mounted for native dismiss linger.
+          gate.update({ visible: false, hasStoreModal: false })
+          expect(gate.state.shouldRender).toBe(true)
+
+          advanceTimers(BOT_MODALS_LINGER_MS - 1)
+          expect(gate.state.shouldRender).toBe(true)
+
+          advanceTimers(1)
+          expect(gate.state.shouldRender).toBe(false)
+          expect(vi.getTimerCount()).toBe(0)
+        },
+      },
+      {
+        name: 'hiding host while deleteConfirm is active yields immediately and resets stale deleteConfirm state',
+        run: () => {
+          vi.useFakeTimers()
+          const gate = mountGate({ visible: true, hasStoreModal: true })
+          reactHarness.act(() => {
+            gate.state.onDeleteConfirmChange(true)
+          })
+          // Store modal closed, deleteConfirm keeps host mounted.
+          gate.update({ hasStoreModal: false })
+          expect(gate.state.shouldRender).toBe(true)
+
+          // Host hides while deleteConfirm is still active -> yields immediately and clears deleteConfirm.
+          gate.update({ visible: false })
+          expect(gate.state.shouldRender).toBe(false)
+
+          // Re-showing the host must NOT resurrect the stale deleteConfirm.
+          gate.update({ visible: true })
+          expect(gate.state.shouldRender).toBe(false)
+          expect(vi.getTimerCount()).toBe(0)
+        },
+      },
+      {
+        name: 're-opening a modal before linger expires cancels the pending unmount timer',
+        run: () => {
+          vi.useFakeTimers()
+          const gate = mountGate({ visible: true, hasStoreModal: true })
+          gate.update({ hasStoreModal: false })
+          expect(gate.state.shouldRender).toBe(true)
+
+          advanceTimers(BOT_MODALS_LINGER_MS - 50)
+          expect(gate.state.shouldRender).toBe(true)
+
+          gate.update({ hasStoreModal: true })
+          advanceTimers(100)
+          expect(gate.state.shouldRender).toBe(true)
+          expect(vi.getTimerCount()).toBe(0)
+        },
+      },
+    ], () => {
+      reactHarness.unmountAll()
+      vi.useRealTimers()
+    })
   })
 })

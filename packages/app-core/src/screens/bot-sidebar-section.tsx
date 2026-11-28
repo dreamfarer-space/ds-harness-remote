@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Modal,
@@ -61,7 +61,7 @@ import { resolveSessionDisplayTitle } from './session-title'
 import { BotAgentBadge, engineOfModel } from './bot/agent-badge'
 import { BotAvatar, BotAvatarWithBadge } from './bot/avatar'
 import { BotEditor, type BotPerform } from './bot/editor'
-import { BotFloatingPopover, type BotPopoverAction } from './bot/popover-menu'
+import { BotFloatingPopover, useBotModalsGate, type BotPopoverAction } from './bot/popover-menu'
 import { BotProfilePage } from './bot/profile-page'
 
 /** Load once on entry or reconnection; roster refreshes are otherwise explicit. */
@@ -861,6 +861,26 @@ export function BotModalsHost({
     </>
   )
 }
+
+/** Conditionally mounts `BotModalsHost` based on host visibility, store modals, and post-close linger. */
+export const BotModalsGate = memo(function BotModalsGate({ visible }: { visible: boolean }) {
+  const hasStoreModal = useBotTeamStore(
+    store =>
+      store.editor !== undefined
+      || store.detailsOpen
+      || store.report !== undefined
+      || store.contextMenu !== undefined,
+  )
+  const { shouldRender, onDeleteConfirmChange } = useBotModalsGate({
+    visible,
+    hasStoreModal,
+  })
+
+  if (!shouldRender) {
+    return null
+  }
+  return <BotModalsHost onDeleteConfirmChange={onDeleteConfirmChange} />
+})
 
 function BotReportView({ value, kind, state }: { value: unknown; kind: 'usage' | 'schedules'; state?: BotState }) {
   const styles = useThemedStyles(createStyles)

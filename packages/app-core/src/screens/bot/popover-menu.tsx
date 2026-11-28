@@ -27,6 +27,52 @@ export function shouldRenderBotModalsHost(params: {
   return !active && params.lingerMounted
 }
 
+/**
+ * Manages post-close linger mounting and visibility gating for `BotModalsHost`.
+ * Keeps the host mounted for `BOT_MODALS_LINGER_MS` after modals close so iOS
+ * native dismiss transitions complete cleanly, while immediately yielding if
+ * the container hides with an active modal.
+ */
+export function useBotModalsGate({
+  visible,
+  hasStoreModal,
+}: {
+  visible: boolean
+  hasStoreModal: boolean
+}): {
+  shouldRender: boolean
+  onDeleteConfirmChange: (active: boolean) => void
+} {
+  const [deleteConfirmActive, setDeleteConfirmActive] = useState(false)
+  const active = hasStoreModal || deleteConfirmActive
+  const [lingerMounted, setLingerMounted] = useState(false)
+
+  useEffect(() => {
+    if (active) {
+      if (!visible) {
+        if (lingerMounted) setLingerMounted(false)
+        if (deleteConfirmActive) setDeleteConfirmActive(false)
+        return
+      }
+      if (!lingerMounted) setLingerMounted(true)
+      return
+    }
+    if (!lingerMounted) return
+    const timer = setTimeout(() => setLingerMounted(false), BOT_MODALS_LINGER_MS)
+    return () => clearTimeout(timer)
+  }, [visible, active, lingerMounted, deleteConfirmActive])
+
+  return {
+    shouldRender: shouldRenderBotModalsHost({
+      visible,
+      hasStoreModal,
+      deleteConfirmActive,
+      lingerMounted,
+    }),
+    onDeleteConfirmChange: setDeleteConfirmActive,
+  }
+}
+
 export function isDrawerHostHidden(inline: boolean, open: boolean, closing: boolean): boolean {
   return !inline && !open && !closing
 }
